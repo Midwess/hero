@@ -20,7 +20,7 @@ impl<'a> Service<&'a SignupMethod, Token> for SignupService {
 
         let existing_user: Option<User> = match email {
             Some(email) => {
-                let user_id = UserId {email: email.clone().to_owned()};
+                let user_id = UserId {email: email.to_owned()};
                 self.db.query(surreal_quote!("SELECT * FROM #val(&user_id)")).await?.take(0)?
             }
             None => None
@@ -32,18 +32,15 @@ impl<'a> Service<&'a SignupMethod, Token> for SignupService {
 
         let new_user = match params.method.as_ref().unwrap() {
             signup_method::Method::ByEmail(value) => {
-                let user_id = UserId { email: value.email.clone() };
-                User { id: Some(user_id), name: "".to_owned(), email: value.email.clone(), password: "".to_owned() }
+                User { name: "".to_owned(), email: value.email.clone(), password: "".to_owned() }
             },
             signup_method::Method::ByEmailPassword(value) => {
-                let user_id = UserId { email: value.email.clone() };
-                User { id: Some(user_id), name: "".to_owned(), email: value.email.clone(), password: value.password.clone() }
+                User { name: "".to_owned(), email: value.email.clone(), password: value.password.clone() }
             },
             signup_method::Method::ByDisplayName(value) => {
                 // This is all about the business :((
                 let email = format!("{}@no-email.com", value.display_name.as_str());
-                let user_id = UserId { email: email.clone() };
-                User { id: Some(user_id), name: value.display_name.clone(), email, password: "".to_owned() }
+                User { name: value.display_name.clone(), email, password: "".to_owned() }
             },
         };
 
