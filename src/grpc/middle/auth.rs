@@ -1,0 +1,34 @@
+use schema::devlog::entities::User;
+use crate::services::{base::Service, errors::Errors, token::{ReadFrom, TokenService}};
+
+use tonic::{async_trait, Status};
+use tonic::codegen::http::Request;
+use tonic::transport::Body;
+use tonic_middleware::RequestInterceptor;
+#[derive(Clone)]
+pub struct AuthInterceptor {}
+
+impl AuthInterceptor {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+#[async_trait]
+impl RequestInterceptor for AuthInterceptor where
+{
+    async fn intercept(&self, mut req: Request<Body>) -> Result<Request<Body>, Status> {
+        match req.headers().get("authentication") {
+            Some(token) => {
+                let token_service = TokenService {};
+                let token = token.to_str().map_err(|e| Errors::UnAuthorized("Invalid token".to_owned()))?.to_owned();
+                let user: User = token_service.execute(ReadFrom::AccessToken(token)).await?;
+                req.extensions_mut().insert(user);
+                Ok(req)
+            },
+            None => {
+                Err(Errors::UnAuthorized("Invalid token".to_owned()).into())
+            }
+        }
+    }
+}

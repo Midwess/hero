@@ -641,6 +641,7 @@ dependencies = [
  "chrono",
  "jsonwebtoken",
  "lazy_static",
+ "once_cell",
  "prost",
  "prost-types",
  "schema",
@@ -654,6 +655,7 @@ dependencies = [
  "thiserror",
  "tonic",
  "tonic-build",
+ "tonic-middleware",
 ]
 
 [[package]]
@@ -3488,6 +3490,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tonic-middleware"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92d34dab0f18194ddb9164685a3d8cf777ff35042752aba2be208b1384d7a304"
+dependencies = [
+ "async-trait",
+ "futures-util",
+ "tonic",
+ "tower",
+]
+
+[[package]]
 name = "tower"
 version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3525,6 +3539,7 @@ version = "0.1.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3523ab5a71916ccf420eebdf5521fcef02141234bbc0b8a49f2fdc4544364ef"
 dependencies = [
+ "log",
  "pin-project-lite",
  "tracing-attributes",
  "tracing-core",
