@@ -641,14 +641,16 @@ dependencies = [
  "chrono",
  "jsonwebtoken",
  "lazy_static",
+ "log",
  "once_cell",
+ "pretty_env_logger",
  "prost",
  "prost-types",
  "schema",
  "serde",
  "serde_derive",
  "serde_json",
- "surreal_derive_plus 1.0.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "surreal_derive_plus",
  "surreal_devl",
  "surrealdb",
  "surrealdb_id",
@@ -850,6 +852,19 @@ name = "endian-type"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c34f04666d835ff5d62e058c3995147c06f42fe86ff053337632bca83e42702d"
+
+[[package]]
+name = "env_logger"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4cd405aab171cb85d6735e5c8d9db038c17d3ca007a4d2c25f337935c3d90580"
+dependencies = [
+ "humantime",
+ "is-terminal",
+ "log",
+ "regex",
+ "termcolor",
+]
 
 [[package]]
 name = "equivalent"
@@ -1446,6 +1461,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f518f335dce6725a761382244631d86cf0ccb2863413590b31338feb467f9c3"
 
 [[package]]
+name = "is-terminal"
+version = "0.4.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f23ff5ef2b80d608d61efee834934d862cd92461afc0560dedf493e4c033738b"
+dependencies = [
+ "hermit-abi",
+ "libc",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "itertools"
 version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2038,6 +2064,16 @@ name = "precomputed-hash"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
+
+[[package]]
+name = "pretty_env_logger"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "865724d4dbe39d9f3dd3b52b88d859d66bcb2d6a0acfd5ea68a65fb66d4bdc1c"
+dependencies = [
+ "env_logger",
+ "log",
+]
 
 [[package]]
 name = "prettyplease"
@@ -2640,7 +2676,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "surreal_derive_plus 1.0.13",
+ "surreal_derive_plus",
  "surreal_devl",
  "surrealdb",
  "surrealdb_id",
@@ -2985,19 +3021,6 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 [[package]]
 name = "surreal_derive_plus"
 version = "1.0.13"
-dependencies = [
- "darling",
- "proc-macro2",
- "quote",
- "surreal_devl",
- "surrealdb",
- "surrealdb_id",
- "syn 2.0.68",
-]
-
-[[package]]
-name = "surreal_derive_plus"
-version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "680fbc017474dce5a431faaa057751080105d567c08e534e0c519c8cb9290443"
 dependencies = [
@@ -3258,6 +3281,15 @@ dependencies = [
  "dirs-next",
  "rustversion",
  "winapi",
+]
+
+[[package]]
+name = "termcolor"
+version = "1.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
+dependencies = [
+ "winapi-util",
 ]
 
 [[package]]

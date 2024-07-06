@@ -3,6 +3,7 @@ use surrealdb::{engine::remote::ws::Client, Surreal};
 pub mod services;
 pub mod config;
 pub mod grpc;
+pub mod logger;
 
 use once_cell::sync::Lazy;
 

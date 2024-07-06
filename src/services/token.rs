@@ -2,7 +2,7 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, TokenData, 
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, time::Duration};
 use super::{base::{self, Resolve, Service}, errors::Errors};
-use schema::devlog::entities::{Datetime, Token, User};
+use schema::{devlog::entities::{Token, User}, misc::datetime::Datetime};
 use crate::config::CONFIGS;
 
 #[derive(Debug, Clone)]
@@ -54,7 +54,7 @@ impl TokenService {
         Ok(Token {
             content: token,
             expired_at: Some(Datetime {
-                time: exp as u64,
+                utc_millis_since_epoch: exp as i64,
             })
         })
     }
