@@ -31,7 +31,7 @@ impl RequestInterceptor for AuthInterceptor where
                 Ok(req)
             },
             None => {
-                Err(Errors::UnAuthorized("Invalid token".to_owned()).into())
+                Err(Errors::UnAuthorized("Missing authentication information".to_owned()).into())
             }
         }
     }

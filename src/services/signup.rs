@@ -10,8 +10,14 @@ pub struct SignupService {
     pub token_service: TokenService
 }
 
-impl<'a> Service<&'a SignupMethod, Token> for SignupService {
-    async fn execute(self, params: &'a SignupMethod) -> Resolve<Token> {
+#[derive(Debug, Clone)]
+pub struct SignupResult {
+    pub token: Token,
+    pub user: User
+}
+
+impl<'a> Service<&'a SignupMethod, SignupResult> for SignupService {
+    async fn execute(self, params: &'a SignupMethod) -> Resolve<SignupResult> {
         let email: Option<&str> = match params.method.as_ref().unwrap() {
             signup_method::Method::ByEmail(value) => Some(value.email.as_str()),
             signup_method::Method::ByEmailPassword(value) => Some(value.email.as_str()),
@@ -35,7 +41,7 @@ impl<'a> Service<&'a SignupMethod, Token> for SignupService {
                 User { name: "".to_owned(), email: value.email.clone(), password: "".to_owned() }
             },
             signup_method::Method::ByEmailPassword(value) => {
-                User { name: "".to_owned(), email: value.email.clone(), password: value.password.clone() }
+                User { name: value.display_name.to_owned(), email: value.email.clone(), password: value.password.clone() }
             },
             signup_method::Method::ByDisplayName(value) => {
                 // This is all about the business :((
@@ -44,12 +50,17 @@ impl<'a> Service<&'a SignupMethod, Token> for SignupService {
             },
         };
 
-        let created_user: Option<User> = self.db.query(surreal_quote!("CREATE #record(&new_user)")).await?.take(0)?;
+        let mut created_user: Option<User> = self.db.query(surreal_quote!("CREATE #record(&new_user)")).await?.take(0)?;
 
         let token = self.token_service.execute(GenerateBy::User(
-            created_user.expect("Not able to create user"),
+            created_user.as_ref().expect("Not able to create user"),
             CONFIGS.token.access_token_duration)).await?;
 
-        Ok(token)
+        let result = SignupResult {
+            token,
+            user: created_user.take().unwrap(),
+        };
+
+        Ok(result)
     }
 }

@@ -9,8 +9,8 @@ use crate::config::CONFIGS;
 pub struct TokenService {}
 
 #[derive(Clone, Debug)]
-pub enum GenerateBy {
-    User(User, Duration)
+pub enum GenerateBy<'a> {
+    User(&'a User, Duration)
 }
 
 #[derive(Clone, Debug)]
@@ -60,8 +60,8 @@ impl TokenService {
     }
 }
 
-impl Service<GenerateBy, Token> for TokenService {
-    async fn execute(self, params: GenerateBy) -> base::Resolve<Token> {
+impl<'a> Service<GenerateBy<'a>, Token> for TokenService {
+    async fn execute(self, params: GenerateBy<'a>) -> base::Resolve<Token> {
         match params {
             GenerateBy::User(user, duration) => {
                 let claims = vec![

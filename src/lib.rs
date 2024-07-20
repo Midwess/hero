@@ -1,6 +1,7 @@
 use surrealdb::{engine::remote::ws::Client, Surreal};
 
 pub mod services;
+pub mod s3;
 pub mod config;
 pub mod grpc;
 pub mod logger;

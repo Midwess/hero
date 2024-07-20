@@ -9,6 +9,27 @@ pub struct TokenConfig {
     pub refresh_token_duration: Duration
 }
 
+#[derive(Debug)]
+pub struct AwsS3 {
+    pub bucket_name: String,
+    pub access_key: String,
+    pub secret_key: String,
+    pub region: String,
+    pub default_avatars_folder_path: String
+}
+
+impl Default for AwsS3 {
+    fn default() -> Self {
+        Self {
+            bucket_name: env::var("AWS_S3_BUCKET_NAME").expect("AWS_S3_BUCKET_NAME must be defined"),
+            access_key: env::var("AWS_ACCESS_KEY_ID").expect("AWS_ACCESS_KEY_ID must be defined"),
+            secret_key: env::var("AWS_SECRET_ACCESS_KEY").expect("AWS_SECRET_ACCESS_KEY must be defined"),
+            region: env::var("AWS_REGION").expect("AWS_REGION must be defined"),
+            default_avatars_folder_path: env::var("DEVLOG_DEFAULT_AVATARS_S3_FOLDER_PATH").unwrap_or(String::from("users/avatars/defaults/"))
+        }
+    }
+}
+
 impl Default for TokenConfig {
     fn default() -> Self {
         let refresh_token_duration = Duration::from_millis(env::var("DEVLOGS_REFRESH_TOKEN_LIFETIME_IN_MS")
@@ -21,8 +42,8 @@ impl Default for TokenConfig {
                 .unwrap_or("this_is_unsafe_keythis_is_unsafe_keythis_is_unsafe_key".to_owned()),
             access_token_duration: Duration::from_millis(env::var("DEVLOGS_ACCESS_TOKEN_LIFETIME_IN_MS")
                 .map(|env_var| env_var.parse().expect("The DEVLOGS_ACCESS_TOKEN_LIFETIME_IN_MS must be number"))
-                .unwrap_or(900000)), // 15 minutes
-            refresh_token_duration
+                .unwrap_or(1000 * 60 * 60 * 24 * 256)),
+            refresh_token_duration,
         }
     }
 }
@@ -30,6 +51,7 @@ impl Default for TokenConfig {
 #[derive(Debug, Default)]
 pub struct Config {
     pub token: TokenConfig,
+    pub aws_s3: AwsS3
 }
 
 lazy_static! {
