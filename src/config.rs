@@ -9,22 +9,24 @@ pub struct TokenConfig {
     pub refresh_token_duration: Duration
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AwsS3 {
     pub bucket_name: String,
     pub access_key: String,
     pub secret_key: String,
     pub region: String,
+    pub host_url: String,
     pub default_avatars_folder_path: String
 }
 
 impl Default for AwsS3 {
     fn default() -> Self {
         Self {
+            host_url: env::var("AWS_ENDPOINT_URL").expect("AWS_ENDPOINT_URL must be defined"),
             bucket_name: env::var("AWS_S3_BUCKET_NAME").expect("AWS_S3_BUCKET_NAME must be defined"),
             access_key: env::var("AWS_ACCESS_KEY_ID").expect("AWS_ACCESS_KEY_ID must be defined"),
             secret_key: env::var("AWS_SECRET_ACCESS_KEY").expect("AWS_SECRET_ACCESS_KEY must be defined"),
-            region: env::var("AWS_REGION").expect("AWS_REGION must be defined"),
+            region: env::var("AWS_S3_REGION").expect("AWS_S3_REGION must be defined"),
             default_avatars_folder_path: env::var("DEVLOG_DEFAULT_AVATARS_S3_FOLDER_PATH").unwrap_or(String::from("users/avatars/defaults/"))
         }
     }

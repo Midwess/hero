@@ -1,5 +1,6 @@
 use crate::{services::{base::{Resolve, Service}, errors::Errors, token::{GenerateBy, TokenService}}, Db};
-use schema::devlog::entities::{signin_method, SigninMethod, Token, User, UserId};
+use schema::devlog::entities::{Token, User, UserId};
+use schema::misc::authentication::{sign_in_method, sign_up_method, SignInMethod, SignUpMethod};
 use surreal_derive_plus::surreal_quote;
 use crate::config::CONFIGS;
 
@@ -14,11 +15,11 @@ pub struct SigninResult {
     pub token: Token
 }
 
-impl<'a> Service<&'a SigninMethod, SigninResult> for SigninService {
-    async fn execute(self, params: &'a SigninMethod) -> Resolve<SigninResult> {
+impl<'a> Service<&'a SignInMethod, SigninResult> for SigninService {
+    async fn execute(self, params: &'a SignInMethod) -> Resolve<SigninResult> {
         let method = params.method.as_ref().unwrap();
         match method {
-            signin_method::Method::ByEmailPassword(value) => {
+            sign_in_method::Method::ByEmailPassword(value) => {
                 let user_id = UserId { email: value.email.clone() };
                 let mut user: Option<User> = self.db.query(surreal_quote!("SELECT * FROM #val(&user_id)")).await?.take(0)?;
                 if user.is_none() || user.as_ref().unwrap().password != value.password {

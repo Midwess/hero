@@ -1,4 +1,6 @@
-use aws_sdk_s3::error::SdkError;
+use aws_sdk_s3::{error::SdkError, presigning::PresigningConfigError};
+use log::info;
+use surreal_devl::wrapper::SurrealResponseError;
 use thiserror::Error;
 use tonic::Status;
 
@@ -6,6 +8,8 @@ use tonic::Status;
 pub enum Errors {
     #[error("Operation on db name {} got error {}", .db_name, .message)]
     DatabaseError { message: String, db_name: String},
+    #[error("Bad request {}", .0)]
+    BadRequest(String),
     #[error("User {} already exist", .0)]
     UserAlreadyExist(String),
     #[error("Failed to generate auth token {:?}", .0)]
@@ -13,7 +17,9 @@ pub enum Errors {
     #[error("UnAuthorize {}", .0)]
     UnAuthorized(String),
     #[error("Resource got error {:?}", .0)]
-    AwsS3Error(String)
+    AwsS3Error(String),
+    #[error("Unexpected data format {}", .0)]
+    UnexpectedDataFormat(String)
 }
 
 impl From<surrealdb::Error> for Errors {
@@ -22,20 +28,36 @@ impl From<surrealdb::Error> for Errors {
     }
 }
 
+impl From<SurrealResponseError> for Errors {
+    fn from(value: SurrealResponseError) -> Self {
+        Self::UnexpectedDataFormat(format!("{:?}", &value))
+    }
+}
+
 impl <E, R> From<SdkError<E, R>> for Errors {
     fn from(value: SdkError<E, R>) -> Self {
+        log::info!(target: "tiendang-debug", "Error while using s3 client {}", &value);
+        return Self::AwsS3Error(value.to_string())
+    }
+}
+
+impl From<PresigningConfigError> for Errors {
+    fn from(value: PresigningConfigError) -> Self {
         return Self::AwsS3Error(value.to_string())
     }
 }
 
 impl From<Errors> for Status {
     fn from(value: Errors) -> Self {
+        info!(target: "error-anounced", "Error happen during the execution {:?}", &value);
         match value {
             Errors::DatabaseError { message, db_name } => Self::aborted(message),
             Errors::UserAlreadyExist(_) => Self::already_exists("User already exist".to_owned()),
             Errors::GenerateTokenFailed(_) => Self::unauthenticated("Invalid token"),
             Errors::UnAuthorized(_) => Self::unauthenticated("You are not allow to access this operation"),
-            Errors::AwsS3Error(_) => Self::aborted("Resource busy, please contact support"),
+            Errors::AwsS3Error(message) => Self::aborted(format!("Resource busy, please contact support {message}")),
+            Errors::BadRequest(message) => Self::invalid_argument(message),
+            Errors::UnexpectedDataFormat(message) => Self::aborted("Internal error, contact support")
         }
     }
 }
