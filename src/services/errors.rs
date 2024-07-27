@@ -12,6 +12,8 @@ pub enum Errors {
     BadRequest(String),
     #[error("User {} already exist", .0)]
     UserAlreadyExist(String),
+    #[error("Already exist {}", .0)]
+    AlreadyExist(String),
     #[error("Failed to generate auth token {:?}", .0)]
     GenerateTokenFailed(#[from] jsonwebtoken::errors::Error),
     #[error("UnAuthorize {}", .0)]
@@ -57,7 +59,8 @@ impl From<Errors> for Status {
             Errors::UnAuthorized(_) => Self::unauthenticated("You are not allow to access this operation"),
             Errors::AwsS3Error(message) => Self::aborted(format!("Resource busy, please contact support {message}")),
             Errors::BadRequest(message) => Self::invalid_argument(message),
-            Errors::UnexpectedDataFormat(message) => Self::aborted("Internal error, contact support")
+            Errors::UnexpectedDataFormat(message) => Self::aborted("Internal error, contact support"),
+            Errors::AlreadyExist(message) => Self::already_exists(format!("Already exist {}", message)),
         }
     }
 }

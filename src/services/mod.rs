@@ -4,3 +4,4 @@ pub mod token;
 pub mod signin;
 pub mod signup;
 pub mod image;
+pub mod user;

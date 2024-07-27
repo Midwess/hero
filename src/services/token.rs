@@ -1,4 +1,5 @@
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, TokenData, Validation};
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, time::Duration};
 use super::{base::{self, Resolve, Service}, errors::Errors};
@@ -30,6 +31,7 @@ impl TokenService {
         let mut validation = Validation::default();
         validation.validate_exp = true;
 
+
         let token_data: TokenData<Claims> = decode::<Claims>(token, &DecodingKey::from_secret(secret.as_ref()), &validation)?;
 
         let claims = token_data.claims.other;
@@ -54,7 +56,7 @@ impl TokenService {
         Ok(Token {
             content: token,
             expired_at: Some(Datetime {
-                utc_millis_since_epoch: exp as i64,
+                utc_millis_since_epoch: exp as u64,
             })
         })
     }

@@ -1,17 +1,24 @@
 use schema::devlog::entities::User;
 use log::*;
-use crate::services::{base::Service, errors::Errors, token::{ReadFrom, TokenService}};
+use crate::{s3::S3Client, services::{base::Service, errors::Errors, token::{ReadFrom, TokenService}, user::guest::{GenerateGuestParams, GuestService}}};
 
 use tonic::{async_trait, Status};
 use tonic::codegen::http::Request;
 use tonic::transport::Body;
 use tonic_middleware::RequestInterceptor;
+
 #[derive(Clone)]
-pub struct AuthInterceptor {}
+pub struct AuthInterceptor {
+    white_list: Vec<String>,
+}
 
 impl AuthInterceptor {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            white_list: vec![
+                String::from("/devlog.devblog.rpc.PostService/interact")
+            ]
+        }
     }
 }
 
@@ -31,7 +38,26 @@ impl RequestInterceptor for AuthInterceptor where
                 Ok(req)
             },
             None => {
-                Err(Errors::UnAuthorized("Missing authentication information".to_owned()).into())
+                let path = req.uri().clone().into_parts().path_and_query.unwrap();
+                let is_allowed = self.white_list.iter().find(|it| {
+                    return path.as_str().contains(it.to_owned());
+                }).is_some();
+
+                if !is_allowed {
+                    return Err(Errors::UnAuthorized("Missing authentication information".to_owned()).into())
+                }
+
+                let s3 = S3Client::new().await;
+
+                let token_service = TokenService {};
+                let service = GuestService {
+                   token_service, s3
+                };
+
+                let params = GenerateGuestParams::ToFullFill();
+                let guest_user = service.execute(params).await?;
+                req.extensions_mut().insert(guest_user);
+                Ok(req)
             }
         }
     }
