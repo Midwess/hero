@@ -21,7 +21,9 @@ pub enum Errors {
     #[error("Resource got error {:?}", .0)]
     AwsS3Error(String),
     #[error("Unexpected data format {}", .0)]
-    UnexpectedDataFormat(String)
+    UnexpectedDataFormat(String),
+    #[error("Resource not found {}", .0)]
+    ResourceNotFound(String)
 }
 
 impl From<surrealdb::Error> for Errors {
@@ -61,6 +63,7 @@ impl From<Errors> for Status {
             Errors::BadRequest(message) => Self::invalid_argument(message),
             Errors::UnexpectedDataFormat(message) => Self::aborted("Internal error, contact support"),
             Errors::AlreadyExist(message) => Self::already_exists(format!("Already exist {}", message)),
+            Errors::ResourceNotFound(message) => Self::not_found(message.to_owned()),
         }
     }
 }
