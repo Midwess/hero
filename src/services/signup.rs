@@ -3,7 +3,6 @@ use surreal_devl::wrapper::SurrealQR;
 use crate::{s3::S3Client, services::{base::{Resolve, Service}, errors::Errors, token::{GenerateBy, TokenService}}, utils::random_number_in_range};
 use crate::config::CONFIGS;
 use surreal_derive_plus::surreal_quote;
-use surrealdb::sql::Object;
 use schema::misc::authentication::{sign_up_method, SignUpMethod};
 use schema::devlog::entities::{Token, User, UserId};
 
@@ -47,6 +46,10 @@ impl<'a> Service<&'a SignUpMethod, SignupResult> for SignupService {
 
         let new_user = match params.method.as_ref().unwrap() {
             sign_up_method::Method::ByEmail(value) => {
+                if value.email.is_empty() {
+                    return Err(Errors::BadRequest("The email can not be empty".to_owned()));
+                }
+
                 User {
                     avatar_object: Some(random_avatar.clone()),
                     name: "".to_owned(),
@@ -55,12 +58,20 @@ impl<'a> Service<&'a SignUpMethod, SignupResult> for SignupService {
                 }
             },
             sign_up_method::Method::ByEmailPassword(value) => {
-                User { avatar_object: Some(random_avatar.clone()), name: "".to_owned(), email: value.email.clone(), password: value.password.clone() }
+                if value.email.is_empty() || value.password.is_empty() {
+                    return Err(Errors::BadRequest("The email and password can not be empty".to_owned()));
+                }
+
+                User { avatar_object: Some(random_avatar.clone()), name: value.display_name.trim().to_owned(), email: value.email.trim().to_owned(), password: value.password.trim().to_owned() }
             },
             sign_up_method::Method::ByDisplayName(value) => {
+                if value.display_name.is_empty() {
+                    return Err(Errors::BadRequest("The email and password and display name can not be empty".to_owned()));
+                }
+
                 // This is all about the business :((
                 let email = format!("{}@no-email.com", value.display_name.as_str());
-                User { avatar_object: Some(random_avatar.clone()), name: value.display_name.clone(), email, password: "".to_owned() }
+                User { avatar_object: Some(random_avatar.to_owned()), name: value.display_name.trim().to_owned(), email, password: "".to_owned() }
             },
         };
 

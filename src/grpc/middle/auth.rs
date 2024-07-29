@@ -16,7 +16,9 @@ impl AuthInterceptor {
     pub fn new() -> Self {
         Self {
             white_list: vec![
-                String::from("/devlog.devblog.rpc.PostService/interact")
+                String::from("/devlog.devblog.rpc.PostService/interact"),
+                String::from("/devlog.devblog.rpc.PostService/get"),
+                String::from("/devlog.devblog.rpc.DevblogDiscussionService/get_discussions"),
             ]
         }
     }
