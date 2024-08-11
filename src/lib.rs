@@ -9,6 +9,7 @@ pub mod config;
 pub mod grpc;
 pub mod logger;
 pub mod utils;
+pub mod smtp;
 
 use once_cell::sync::{Lazy};
 use tokio::sync::OnceCell;

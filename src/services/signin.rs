@@ -36,7 +36,7 @@ impl<'a> Service<&'a SignInMethod, SigninResult> for SigninService {
                 }
 
                 let mut user = user.take().unwrap();
-                self.s3.sign_object(user.avatar_object.as_mut().unwrap(), Duration::from_secs(60 * 60 * 24 * 7)).await?;
+                self.s3.use_cdn(user.avatar_object.as_mut().unwrap()).await?;
                 let token = self.token_service.execute(GenerateBy::User(&user, CONFIGS.token.access_token_duration)).await?;
                 let result = SigninResult {
                     user,

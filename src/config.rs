@@ -16,13 +16,47 @@ pub struct AwsS3 {
     pub secret_key: String,
     pub region: String,
     pub host_url: String,
+    pub cdn_host_url: String,
     pub default_avatars_folder_path: String
+}
+
+#[derive(Debug, Clone)]
+pub struct Crafter {
+    pub url: String
+}
+
+impl Default for Crafter {
+    fn default() -> Self {
+        Self {
+            url: env::var("DEVLOG_CRAFTER_URL").unwrap_or("http://localhost:8025".to_owned())
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Smtp {
+    pub host: String,
+    pub username: String,
+    pub password: String,
+    pub port: i32
+}
+
+impl Default for Smtp {
+    fn default() -> Self {
+        Self {
+            host: env::var("DEVLOG_SMTP_HOST").unwrap_or("127.0.0.1".to_owned()),
+            port: env::var("DEVLOG_SMTP_PORT").map(|it| it.parse().expect("DEVLOG_SMTP_PORT must be a number")).unwrap_or(8025),
+            username: env::var("DEVLOG_SMTP_USERNAME").unwrap_or("root".to_owned()),
+            password: env::var("DEVLOG_SMTP_PASSWORD").unwrap_or("root".to_owned())
+        }
+    }
 }
 
 impl Default for AwsS3 {
     fn default() -> Self {
         Self {
             host_url: env::var("AWS_ENDPOINT_URL").expect("AWS_ENDPOINT_URL must be defined"),
+            cdn_host_url: env::var("AWS_CDN_ENDPOINT_URL").unwrap_or(env::var("AWS_ENDPOINT_URL").expect("AWS_ENDPOINT_URL must be defined")),
             bucket_name: env::var("AWS_S3_BUCKET_NAME").expect("AWS_S3_BUCKET_NAME must be defined"),
             access_key: env::var("AWS_ACCESS_KEY_ID").expect("AWS_ACCESS_KEY_ID must be defined"),
             secret_key: env::var("AWS_SECRET_ACCESS_KEY").expect("AWS_SECRET_ACCESS_KEY must be defined"),
@@ -31,6 +65,7 @@ impl Default for AwsS3 {
         }
     }
 }
+
 
 impl Default for TokenConfig {
     fn default() -> Self {
@@ -53,7 +88,9 @@ impl Default for TokenConfig {
 #[derive(Debug, Default)]
 pub struct Config {
     pub token: TokenConfig,
-    pub aws_s3: AwsS3
+    pub aws_s3: AwsS3,
+    pub smtp: Smtp,
+    pub crafter: Crafter
 }
 
 lazy_static! {

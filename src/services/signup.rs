@@ -1,6 +1,7 @@
 use std::time::Duration;
+use log::info;
 use surreal_devl::wrapper::SurrealQR;
-use crate::{s3::S3Client, services::{base::{Resolve, Service}, errors::Errors, token::{GenerateBy, TokenService}}, utils::random_number_in_range};
+use crate::{s3::S3Client, services::{base::{Resolve, Service}, errors::Errors, token::{GenerateBy, TokenService}}, smtp::{client::SmtpClient, template::EmailTemplate}, utils::random_number_in_range};
 use crate::config::CONFIGS;
 use surreal_derive_plus::surreal_quote;
 use schema::misc::authentication::{sign_up_method, SignUpMethod};
@@ -11,7 +12,8 @@ use crate::Db;
 pub struct SignupService {
     pub db: Db,
     pub token_service: TokenService,
-    pub s3: S3Client
+    pub s3: S3Client,
+    pub smtp_client: SmtpClient
 }
 
 #[derive(Debug, Clone)]
@@ -33,6 +35,7 @@ impl<'a> Service<&'a SignUpMethod, SignupResult> for SignupService {
                 let user_id = UserId {email: email.to_owned()};
                 let value: SurrealQR = self.db.query(surreal_quote!("SELECT * FROM #val(&user_id)")).await?.take(0)?;
                 let value = value.object()?;
+                info!(target: "tiendnag-debug", "Found {:?}", &value);
                 if value.is_some() {
                     return Err(Errors::UnAuthorized("Already exist".to_owned()));
                 }
@@ -83,8 +86,10 @@ impl<'a> Service<&'a SignUpMethod, SignupResult> for SignupService {
             &created_user,
             CONFIGS.token.access_token_duration)).await?;
 
-        self.s3.sign_object(&mut random_avatar, Duration::from_days(7)).await?;
+        self.s3.use_cdn(&mut random_avatar).await?;
         created_user.avatar_object = Some(random_avatar);
+
+        self.smtp_client.send(EmailTemplate::WelcomeNewMember(created_user.clone())).await?;
 
         let result = SignupResult {
             token,

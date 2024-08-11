@@ -50,6 +50,18 @@ impl S3Client {
        objects
    }
 
+   pub async fn use_cdn(&self, s3_object: &mut S3Object) -> Resolve<()> {
+       let path = match &s3_object.content {
+           Some(Content::Path(path)) => path.clone(),
+          _ => return Err(Errors::BadRequest("Bad request, s3_object must have path".to_owned()))
+       };
+
+       let cdn_url = format!("{}/{}", CONFIGS.aws_s3.cdn_host_url.clone(), path);
+
+       s3_object.content = Some(Content::DownloadUrl(cdn_url.to_owned()));
+       Ok(())
+   }
+
    pub async fn sign_object(&self, s3_object: &mut S3Object, duration: Duration) -> Resolve<()> {
        let path = match &s3_object.content {
            Some(Content::Path(path)) => path.clone(),

@@ -23,7 +23,9 @@ pub enum Errors {
     #[error("Unexpected data format {}", .0)]
     UnexpectedDataFormat(String),
     #[error("Resource not found {}", .0)]
-    ResourceNotFound(String)
+    ResourceNotFound(String),
+    #[error("Failed to send email {}", .0)]
+    FailedToSendEmail(String)
 }
 
 impl From<surrealdb::Error> for Errors {
@@ -40,7 +42,6 @@ impl From<SurrealResponseError> for Errors {
 
 impl <E, R> From<SdkError<E, R>> for Errors {
     fn from(value: SdkError<E, R>) -> Self {
-        log::info!(target: "tiendang-debug", "Error while using s3 client {}", &value);
         return Self::AwsS3Error(value.to_string())
     }
 }
@@ -64,6 +65,7 @@ impl From<Errors> for Status {
             Errors::UnexpectedDataFormat(message) => Self::aborted("Internal error, contact support"),
             Errors::AlreadyExist(message) => Self::already_exists(format!("Already exist {}", message)),
             Errors::ResourceNotFound(message) => Self::not_found(message.to_owned()),
+            Errors::FailedToSendEmail(message) => Self::internal("Failed to send email"),
         }
     }
 }
