@@ -1,6 +1,6 @@
 use std::time::Duration;
 use aws_sdk_s3::{presigning::PresigningConfig, Client};
-use aws_config::{meta::region::RegionProviderChain};
+use aws_config::meta::region::RegionProviderChain;
 use log::info;
 use schema::misc::s3::s3_object::Content;
 use schema::misc::s3::S3Object;

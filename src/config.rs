@@ -69,16 +69,16 @@ impl Default for AwsS3 {
 
 impl Default for TokenConfig {
     fn default() -> Self {
-        let refresh_token_duration = Duration::from_millis(env::var("DEVLOGS_REFRESH_TOKEN_LIFETIME_IN_MS")
-            .map(|env_var| env_var.parse().expect("The DEVLOGS_REFRESH_TOKEN_LIFETIME_IN_MS must be number"))
+        let refresh_token_duration = Duration::from_millis(env::var("DEVLOG_REFRESH_TOKEN_LIFETIME_IN_MS")
+            .map(|env_var| env_var.parse().expect("The DEVLOG_REFRESH_TOKEN_LIFETIME_IN_MS must be number"))
             .unwrap_or(86400000)); // 1 day
         Self {
-            jwt_refresh_token_private_key: env::var("DEVLOGS_REFRESH_TOKEN_PRIVATE_KEY")
+            jwt_refresh_token_private_key: env::var("DEVLOG_REFRESH_TOKEN_PRIVATE_KEY")
                 .unwrap_or("this_is_unsafe_keythis_is_unsafe_keythis_is_unsafe_key".to_owned()),
-            jwt_access_token_private_key: env::var("DEVLOGS_ACCESS_TOKEN_PRIVATE_KEY")
+            jwt_access_token_private_key: env::var("DEVLOG_ACCESS_TOKEN_PRIVATE_KEY")
                 .unwrap_or("this_is_unsafe_keythis_is_unsafe_keythis_is_unsafe_key".to_owned()),
-            access_token_duration: Duration::from_millis(env::var("DEVLOGS_ACCESS_TOKEN_LIFETIME_IN_MS")
-                .map(|env_var| env_var.parse().expect("The DEVLOGS_ACCESS_TOKEN_LIFETIME_IN_MS must be number"))
+            access_token_duration: Duration::from_millis(env::var("DEVLOG_ACCESS_TOKEN_LIFETIME_IN_MS")
+                .map(|env_var| env_var.parse().expect("The DEVLOG_ACCESS_TOKEN_LIFETIME_IN_MS must be number"))
                 .unwrap_or(1000 * 60 * 60 * 24 * 256)),
             refresh_token_duration,
         }

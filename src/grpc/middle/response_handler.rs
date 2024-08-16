@@ -1,13 +1,9 @@
-use std::str::FromStr;
-
 use tonic::body::BoxBody;
 use tonic::codegen::http::{HeaderValue, Request, Response};
-use tonic::metadata::MetadataValue;
-use tonic::transport::{Body, Server};
-use tonic::{async_trait, Status};
+use tonic::transport::Body;
+use tonic::async_trait;
 use tonic_middleware::{
-    InterceptorFor, Middleware, MiddlewareFor, MiddlewareLayer, RequestInterceptor,
-    RequestInterceptorLayer, ServiceBound,
+    Middleware, ServiceBound,
 };
 
 #[derive(Default, Clone)]

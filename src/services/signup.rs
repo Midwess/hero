@@ -1,5 +1,4 @@
-use std::time::Duration;
-use log::info;
+use log::{error, info};
 use surreal_devl::wrapper::SurrealQR;
 use crate::{s3::S3Client, services::{base::{Resolve, Service}, errors::Errors, token::{GenerateBy, TokenService}}, smtp::{client::SmtpClient, template::EmailTemplate}, utils::random_number_in_range};
 use crate::config::CONFIGS;
@@ -43,7 +42,7 @@ impl<'a> Service<&'a SignUpMethod, SignupResult> for SignupService {
             None => {}
         };
 
-        let mut current_default_avatars = self.s3.get_default_avatars_object().await?;
+        let current_default_avatars = self.s3.get_default_avatars_object().await?;
         let random_index = random_number_in_range(0, current_default_avatars.len() as u32 - 1);
         let mut random_avatar = current_default_avatars.get(random_index as usize).take().unwrap().to_owned();
 
@@ -89,7 +88,9 @@ impl<'a> Service<&'a SignUpMethod, SignupResult> for SignupService {
         self.s3.use_cdn(&mut random_avatar).await?;
         created_user.avatar_object = Some(random_avatar);
 
-        self.smtp_client.send(EmailTemplate::WelcomeNewMember(created_user.clone())).await?;
+        if let Err(send_mail_err) = self.smtp_client.send(EmailTemplate::WelcomeNewMember(created_user.clone())).await {
+            error!(target: "signup", "Failed to send welcome email, skipping, {:?}", send_mail_err);
+        }
 
         let result = SignupResult {
             token,
