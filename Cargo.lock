@@ -3565,6 +3565,7 @@ dependencies = [
 [[package]]
 name = "schema"
 version = "0.1.0"
+source = "git+ssh://git@github.com/dev-logs/schema.git#b450c0231e0a9b8f8dedcb69c3956a5cb3b0f1af"
 dependencies = [
  "prost",
  "prost-types",

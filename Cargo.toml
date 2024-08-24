@@ -41,6 +41,3 @@ reqwest = "0.12.5"
 
 [build-dependencies]
 tonic-build = "0.11"
-
-[replace]
-"schema:0.1.0" = { path = "./schema" }
