@@ -56,16 +56,16 @@ impl From<Errors> for Status {
     fn from(value: Errors) -> Self {
         info!(target: "error-anounced", "Error happen during the execution {:?}", &value);
         match value {
-            Errors::DatabaseError { message, db_name } => Self::aborted(message),
+            Errors::DatabaseError { message, db_name: _ } => Self::aborted(message),
             Errors::UserAlreadyExist(_) => Self::already_exists("User already exist".to_owned()),
             Errors::GenerateTokenFailed(_) => Self::unauthenticated("Invalid token"),
             Errors::UnAuthorized(_) => Self::unauthenticated("You are not allow to access this operation"),
             Errors::AwsS3Error(message) => Self::aborted(format!("Resource busy, please contact support {message}")),
             Errors::BadRequest(message) => Self::invalid_argument(message),
-            Errors::UnexpectedDataFormat(message) => Self::aborted("Internal error, contact support"),
+            Errors::UnexpectedDataFormat(_) => Self::aborted("Internal error, contact support"),
             Errors::AlreadyExist(message) => Self::already_exists(format!("Already exist {}", message)),
             Errors::ResourceNotFound(message) => Self::not_found(message.to_owned()),
-            Errors::FailedToSendEmail(message) => Self::internal("Failed to send email"),
+            Errors::FailedToSendEmail(_) => Self::internal("Failed to send email"),
         }
     }
 }

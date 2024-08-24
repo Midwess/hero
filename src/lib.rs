@@ -11,7 +11,7 @@ pub mod logger;
 pub mod utils;
 pub mod smtp;
 
-use once_cell::sync::{Lazy};
+use once_cell::sync::Lazy;
 use tokio::sync::OnceCell;
 
 pub type Db = Surreal<Client>;

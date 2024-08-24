@@ -46,7 +46,9 @@ impl S3Client {
    pub async fn get_default_avatars_object(&self) -> Resolve<Vec<S3Object>> {
        let objects = self.get_objects(CONFIGS.aws_s3.default_avatars_folder_path.clone()).await;
 
-       info!(target: "get_default_avatars_object", "got {:?} objects", objects.as_ref().map(|it| it.len() as i32).unwrap_or(-1));
+       info!(target: "get_default_avatars_object", "got {:?} objects",
+           objects.as_ref().map(|it| it.len() as i32).unwrap_or(-1));
+
        objects
    }
 
@@ -59,6 +61,7 @@ impl S3Client {
        let cdn_url = format!("{}/{}", CONFIGS.aws_s3.cdn_host_url.clone(), path);
 
        s3_object.content = Some(Content::DownloadUrl(cdn_url.to_owned()));
+
        Ok(())
    }
 
@@ -77,6 +80,7 @@ impl S3Client {
            .await?;
 
        s3_object.content = Some(Content::DownloadUrl(presigned_req.uri().to_owned()));
+
        Ok(())
    }
 }
