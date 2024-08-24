@@ -7,7 +7,7 @@ use crate::config::CONFIGS;
 
 pub static DB: Lazy<Db> = Lazy::new(Surreal::init);
 
-pub static NS = "devlog-sdk";
+pub static NS: &'static str = "devlog-sdk";
 
 pub async fn setup_devlog_db() -> Result<(), Box<dyn std::error::Error>> {
     let ns = format!("{NS} devlog-sdk-hub-db");

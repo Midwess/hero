@@ -1056,6 +1056,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 [[package]]
 name = "core-services"
 version = "0.1.0"
+source = "git+ssh://git@github.com/dev-logs/core-services.git#3334aa47ce933d4cc45f11312f7e09894d4d5262"
 dependencies = [
  "aws-config",
  "aws-sdk-s3",
@@ -3677,6 +3678,7 @@ dependencies = [
 [[package]]
 name = "schema"
 version = "0.1.0"
+source = "git+ssh://git@github.com/dev-logs/schema.git#b450c0231e0a9b8f8dedcb69c3956a5cb3b0f1af"
 dependencies = [
  "prost",
  "prost-types",
