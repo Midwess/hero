@@ -1,36 +1,35 @@
 use schema::devlog::entities::User;
 use log::*;
-use core_services::{
-    s3::S3Client,
-    services::{base::Service, errors::Errors}
-};
+use core_services::services::{base::Service, errors::Errors};
 
+use tokio::sync::OnceCell;
 use tonic::{async_trait, Status};
 use tonic::codegen::http::Request;
 use tonic::transport::Body;
 use tonic_middleware::RequestInterceptor;
+use crate::sdk::DependenciesInjection;
+use crate::{sdk::DevlogSdk, services::{token::{ReadFrom, TokenService}, user::GenerateGuestParams}};
 
-use crate::services::{guest::{GenerateGuestParams, GuestService}, token::{ReadFrom, TokenService}};
-
-#[derive(Clone)]
-pub struct AuthInterceptor {
-    white_list: Vec<String>,
+pub struct AuthInterceptor<'a> {
+    pub white_list: Vec<String>,
+    pub sdk: &'a OnceCell<DevlogSdk>
 }
 
-impl AuthInterceptor {
-    pub fn new() -> Self {
+impl<'a> AuthInterceptor<'a> {
+    pub fn new(sdk: &'a OnceCell<DevlogSdk>) -> Self {
         Self {
             white_list: vec![
                 String::from("/devlog.devblog.rpc.PostService/interact"),
                 String::from("/devlog.devblog.rpc.PostService/get"),
                 String::from("/devlog.devblog.rpc.DevblogDiscussionService/get_discussions"),
-            ]
+            ],
+            sdk
         }
     }
 }
 
 #[async_trait]
-impl RequestInterceptor for AuthInterceptor where
+impl<'a> RequestInterceptor for AuthInterceptor<'a>
 {
     async fn intercept(&self, mut req: Request<Body>) -> Result<Request<Body>, Status> {
         match req.headers().get("authorization") {
@@ -54,13 +53,7 @@ impl RequestInterceptor for AuthInterceptor where
                     return Err(Errors::UnAuthorized("Missing authentication information".to_owned()).into())
                 }
 
-                let s3 = S3Client::new().await;
-
-                let token_service = TokenService {};
-                let service = GuestService {
-                   token_service, s3
-                };
-
+                let service = self.sdk.get().unwrap().generate_guest_service();
                 let params = GenerateGuestParams::ToFullFill();
                 let guest_user = service.execute(params).await?; req.extensions_mut().insert(guest_user); Ok(req)
             }

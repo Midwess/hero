@@ -1,5 +1,6 @@
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, TokenData, Validation};
 use serde::{Deserialize, Serialize};
+use async_trait::async_trait;
 use std::{collections::HashMap, time::Duration};
 use core_services::services::{base::{self, Resolve, Service}, errors::Errors};
 use schema::{devlog::entities::{Token, User}, misc::datetime::Datetime};
@@ -17,7 +18,6 @@ pub enum GenerateBy<'a> {
 pub enum ReadFrom {
     AccessToken(String)
 }
-
 
 #[derive(Deserialize, Serialize)]
 struct Claims {
@@ -61,8 +61,9 @@ impl TokenService {
     }
 }
 
+#[async_trait]
 impl<'a> Service<GenerateBy<'a>, Token> for TokenService {
-    async fn execute(self, params: GenerateBy<'a>) -> base::Resolve<Token> {
+    async fn execute(&self, params: GenerateBy<'a>) -> base::Resolve<Token> {
         match params {
             GenerateBy::User(user, duration) => {
                 let claims = vec![
@@ -81,9 +82,9 @@ impl<'a> Service<GenerateBy<'a>, Token> for TokenService {
     }
 }
 
+#[async_trait]
 impl Service<ReadFrom, User> for TokenService {
-    async fn execute(self, params: ReadFrom) -> base::Resolve<User> {
-
+    async fn execute(&self, params: ReadFrom) -> base::Resolve<User> {
         match params {
             ReadFrom::AccessToken(token) => {
                 let claims = self.read_claims_from_jwt(

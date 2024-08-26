@@ -1,27 +1,6 @@
+use core_services::db::SurrealDbConnectionInfo;
 use lazy_static::lazy_static;
 use std::{env, time::Duration};
-
-#[derive(Debug)]
-pub struct SurrealDb {
-    pub socket_address: String,
-    /// https://surrealdb.com/docs/surrealql/statements/define/namespace
-    pub namespace: String,
-    pub db_name: String,
-    pub db_password: String,
-    pub db_username: String,
-}
-
-impl Default for SurrealDb {
-    fn default() -> Self {
-        SurrealDb {
-            socket_address: env::var("DEVLOG_SURREAL_DB_SOCKET_ADDRESS").unwrap_or("127.0.0.1:8000".to_owned()),
-            db_name: env::var("DEVLOG_SURREAL_DB_NAME").unwrap_or("devlog".to_owned()),
-            namespace: env::var("DEVLOG_SURREAL_DB_NAMESPACE").unwrap_or("dev".to_owned()),
-            db_username: env::var("DEVLOG_SURREAL_DB_USERNAME").unwrap_or("root".to_owned()),
-            db_password: env::var("DEVLOG_SURREAL_DB_PASSWORD").unwrap_or("root".to_owned()),
-        }
-    }
-}
 
 #[derive(Debug)]
 pub struct TokenConfig {
@@ -49,10 +28,25 @@ impl Default for TokenConfig {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Config {
     pub token: TokenConfig,
-    pub surrealdb: SurrealDb
+    pub surrealdb: SurrealDbConnectionInfo
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            token: Default::default(),
+            surrealdb: SurrealDbConnectionInfo {
+                socket_address: env::var("DEVLOG_SURREAL_DB_SOCKET_ADDRESS").unwrap_or("127.0.0.1:8000".to_owned()),
+                db_name: env::var("DEVLOG_SURREAL_DB_NAME").unwrap_or("devlog".to_owned()),
+                namespace: env::var("DEVLOG_SURREAL_DB_NAMESPACE").unwrap_or("dev".to_owned()),
+                db_username: env::var("DEVLOG_SURREAL_DB_USERNAME").unwrap_or("root".to_owned()),
+                db_password: env::var("DEVLOG_SURREAL_DB_PASSWORD").unwrap_or("root".to_owned()),
+            }
+        }
+    }
 }
 
 lazy_static! {

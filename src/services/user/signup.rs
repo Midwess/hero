@@ -1,36 +1,21 @@
 use log::error;
-use surreal_devl::wrapper::SurrealQR;
 use core_services::{
-    s3::S3Client,
     services::{base::{Resolve, Service},
     errors::Errors},
-    smtp::{client::SmtpClient, template::EmailTemplate},
+    smtp::template::EmailTemplate,
     utils::random_number_in_range
 };
 use crate::config::CONFIGS;
-use surreal_derive_plus::surreal_quote;
 use schema::misc::authentication::{sign_up_method, SignUpMethod};
-use schema::devlog::entities::{Token, User, UserId};
+use schema::devlog::entities::{User, UserId};
+use async_trait::async_trait;
+use crate::services::{token::GenerateBy, user::SignupResult};
 
-use core_services::Db;
+use super::UserService;
 
-use super::token::{GenerateBy, TokenService};
-
-pub struct SignupService {
-    pub db: Db,
-    pub token_service: TokenService,
-    pub s3: S3Client,
-    pub smtp_client: SmtpClient
-}
-
-#[derive(Debug, Clone)]
-pub struct SignupResult {
-    pub token: Token,
-    pub user: User
-}
-
-impl<'a> Service<&'a SignUpMethod, SignupResult> for SignupService {
-    async fn execute(self, params: &'a SignUpMethod) -> Resolve<SignupResult> {
+#[async_trait]
+impl<'a> Service<&'a SignUpMethod, SignupResult> for UserService<'a> {
+    async fn execute(&self, params: &'a SignUpMethod) -> Resolve<SignupResult> {
         let email: Option<&str> = match params.method.as_ref().unwrap() {
             sign_up_method::Method::ByEmail(value) => Some(value.email.as_str()),
             sign_up_method::Method::ByEmailPassword(value) => Some(value.email.as_str()),
@@ -40,9 +25,8 @@ impl<'a> Service<&'a SignUpMethod, SignupResult> for SignupService {
         match email {
             Some(email) => {
                 let user_id = UserId {email: email.to_owned()};
-                let value: SurrealQR = self.db.query(surreal_quote!("SELECT * FROM #val(&user_id)")).await?.take(0)?;
-                let value = value.object()?;
-                if value.is_some() {
+                let found_user: Option<User> = self.user_repository.find_one(crate::repository::user::UserFind::UserId(&user_id)).await?;
+                if found_user.is_some() {
                     return Err(Errors::UnAuthorized("Already exist".to_owned()));
                 }
             }
@@ -94,9 +78,7 @@ impl<'a> Service<&'a SignUpMethod, SignupResult> for SignupService {
             },
         };
 
-        let created_user: SurrealQR = self.db.query(surreal_quote!("CREATE #record(&new_user)")).await?.take(0)?;
-        let created_user = created_user.object()?;
-        let mut created_user: User = created_user.map(|it| it.into()).expect("Error while creating user");
+        let mut created_user: User = self.user_repository.create(new_user).await?;
 
         let token = self.token_service.execute(
             GenerateBy::User(

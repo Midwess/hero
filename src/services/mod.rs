@@ -1,4 +1,2 @@
-pub mod signin;
-pub mod signup;
+pub mod user;
 pub mod token;
-pub mod guest;

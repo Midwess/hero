@@ -1,33 +1,20 @@
-use core_services::{
-    s3::S3Client,
-    services::{base::{Resolve, Service},
-    errors::Errors},
-    Db,
+use core_services::services::{
+    base::{Resolve, Service},
+    errors::Errors
 };
 
-use surreal_derive_plus::surreal_quote;
-use surreal_devl::wrapper::SurrealQR;
-
-use schema::{devlog::entities::{Token, User, UserId}, misc::authentication::SignInMethod};
+use schema::{devlog::entities::UserId, misc::authentication::SignInMethod};
 use schema::misc::authentication::sign_in_method;
+use async_trait::async_trait;
 use crate::config::CONFIGS;
 
-use super::token::{GenerateBy, TokenService};
+use crate::services::{token::GenerateBy, user::SigninResult};
 
-pub struct SigninService {
-    pub db: Db,
-    pub token_service: TokenService,
-    pub s3: S3Client
-}
+use super::UserService;
 
-#[derive(Debug, Clone)]
-pub struct SigninResult {
-    pub user: User,
-    pub token: Token
-}
-
-impl<'a> Service<&'a SignInMethod, SigninResult> for SigninService {
-    async fn execute(self, params: &'a SignInMethod) -> Resolve<SigninResult> {
+#[async_trait]
+impl<'a> Service<&'a SignInMethod, SigninResult> for UserService<'a> {
+    async fn execute(&self, params: &'a SignInMethod) -> Resolve<SigninResult> {
         let method = params.method.as_ref().unwrap();
         match method {
             sign_in_method::Method::ByEmailPassword(value) => {
@@ -36,8 +23,7 @@ impl<'a> Service<&'a SignInMethod, SigninResult> for SigninService {
                 }
 
                 let user_id = UserId { email: value.email.clone() };
-                let user: SurrealQR = self.db.query(surreal_quote!("SELECT * FROM #val(&user_id)")).await?.take(0)?;
-                let mut user = user.object()?.map(|it| User::from(it));
+                let mut user = self.user_repository.find_one(crate::repository::user::UserFind::UserId(&user_id)).await?;
                 if user.is_none() || user.as_ref().unwrap().password != value.password {
                     return Err(Errors::UnAuthorized(
                         format!("Incorrect user name or password {}", value.email.as_str()).to_owned())
