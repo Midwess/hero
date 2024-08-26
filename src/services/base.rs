@@ -45,27 +45,6 @@ pub trait Service<P, T>
     where
         P: Clone,
 {
-    async fn execute(&self, params: P) -> Resolve<T>;
-}
-
-pub trait MyTrait: Send + Sync {}
-
-pub struct UserService<'a> {
-    pub user_repository: &'a Box<dyn MyTrait>,
-    pub s3: &'a S3Client,
-    pub smtp_client: &'a SmtpClient,
-}
-
-pub struct XXService<'a> {
-    repo: &'a Box<dyn MyTrait + Send + Sync>,
-    smtp: &'a SmtpClient,
-    x: &'a str
-}
-
-#[async_trait]
-impl<'a> Service<(), ()> for UserService<'a> {
-   async fn execute(&self, _param: ()) -> Resolve<()> {
-       Ok(())
-   } 
+    async fn execute(&self, params: P) -> Resolve<T> where P: 'async_trait;
 }
 
