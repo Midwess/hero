@@ -1,3 +1,5 @@
+pub mod pool_allocator;
+
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn random_number_in_range(min: u32, max: u32) -> u32 {

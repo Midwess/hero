@@ -1,10 +1,10 @@
 use tonic::body::BoxBody;
 use tonic::codegen::http::{HeaderValue, Request, Response};
 use tonic::transport::Body;
-use tonic::async_trait;
 use tonic_middleware::{
     Middleware, ServiceBound,
 };
+use async_trait::async_trait;
 
 #[derive(Default, Clone)]
 pub struct ResponseHeaderHandler;

@@ -1,6 +1,6 @@
 #![feature(duration_constructors)]
+#![feature(type_alias_impl_trait)]
 
-use s3::S3Client;
 use surrealdb::{engine::remote::ws::Client, Surreal};
 
 pub mod services;
@@ -10,10 +10,7 @@ pub mod grpc;
 pub mod logger;
 pub mod utils;
 pub mod smtp;
-
-use once_cell::sync::Lazy;
-use tokio::sync::OnceCell;
+pub mod db;
 
 pub type Db = Surreal<Client>;
-pub static DB: Lazy<Db> = Lazy::new(Surreal::init);
-pub static S3_CLIENT: OnceCell<S3Client> = OnceCell::const_new();
+
