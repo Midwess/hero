@@ -193,16 +193,6 @@ pub struct PoolItem<T, P> where T: PoolResource<P>, P: Send + Sync {
     pub max_idling_timeout: Option<Duration>
 }
 
-impl<T, P> PoolItem<T, P> where T: PoolResource<P>, P: Send + Sync {
-    pub async fn invalidate(&mut self) {
-        let elapsed = self.start_time.elapsed();
-        if elapsed.gt(self.max_idling_timeout.as_ref().unwrap()) {
-            drop(self.resource.take())
-        }
-    }
-}
-
-
 impl<T, P> Deref for PoolItem<T, P> where T: PoolResource<P>, P: Send + Sync {
     type Target = T;
 
@@ -223,13 +213,13 @@ impl<T, P> Default for PoolItem<T, P> where T: PoolResource<P>, P: Send + Sync {
 }
 
 impl<T, P> PoolItem<T, P> where T: PoolResource<P>, P: Send + Sync {
-    pub async fn new(param: &P) -> Self {
+    pub async fn new(param: &P, max_idling_timeout: Option<Duration>) -> Self {
         let resource = T::new(param).await;
         Self {
             resource: Some(resource),
             start_time: Instant::now(),
             _marker: PhantomData::default(),
-            max_idling_timeout: None
+            max_idling_timeout
         }
     }
 
@@ -238,7 +228,17 @@ impl<T, P> PoolItem<T, P> where T: PoolResource<P>, P: Send + Sync {
     }
 
     pub fn put(&mut self, resource: T) {
-        self.resource = Some(resource)
+        self.resource = Some(resource);
+        self.start_time = Instant::now();
+    }
+
+    pub fn invalidate(&mut self) {
+        if self.max_idling_timeout.is_some() {
+            let elapsed = self.start_time.elapsed();
+            if elapsed.gt(self.max_idling_timeout.as_ref().unwrap()) {
+                drop(self.resource.take());
+            }
+        }
     }
 }
 
@@ -246,7 +246,7 @@ impl<T, P> PoolAllocator<T, P> where T: PoolResource<P>,  P: Send + Sync {
     pub async fn init(&mut self) {
        let mut pool = self.pool.write().await;
        for _i in 0..self.min_pool_size  {
-          pool.push(PoolItem::new(&self.new_resource_param).await) 
+          pool.push(PoolItem::new(&self.new_resource_param, Some(self.resource_idle_timeout)).await) 
        }
     }
 
@@ -262,7 +262,7 @@ impl<T, P> PoolAllocator<T, P> where T: PoolResource<P>,  P: Send + Sync {
         }
         else {
             if size < self.max_pool_size as usize {
-                let mut new_item = PoolItem::<T, P>::new(&self.new_resource_param).await;
+                let mut new_item = PoolItem::<T, P>::new(&self.new_resource_param, Some(self.resource_idle_timeout)).await;
                 let resource = new_item.take();
                 pool.push(new_item);
                 Some(resource)
@@ -284,6 +284,13 @@ impl<T, P> PoolAllocator<T, P> where T: PoolResource<P>,  P: Send + Sync {
             panic!("Panic ! pool cannot provide more resource than it can contains")
         }
     } 
+
+    pub async fn invalidate(&self) {
+        let mut pool = self.pool.write().await;
+        for pool_item in pool.iter_mut() {
+            pool_item.invalidate()
+        }
+    }
 }
 
 #[cfg(test)]
@@ -322,8 +329,7 @@ pub mod test {
         let response = requester.retreive().await;
         //let response = requester.retreive().await;
         assert_eq!(response.is_some(), true);
-        //
-        //drop(response);
+        drop(response);
         //
     }
 }
