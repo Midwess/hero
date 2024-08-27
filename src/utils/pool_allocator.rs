@@ -1,39 +1,51 @@
-use std::{marker::PhantomData, ops::Deref, sync::Arc, thread::scope, time::{Duration, Instant}};
-use tokio::{join, runtime::Runtime, spawn, sync::{Mutex, RwLock}, time::sleep};
+use std::{marker::PhantomData, ops::Deref, sync::Arc, time::{Duration, Instant}};
+use tokio::{spawn, sync::RwLock};
 
-/* 
- * Resource pool
- * A Pool is created using PoolBuilder which require two generic, one for type of parameter to use
- * as an input of creation, another is the resource type.
- * PoolRequest will keep reference to Pool through Arc, handle communication with pool
- * PoolRequest return a PoolResponse which will also keep reference to pool using Arc
- * After the PoolResponse were dropped it will return the resource back to the pool
- */
+/// Pool to provide a set of the same resource such as Http connection, Database connection, Socket connection.
+/// Can use to serve high concurrent requests
+/// How does it work:
+/// PoolBuilder creates a PoolAllocator which will accept:
+/// - Your resource which required to impl trait PoolResource
+/// - Your parameter during the initallization of resource
+/// PoolRequestBuilder creates PoolRequest which will accept:
+/// - A PoolAllocator
+/// How it works:
+/// - PoolRequest request the PoolAllocator to provide new source
+/// - PoolAllocator will return:
+///     - First available resource if found
+///     - Init more available resource if not reach max pool size
+/// - PoolRequest will:
+///     - Return PoolResponse if PoolAllocator return a success response
+///     - Wait for retreiving_timeout until PoolAllocator have new resource to return
+/// - PoolResponse will:
+///     - Return the resource to the pool when it is dropped, you can manually do that by calling
+///     drop(response)
+///     - PoolResponse is implement Deref to resource
 
 pub trait PoolResource<P>: Send + Sync where P: Send + Sync {
     fn new(param: &P) -> impl std::future::Future<Output = Self>;
 }
 
 pub struct PoolRequest<T, P> where T: PoolResource<P> + 'static, P: Send + Sync {
-    retreving_timeout: Duration,
+    retreving_timeout: Option<Duration>,
     pub pool: Arc<PoolAllocator<T, P>>,
 }
 
 pub struct PoolRequestBuilder<T, P> where T: PoolResource<P>, P: Send + Sync {
-    retreiving_timeout: Duration,
+    retreiving_timeout: Option<Duration>,
     pool_sync: Option<Arc<PoolAllocator<T, P>>>,
 }
 
 impl<T, P> PoolRequestBuilder<T, P> where T: PoolResource<P>, P: Send + Sync {
     pub fn new() -> Self {
         Self {
-            retreiving_timeout: Duration::new(20, 0),
+            retreiving_timeout: None,
             pool_sync: None
         }
     }
 
     pub fn retreiving_timeout(mut self, timeout: Duration) -> Self {
-        self.retreiving_timeout = timeout;
+        self.retreiving_timeout = Some(timeout);
         self
     }
 
@@ -70,13 +82,37 @@ impl<T, P> Deref for PoolResponse<T, P> where T: PoolResource<P>,  P: Send + Syn
 }
 
 impl<T, P> PoolRequest<T, P> where T: PoolResource<P>,  P: Send + Sync + 'static {
-    pub async fn retreive(&self) -> PoolResponse<T, P> {
+    pub async fn retreive(&self) -> Option<PoolResponse<T, P>> {
         let resource = self.pool.retrieve().await;
 
-        PoolResponse {
+        if resource.is_none() {
+            if self.retreving_timeout.is_none() {
+                return None
+            }
+
+            // Wait for available resource within timeout
+            let now = Instant::now();
+            let mut elapsed = Duration::new(0, 0);
+
+            while elapsed.lt(self.retreving_timeout.as_ref().unwrap()) {
+                let resource = self.pool.retrieve().await;
+                if resource.is_some() {
+                    return Some(PoolResponse {
+                        resource,
+                        pool: Some(self.pool.clone())
+                    })
+                }
+
+                elapsed = now.elapsed();
+            }
+
+            return None
+        }
+
+        Some(PoolResponse {
             resource,
             pool: Some(self.pool.clone())
-        }
+        })
     }
 }
 
@@ -87,18 +123,17 @@ impl<T, P> Drop for PoolResponse<T, P> where T: PoolResource<P>, P: Send + Sync 
 
         spawn(async move {
             pool.expect("This response already dropped").put(resource.expect("The response already dropped")).await;
-            println!("Returned 1 resource to pool in async");
         });
     }
 }
 
 #[derive(Clone)]
 pub struct PoolAllocator <T, P> where T: PoolResource<P>,  P: Send + Sync {
-    pub pool: Arc<RwLock<Vec<PoolItem<T, P>>>>,
-    pub min_pool_size: i8,
-    pub max_pool_size: i8,
-    pub resource_idle_timeout: Duration,
-    pub new_resource_param: P,
+    pool: Arc<RwLock<Vec<PoolItem<T, P>>>>,
+    min_pool_size: i8,
+    max_pool_size: i8,
+    resource_idle_timeout: Duration,
+    new_resource_param: P,
 }
 
 pub struct PoolBuilder<P> where P: Send + Sync + 'static {
@@ -136,6 +171,11 @@ impl<P> PoolBuilder<P> where P: Send + Sync + 'static {
 
     pub async fn build<T>(&mut self) -> PoolAllocator<T, P> where T: PoolResource<P> {
         let pool = Vec::with_capacity(self.min_pool_size as usize); 
+
+        if self.max_pool_size < self.min_pool_size {
+            panic!("The max pool size can not less than min pool size");
+        }
+
         PoolAllocator {
             max_pool_size: self.max_pool_size,
             min_pool_size: self.min_pool_size,
@@ -149,6 +189,17 @@ impl<P> PoolBuilder<P> where P: Send + Sync + 'static {
 pub struct PoolItem<T, P> where T: PoolResource<P>, P: Send + Sync {
     _marker: PhantomData<P>,
     pub resource: Option<T>,
+    pub start_time: Instant,
+    pub max_idling_timeout: Option<Duration>
+}
+
+impl<T, P> PoolItem<T, P> where T: PoolResource<P>, P: Send + Sync {
+    pub async fn invalidate(&mut self) {
+        let elapsed = self.start_time.elapsed();
+        if elapsed.gt(self.max_idling_timeout.as_ref().unwrap()) {
+            drop(self.resource.take())
+        }
+    }
 }
 
 
@@ -164,7 +215,9 @@ impl<T, P> Default for PoolItem<T, P> where T: PoolResource<P>, P: Send + Sync {
     fn default() -> Self {
         Self {
             resource: None,
-            _marker: PhantomData::default()
+            start_time: Instant::now(),
+            _marker: PhantomData::default(),
+            max_idling_timeout: None,
         }
     }
 }
@@ -174,7 +227,9 @@ impl<T, P> PoolItem<T, P> where T: PoolResource<P>, P: Send + Sync {
         let resource = T::new(param).await;
         Self {
             resource: Some(resource),
-            _marker: PhantomData::default()
+            start_time: Instant::now(),
+            _marker: PhantomData::default(),
+            max_idling_timeout: None
         }
     }
 
@@ -233,7 +288,6 @@ impl<T, P> PoolAllocator<T, P> where T: PoolResource<P>,  P: Send + Sync {
 
 #[cfg(test)]
 pub mod test {
-    use std::sync::Arc;
     use crate::utils::pool_allocator::*;
 
     pub struct Db {}
@@ -248,29 +302,26 @@ pub mod test {
     pub async fn test_pool() {
         let builder = PoolBuilder::new(());
         let pool = builder
-            .min_pool_size(1)
+            .min_pool_size(4)
             .max_pool_size(2)
             .build::<Db>()
             .await;
 
         let requester = PoolRequestBuilder::new()
             .pool(pool)
+            .retreiving_timeout(Duration::new(10, 0))
             .build();
 
         let response = requester.retreive().await;
-        println!("Requested 1");
 
-        assert_eq!(response.resource.is_some(), true);
+        assert_eq!(response.is_some(), true);
         let response = requester.retreive().await;
-        println!("Requested 2");
         drop(response);
         let response = requester.retreive().await;
-        assert_eq!(response.resource.is_some(), true);
-        println!("Requested 3");
-        drop(response);
+        assert_eq!(response.is_some(), true);
         let response = requester.retreive().await;
         //let response = requester.retreive().await;
-        assert_eq!(response.resource.is_some(), true);
+        assert_eq!(response.is_some(), true);
         //
         //drop(response);
         //
