@@ -1,26 +1,26 @@
-use std::{ops::Deref, sync::Arc, thread::scope, time::{Duration, Instant}};
+use std::{marker::PhantomData, ops::Deref, sync::Arc, thread::scope, time::{Duration, Instant}};
 use tokio::{join, runtime::Runtime, spawn, sync::{Mutex, RwLock}, time::sleep};
 
-pub trait PoolItem<P>: Send + Sync where P: Send + Sync {
+pub trait PoolResource<P>: Send + Sync where P: Send + Sync {
     fn new(param: &P) -> impl std::future::Future<Output = Self>;
 }
 
-pub struct PoolRequest<T, P> where T: PoolItem<P> + 'static, P: Send + Sync {
+pub struct PoolRequest<T, P> where T: PoolResource<P> + 'static, P: Send + Sync {
     pub pool: Arc<PoolAllocator<T, P>>,
 }
 
-impl<T, P> Clone for PoolRequest<T, P> where T: PoolItem<P>,  P: Send + Sync {
+impl<T, P> Clone for PoolRequest<T, P> where T: PoolResource<P>,  P: Send + Sync {
     fn clone(&self) -> Self {
         Self { pool: self.pool.clone() }
     }
 }
 
-pub struct PoolResponse<T, P> where T: PoolItem<P> + 'static,  P: Send + Sync + 'static {
+pub struct PoolResponse<T, P> where T: PoolResource<P> + 'static,  P: Send + Sync + 'static {
     resource: Option<T>,
     pool: Option<Arc<PoolAllocator<T, P>>>
 }
 
-impl<T, P> Deref for PoolResponse<T, P> where T: PoolItem<P>,  P: Send + Sync {
+impl<T, P> Deref for PoolResponse<T, P> where T: PoolResource<P>,  P: Send + Sync {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -28,7 +28,7 @@ impl<T, P> Deref for PoolResponse<T, P> where T: PoolItem<P>,  P: Send + Sync {
     }
 }
 
-impl<T, P> PoolRequest<T, P> where T: PoolItem<P>,  P: Send + Sync + 'static {
+impl<T, P> PoolRequest<T, P> where T: PoolResource<P>,  P: Send + Sync + 'static {
     pub async fn retreive(&self) -> PoolResponse<T, P> {
         let resource = self.pool.retrieve().await;
 
@@ -39,7 +39,7 @@ impl<T, P> PoolRequest<T, P> where T: PoolItem<P>,  P: Send + Sync + 'static {
     }
 }
 
-impl<T, P> Drop for PoolResponse<T, P> where T: PoolItem<P>, P: Send + Sync {
+impl<T, P> Drop for PoolResponse<T, P> where T: PoolResource<P>, P: Send + Sync {
     fn drop(&mut self) {
         let pool = self.pool.take();
         let resource = self.resource.take();
@@ -52,88 +52,141 @@ impl<T, P> Drop for PoolResponse<T, P> where T: PoolItem<P>, P: Send + Sync {
 }
 
 #[derive(Clone)]
-pub struct PoolAllocator <T, P> where T: PoolItem<P>,  P: Send + Sync {
-    pub pool: Arc<RwLock<Vec<Option<T>>>>,
+pub struct PoolAllocator <T, P> where T: PoolResource<P>,  P: Send + Sync {
+    pub pool: Arc<RwLock<Vec<PoolItem<T, P>>>>,
     pub min_pool_size: i8,
     pub max_pool_size: i8,
-    pub retreiving_timeout: Duration,
-    pub new_resource_param: P
+    pub resource_idle_timeout: Duration,
+    pub new_resource_param: P,
 }
 
-impl<T, P> PoolAllocator<T, P> where T: PoolItem<P>,  P: Send + Sync {
-    pub async fn new(min_size: i8, max_size: i8, new_resource_param: P, retreiving_timeout: Duration) -> Self {
-       let mut pool = Vec::with_capacity(max_size as usize); 
-       for _i in 0..min_size  {
-          pool.push(Some(T::new(&new_resource_param).await)) 
-       };
+pub struct PoolBuilder<P> where P: Send + Sync + 'static {
+    min_pool_size: i8,
+    max_pool_size: i8,
+    resource_idle_timeout: Duration,
+    new_parameter_resource: Option<P>
+}
 
-       Self {
-           pool: Arc::new(RwLock::new(pool)),
-           max_pool_size: max_size,
-           min_pool_size: min_size,
-           retreiving_timeout,
-           new_resource_param
+impl<P> PoolBuilder<P> where P: Send + Sync + 'static {
+    pub fn new(pool_param: P) -> Self {
+        Self {
+            min_pool_size: 10,
+            max_pool_size: 20,
+            resource_idle_timeout: Duration::new(10, 0),
+            new_parameter_resource: Some(pool_param)
+        }
+    }
+
+    pub fn min_pool_size(mut self, size: i8) -> Self {
+        if size <= 0 {
+            panic!("The pool size must be positive");
+        }
+
+        self.min_pool_size = size;
+
+        self
+    }
+
+    pub fn max_pool_size(mut self, size: i8) -> Self {
+        self.max_pool_size = size;
+
+        self
+    }
+
+    pub async fn build<T>(&mut self) -> PoolAllocator<T, P> where T: PoolResource<P> {
+        let pool = Vec::with_capacity(self.min_pool_size as usize); 
+        PoolAllocator {
+            max_pool_size: self.max_pool_size,
+            min_pool_size: self.min_pool_size,
+            new_resource_param: self.new_parameter_resource.take().unwrap(),
+            resource_idle_timeout: self.resource_idle_timeout,
+            pool: Arc::new(RwLock::new(pool))
+        }
+    }
+}
+
+pub struct PoolItem<T, P> where T: PoolResource<P>, P: Send + Sync {
+    _marker: PhantomData<P>,
+    pub resource: Option<T>,
+}
+
+
+impl<T, P> Deref for PoolItem<T, P> where T: PoolResource<P>, P: Send + Sync {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.resource.as_ref().expect("The resource has been invalidated or not initialized before use")
+    }
+}
+
+impl<T, P> Default for PoolItem<T, P> where T: PoolResource<P>, P: Send + Sync {
+    fn default() -> Self {
+        Self {
+            resource: None,
+            _marker: PhantomData::default()
+        }
+    }
+}
+
+impl<T, P> PoolItem<T, P> where T: PoolResource<P>, P: Send + Sync {
+    pub async fn new(param: &P) -> Self {
+        let resource = T::new(param).await;
+        Self {
+            resource: Some(resource),
+            _marker: PhantomData::default()
+        }
+    }
+
+    pub fn take(&mut self) -> T {
+        self.resource.take().unwrap()
+    }
+
+    pub fn put(&mut self, resource: T) {
+        self.resource = Some(resource)
+    }
+}
+
+impl<T, P> PoolAllocator<T, P> where T: PoolResource<P>,  P: Send + Sync {
+    pub async fn init(&mut self) {
+       let mut pool = self.pool.write().await;
+       for _i in 0..self.min_pool_size  {
+          pool.push(PoolItem::new(&self.new_resource_param).await) 
        }
     }
 
     pub async fn retrieve(&self) -> Option<T> {
-        let (resource, len): (Option<T>, usize) = {
-            let mut pool = self.pool.write().await;
-            let size = pool.len();
+        // Request the write to ensure that there is no dangling data
+        let mut pool = self.pool.write().await;
+        let size = pool.len();
             
-            let found_available_index = pool.iter().position(|it| it.is_some());
-            if found_available_index.is_some() {
-                let resource = std::mem::replace(&mut pool[found_available_index.unwrap()], None);
-                (resource, size)
+        let found_available_index = pool.iter().position(|it| it.resource.is_some());
+        if found_available_index.is_some() {
+            let pool_item = pool.get_mut(found_available_index.unwrap()).expect("Panic! UnExpected result, the pool item must be exist");
+            return Some(pool_item.take());
+        }
+        else {
+            if size < self.max_pool_size as usize {
+                let mut new_item = PoolItem::<T, P>::new(&self.new_resource_param).await;
+                let resource = new_item.take();
+                pool.push(new_item);
+                Some(resource)
             }
             else {
-                if size < self.max_pool_size as usize {
-                    pool.push(None);
-                }
-
-                (Option::<T>::None, size)
+                None
             }
-        };
-
-        match resource {
-           Some(resource) => {
-               return Some(resource)
-           },
-           None => {
-                if len < self.max_pool_size as usize {
-                    return Some(T::new(&self.new_resource_param).await);
-                }
-
-                let start_time = Instant::now();
-                let mut elapsed = Duration::new(0, 0);
-                while elapsed.lt(&self.retreiving_timeout) {
-                    elapsed = start_time.elapsed();
-
-                    let mut pool = self.pool.write().await;
-                    let found_available_index = pool.iter().position(|it| it.is_some());
-                    if found_available_index.is_some() {
-                        let resource = std::mem::replace(&mut pool[found_available_index.unwrap()], None);
-                        return resource;
-                    }
-                }
-
-                return None
-           }
         }
     }
 
-    pub async fn put(&self, pool_item: T) {
+    pub async fn put(&self, resource: T) {
         let mut pool = self.pool.write().await;
-        let found_unavailable_index = pool.iter().position(|it| it.is_none());
-        if found_unavailable_index.is_none() {
-            if pool.len() < self.max_pool_size as usize {
-                pool.push(Some(pool_item))
-            }
-
-            return;
+        let found_unavailable_index = pool.iter().position(|it| it.resource.is_none());
+        if found_unavailable_index.is_some() {
+            let available_pool_item = pool.get_mut(found_unavailable_index.unwrap()).expect("Panic ! A resource when leave pool must always have place to be returned to pool");
+            available_pool_item.put(resource);
         }
-
-        let _ = std::mem::replace(&mut pool[found_unavailable_index.unwrap()], Some(pool_item));
+        else {
+            panic!("Panic ! pool cannot provide more resource than it can contains")
+        }
     } 
 }
 
@@ -142,12 +195,9 @@ pub mod test {
     use std::sync::Arc;
     use crate::utils::pool_allocator::*;
 
-    use tokio::sync::Mutex;
-    use tokio::time::sleep;
-
     pub struct Db {}
 
-    impl PoolItem<()> for Db {
+    impl PoolResource<()> for Db {
         async fn new(param: &()) -> Self {
             Self {}
         }
@@ -155,7 +205,14 @@ pub mod test {
 
     #[tokio::test]
     pub async fn test_pool() {
-        let pool = Arc::new(PoolAllocator::<Db, ()>::new(1, 2, (), Duration::new(10, 0)).await);
+        let builder = PoolBuilder::new(());
+        let pool = builder
+            .min_pool_size(1)
+            .max_pool_size(2)
+            .build::<Db>()
+            .await;
+
+        let pool = Arc::new(pool);
         let requester = PoolRequest {
             pool: pool.clone()
         };
@@ -172,9 +229,8 @@ pub mod test {
         println!("Requested 3");
         drop(response);
         let response = requester.retreive().await;
-        //
         //let response = requester.retreive().await;
-        //assert_eq!(response.resource.is_some(), true);
+        assert_eq!(response.resource.is_some(), true);
         //
         //drop(response);
         //
