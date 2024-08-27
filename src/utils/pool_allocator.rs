@@ -1,17 +1,58 @@
 use std::{marker::PhantomData, ops::Deref, sync::Arc, thread::scope, time::{Duration, Instant}};
 use tokio::{join, runtime::Runtime, spawn, sync::{Mutex, RwLock}, time::sleep};
 
+/* 
+ * Resource pool
+ * A Pool is created using PoolBuilder which require two generic, one for type of parameter to use
+ * as an input of creation, another is the resource type.
+ * PoolRequest will keep reference to Pool through Arc, handle communication with pool
+ * PoolRequest return a PoolResponse which will also keep reference to pool using Arc
+ * After the PoolResponse were dropped it will return the resource back to the pool
+ */
+
 pub trait PoolResource<P>: Send + Sync where P: Send + Sync {
     fn new(param: &P) -> impl std::future::Future<Output = Self>;
 }
 
 pub struct PoolRequest<T, P> where T: PoolResource<P> + 'static, P: Send + Sync {
+    retreving_timeout: Duration,
     pub pool: Arc<PoolAllocator<T, P>>,
+}
+
+pub struct PoolRequestBuilder<T, P> where T: PoolResource<P>, P: Send + Sync {
+    retreiving_timeout: Duration,
+    pool_sync: Option<Arc<PoolAllocator<T, P>>>,
+}
+
+impl<T, P> PoolRequestBuilder<T, P> where T: PoolResource<P>, P: Send + Sync {
+    pub fn new() -> Self {
+        Self {
+            retreiving_timeout: Duration::new(20, 0),
+            pool_sync: None
+        }
+    }
+
+    pub fn retreiving_timeout(mut self, timeout: Duration) -> Self {
+        self.retreiving_timeout = timeout;
+        self
+    }
+
+    pub fn pool(mut self, pool: PoolAllocator<T, P>) -> Self {
+        self.pool_sync = Some(Arc::new(pool));
+        self
+    }
+
+    pub fn build(mut self) -> PoolRequest<T, P> {
+        PoolRequest {
+            retreving_timeout: self.retreiving_timeout,
+            pool: self.pool_sync.take().expect("Pool must be set")
+        }
+    }
 }
 
 impl<T, P> Clone for PoolRequest<T, P> where T: PoolResource<P>,  P: Send + Sync {
     fn clone(&self) -> Self {
-        Self { pool: self.pool.clone() }
+        Self { pool: self.pool.clone(), retreving_timeout: self.retreving_timeout.clone() }
     }
 }
 
@@ -212,10 +253,9 @@ pub mod test {
             .build::<Db>()
             .await;
 
-        let pool = Arc::new(pool);
-        let requester = PoolRequest {
-            pool: pool.clone()
-        };
+        let requester = PoolRequestBuilder::new()
+            .pool(pool)
+            .build();
 
         let response = requester.retreive().await;
         println!("Requested 1");
