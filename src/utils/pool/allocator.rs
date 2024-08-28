@@ -1,5 +1,6 @@
 use std::{marker::PhantomData, ops::Deref, sync::Arc, time::{Duration, Instant}};
 
+use aws_sdk_s3::operation::put_object_legal_hold::builders::PutObjectLegalHoldInputBuilder;
 use tokio::sync::RwLock;
 
 use super::cleanup::{CleanupStrategy, PoolCleanup};
@@ -34,6 +35,7 @@ pub struct PoolAllocator <T, P> where T: PoolResource<P> + 'static,  P: Send + S
     max_pool_size: i8,
     resource_idle_timeout: Duration,
     new_resource_param: P,
+    // Keep the reference, make sure the life time of Cleanup always belong to PoolAllocator
     pool_cleanup: PoolCleanup<T, P>
 }
 
@@ -72,6 +74,11 @@ impl<P> PoolBuilder<P> where P: Send + Sync + 'static {
         self
     }
 
+    pub fn cleanup(mut self, strategy: CleanupStrategy) -> Self {
+        self.cleanup_strategy = Some(strategy);
+        self
+    }
+
     pub async fn build<T>(&mut self) -> Arc<PoolAllocator<T, P>> where T: PoolResource<P> + 'static, P: Send + Sync + 'static {
         let pool = Vec::with_capacity(self.min_pool_size as usize); 
 
@@ -81,17 +88,19 @@ impl<P> PoolBuilder<P> where P: Send + Sync + 'static {
 
         let pool = Arc::new(RwLock::new(pool));
 
-        let mut cleanup = PoolCleanup::new(pool.clone(), self.cleanup_strategy.take().unwrap());
-        cleanup.start_background();
-
-        Arc::new(PoolAllocator {
+        let cleanup = PoolCleanup::new(pool.clone(), self.cleanup_strategy.take().unwrap());
+        let mut pool_allocator = PoolAllocator {
             max_pool_size: self.max_pool_size,
             min_pool_size: self.min_pool_size,
             new_resource_param: self.new_parameter_resource.take().unwrap(),
             resource_idle_timeout: self.resource_idle_timeout,
             pool,
             pool_cleanup: cleanup
-        })
+        };
+
+        pool_allocator.init().await;
+
+        Arc::new(pool_allocator)
     }
 }
 
@@ -160,6 +169,8 @@ impl<T, P> PoolAllocator<T, P> where T: PoolResource<P>,  P: Send + Sync {
        for _i in 0..self.min_pool_size  {
           pool.push(PoolItem::new(&self.new_resource_param, Some(self.resource_idle_timeout)).await) 
        }
+
+       self.pool_cleanup.start_background();
     }
 
     pub async fn retrieve(&self) -> Option<T> {
