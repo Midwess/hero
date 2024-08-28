@@ -1,4 +1,5 @@
 pub mod pool_allocator;
+pub mod pool;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 

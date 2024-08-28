@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use surrealdb::{engine::remote::ws::{Client, Ws}, opt::auth::Database, Surreal};
 
-use crate::{utils::pool_allocator::{PoolItem, PoolResource}, Db};
+use crate::{utils::pool::allocator::PoolResource, Db};
 
 #[derive(Debug, Clone)]
 pub struct SurrealDbConnectionInfo {
