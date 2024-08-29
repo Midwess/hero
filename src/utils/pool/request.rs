@@ -1,9 +1,12 @@
-use std::{marker::PhantomData, sync::Arc, time::{Duration, Instant}};
+use std::{marker::PhantomData, sync::{Arc, Mutex}, time::{Duration, Instant}};
+use tokio::sync::RwLock;
+
 use super::{allocator::{PoolAllocator, PoolResource}, reponse::PoolResponse};
 
 pub struct PoolRequest<T, P> where T: PoolResource<P> + 'static, P: Send + Sync + 'static {
     _marker: PhantomData<T>,
     retreving_timeout: Option<Duration>,
+    resource: Arc<RwLock<Option<T>>>,
     pub pool: Arc<PoolAllocator<T, P>>,
 }
 
@@ -35,6 +38,7 @@ impl<T, P> PoolRequestBuilder<T, P> where T: PoolResource<P>, P: Send + Sync {
     pub fn build(mut self) -> PoolRequest<T, P> {
         PoolRequest {
             _marker: PhantomData::default(),
+            resource: Arc::new(RwLock::new(None)),
             retreving_timeout: self.retreiving_timeout,
             pool: self.pool_sync.take().expect("Pool must be set")
         }
@@ -45,6 +49,7 @@ impl<T, P> Clone for PoolRequest<T, P> where T: PoolResource<P>,  P: Send + Sync
     fn clone(&self) -> Self {
         Self {
             _marker: PhantomData::default(),
+            resource: Arc::new(RwLock::new(None)),
             pool: self.pool.clone(),
             retreving_timeout: self.retreving_timeout.clone()
         }
@@ -76,7 +81,9 @@ impl<T, P> PoolRequest<T, P> where T: PoolResource<P>,  P: Send + Sync + 'static
             return None
         }
 
-        Some(PoolResponse::new(resource.unwrap(), self.pool.clone()))
+        let response = PoolResponse::new(resource.unwrap(), self.pool.clone());
+
+        Some(response)
     }
 }
 

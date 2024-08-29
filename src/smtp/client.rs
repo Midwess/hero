@@ -9,30 +9,28 @@ use lettre::transport::smtp::authentication::Credentials;
 use schema::misc::datetime::Datetime;
 use lettre::message::header::ContentType;
 use crate::services::errors::Errors;
+use crate::utils::pool::allocator::PoolResource;
+use crate::utils::pool::request::PoolRequest;
 use crate::{config::CONFIGS, services::base::Resolve};
 use crate::smtp::template::EmailTemplate;
 
+impl PoolResource<()> for SmtpTransport {
+    async fn new(_p: &()) -> Self {
+        let creds = Credentials::new(CONFIGS.smtp.username.clone(), CONFIGS.smtp.password.clone());
+        let connection_string = format!("{}", CONFIGS.smtp.host);
+        SmtpTransport::relay(connection_string.as_str())
+            .unwrap()
+            .credentials(creds)
+            .build()
+    }
+}
+
 #[derive(Clone)]
 pub struct SmtpClient {
-    transport: SmtpTransport,
-    connection_string: String
+    pub transport: PoolRequest<SmtpTransport, ()>,
 }
 
 impl SmtpClient {
-    pub fn new() -> Self {
-        let creds = Credentials::new(CONFIGS.smtp.username.clone(), CONFIGS.smtp.password.clone());
-        let connection_string = format!("{}", CONFIGS.smtp.host);
-        let transport = SmtpTransport::relay(connection_string.as_str())
-            .unwrap()
-            .credentials(creds)
-            .build();
-
-        Self {
-            transport,
-            connection_string
-        }
-    }
-
     pub async fn send(&self, template: EmailTemplate) -> Resolve<()> {
         let subject = match &template {
             EmailTemplate::WelcomeNewMember(_) => "Welcome our new members"
@@ -51,8 +49,9 @@ impl SmtpClient {
             .body(html)
             .unwrap();
 
-        self.transport.send(&message).map_err(|e| {
-            Errors::FailedToSendEmail(format!("Failed to send email to smtp server={}, error={:?}", self.connection_string, e))
+        let transport = self.transport.retreive().await.unwrap();
+        transport.send(&message).map_err(|e| {
+            Errors::FailedToSendEmail(format!("Failed to send email, error={:?}", e))
         })?;
 
         Ok(())

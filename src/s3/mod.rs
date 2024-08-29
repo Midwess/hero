@@ -4,31 +4,31 @@ use aws_config::meta::region::RegionProviderChain;
 use log::info;
 use schema::misc::s3::s3_object::Content;
 use schema::misc::s3::S3Object;
-use crate::{config::CONFIGS, services::{base::Resolve, errors::Errors}};
+use crate::{config::CONFIGS, services::{base::Resolve, errors::Errors}, utils::pool::{allocator::PoolResource, request::PoolRequest}};
 
-#[derive(Debug, Clone)]
-pub struct S3Client {
-    client: Client
-}
-
-impl S3Client {
-    pub async fn new() -> Self {
+impl PoolResource<()> for Client {
+    async fn new(_param: &()) -> Self {
         let region_provider = RegionProviderChain::default_provider().or_else("us-east-1");
         let config = aws_config::from_env()
             .region(region_provider).load().await;
-        let client = Client::new(&config);
-
-        Self {
-            client
-        }
+        Client::new(&config)
     }
+}
 
+#[derive(Clone)]
+pub struct S3Client {
+    pub client: PoolRequest<Client, ()>
+}
+
+impl S3Client {
     pub async fn get_objects(&self, prefix: String) -> Resolve<Vec<S3Object>> {
-        let list_objects_resp = self.client.list_objects_v2()
+        let client = self.client.retreive().await.unwrap();
+        let list_objects_resp = client.list_objects_v2()
             .bucket(CONFIGS.aws_s3.bucket_name.clone())
             .prefix(prefix.clone())
             .send()
             .await?;
+        drop(client);
 
         let mut result: Vec<S3Object> = vec![];
         for object in list_objects_resp.contents() {
@@ -72,12 +72,15 @@ impl S3Client {
        };
 
        let presigning_config = PresigningConfig::expires_in(duration)?;
-       let presigned_req = self.client
+       let client = self.client.retreive().await.unwrap();
+       let presigned_req = client
            .get_object()
            .bucket(CONFIGS.aws_s3.bucket_name.clone())
            .key(path)
            .presigned(presigning_config)
            .await?;
+
+       drop(client);
 
        s3_object.content = Some(Content::DownloadUrl(presigned_req.uri().to_owned()));
 

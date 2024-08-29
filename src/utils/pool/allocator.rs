@@ -1,6 +1,5 @@
 use std::{marker::PhantomData, ops::Deref, sync::Arc, time::{Duration, Instant}};
 
-use aws_sdk_s3::operation::put_object_legal_hold::builders::PutObjectLegalHoldInputBuilder;
 use tokio::sync::RwLock;
 
 use super::cleanup::{CleanupStrategy, PoolCleanup};

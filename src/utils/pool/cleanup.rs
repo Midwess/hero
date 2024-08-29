@@ -1,9 +1,8 @@
 use std::{marker::PhantomData, sync::Arc, time::Duration};
 
-use log::info;
-use tokio::{spawn, sync::RwLock, task::JoinHandle, time::{sleep, Interval}};
+use tokio::{spawn, sync::RwLock, task::JoinHandle, time::sleep};
 
-use super::allocator::{PoolAllocator, PoolItem, PoolResource};
+use super::allocator::{PoolItem, PoolResource};
 
 pub enum CleanupStrategy {
     Easy,
