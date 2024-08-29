@@ -12,7 +12,7 @@ use core_services::{
 use super::{GenerateGuestParams, UserService};
 
 #[async_trait::async_trait]
-impl<'a> Service<GenerateGuestParams, User> for UserService<'a> {
+impl<'a> Service<GenerateGuestParams, User> for UserService {
     async fn execute(&self, params: GenerateGuestParams) -> Resolve<User> {
         let mut default_avatar_path = self.s3.get_default_avatars_object().await?;
         let random_index = random_number_in_range(0, default_avatar_path.iter().count() as u32);

@@ -1245,10 +1245,12 @@ name = "devlog-sdk"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "aws-sdk-s3",
  "chrono",
  "core-services",
  "jsonwebtoken",
  "lazy_static",
+ "lettre",
  "log",
  "once_cell",
  "schema",

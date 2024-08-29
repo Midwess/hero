@@ -14,7 +14,7 @@ use crate::services::{token::GenerateBy, user::SignupResult};
 use super::UserService;
 
 #[async_trait]
-impl<'a> Service<&'a SignUpMethod, SignupResult> for UserService<'a> {
+impl<'a> Service<&'a SignUpMethod, SignupResult> for UserService {
     async fn execute(&self, params: &'a SignUpMethod) -> Resolve<SignupResult> {
         let email: Option<&str> = match params.method.as_ref().unwrap() {
             sign_up_method::Method::ByEmail(value) => Some(value.email.as_str()),

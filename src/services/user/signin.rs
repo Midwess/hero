@@ -13,7 +13,7 @@ use crate::services::{token::GenerateBy, user::SigninResult};
 use super::UserService;
 
 #[async_trait]
-impl<'a> Service<&'a SignInMethod, SigninResult> for UserService<'a> {
+impl<'a> Service<&'a SignInMethod, SigninResult> for UserService {
     async fn execute(&self, params: &'a SignInMethod) -> Resolve<SigninResult> {
         let method = params.method.as_ref().unwrap();
         match method {

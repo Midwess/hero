@@ -1,55 +1,44 @@
-use std::sync::Arc;
-
 use core_services::db::{SurrealDbConnection, SurrealDbConnectionInfo};
-use core_services::utils::pool_allocator::{PoolAllocator, PoolRequest};
+use core_services::utils::pool::request::PoolRequest;
 use core_services::{s3::S3Client, smtp::client::SmtpClient};
-use tokio::sync::Mutex;
+use lettre::{SmtpTransport, Transport};
+use crate::repository::surrealdb::user::UserRepositorySurrealDb;
 use crate::repository::user::UserRepository;
 use crate::services::token::TokenService;
 use crate::services::user::{GenerateGuestService, SignInService, SignupService, UserService};
-use crate::repository::surrealdb::user::UserRepositorySurrealDb;
 
 pub trait DependenciesInjection {
     fn signin_service(&self) -> impl SignInService;
     fn signup_service(&self) -> impl SignupService;
     fn generate_guest_service(&self) -> impl GenerateGuestService;
     fn user_repository(&self) -> Box<dyn UserRepository>;
+    fn s3_client(&self) -> S3Client;
+    fn smtp_client(&self) -> SmtpClient;
 }
 
-pub struct ScopedDependencies {
-    pub smtp_client: SmtpClient,
-    pub s3: S3Client,
-    pub db_pool: Arc<Mutex<PoolAllocator<SurrealDbConnection, SurrealDbConnectionInfo>>>,
-    pub user_repository: Box<dyn UserRepository + Send + Sync>
-
+pub struct SharingResource {
+    pub smtp_client: PoolRequest<SmtpTransport, ()>,
+    pub s3: PoolRequest<aws_sdk_s3::client::Client, ()>,
+    pub devlog_db: PoolRequest<SurrealDbConnection, SurrealDbConnectionInfo> 
 }
 
 pub struct DevlogSdk {
-    app_scoped: ScopedDependencies
+    sharing_resource: SharingResource
 }
 
 impl DevlogSdk {
-    pub fn new(smtp_client: &SmtpClient, s3: &S3Client, db_pool: Arc<Mutex<PoolAllocator<SurrealDbConnection, SurrealDbConnectionInfo>>>) -> Self {
-        let db_request = PoolRequest {
-            pool: db_pool.clone()
-        };
-
+    pub fn new(sharing_resource: SharingResource) -> Self {
         Self {
-            app_scoped: ScopedDependencies {
-                user_repository: Box::new(UserRepositorySurrealDb {db: db_request.clone()}),
-                smtp_client: smtp_client.clone(),
-                s3: s3.clone(),
-                db_pool
-            }
+            sharing_resource
         }
     }
 
     fn new_user_service(&self) -> UserService {
         UserService {
-            user_repository: &self.app_scoped.user_repository,
+            user_repository: self.user_repository(),
             token_service: self.new_token_service(),
-            s3: &self.app_scoped.s3,
-            smtp_client: &self.app_scoped.smtp_client,
+            s3: self.s3_client(),
+            smtp_client: self.smtp_client(),
         }
     } 
 
@@ -72,8 +61,21 @@ impl DependenciesInjection for DevlogSdk {
     }
 
     fn user_repository(&self) -> Box<dyn UserRepository> {
-       Box::new(UserRepositorySurrealDb {
-            db: PoolRequest { pool: self.app_scoped.db_pool.clone() }
-       })
+        Box::new(UserRepositorySurrealDb {
+            db: self.sharing_resource.devlog_db.clone()
+        })
+    }
+
+    fn s3_client(&self) -> S3Client {
+        S3Client {
+            client: self.sharing_resource.s3.clone()
+        }
+    }
+
+    fn smtp_client(&self) -> SmtpClient {
+        SmtpClient {
+            transport: self.sharing_resource.smtp_client.clone()
+        }
     }
 }
+
