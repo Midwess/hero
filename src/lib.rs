@@ -8,6 +8,7 @@ pub type S3Connection = aws_sdk_s3::client::Client;
 pub type SmtpTransport = lettre::SmtpTransport;
 
 pub mod services;
+pub mod repository;
 pub mod s3;
 pub mod config;
 pub mod grpc;

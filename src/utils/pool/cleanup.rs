@@ -54,7 +54,6 @@ impl<T,P> PoolCleanup<T, P> where T: PoolResource<P> + 'static, P: Send + Sync +
 
     pub async fn request_cleanup_loop(pool: &Arc<RwLock<Vec<PoolItem<T, P>>>>, from_index: usize) {
         let mut pool = pool.write().await;
-        println!("Cleaning up");
         let mut out_dated_indices = Vec::<usize>::new();
         for (index, pool_item) in pool.iter_mut().enumerate() {
             if index >= from_index {
@@ -67,7 +66,6 @@ impl<T,P> PoolCleanup<T, P> where T: PoolResource<P> + 'static, P: Send + Sync +
         for out_dated_indice in out_dated_indices {
             loop {
                 let item = pool.get(out_dated_indice);
-        println!("Cleaning up 1");
                 if item.is_some() && item.unwrap().resource.is_some() {
                     pool.swap_remove(out_dated_indice);
                 }

@@ -3,3 +3,4 @@
 Secrets*.toml
 out
 .DS_store
+.idea

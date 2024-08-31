@@ -21,7 +21,7 @@ schema = { git ="ssh://git@github.com/dev-logs/schema.git" }
 serde_derive = "1.0.203"
 serde_json = "1.0.117"
 surreal_derive_plus = "1.0.9"
-surreal_devl = "1.0.6"
+surreal_devl = "1.0.9"
 surrealdb = {version="1.5.4", default-features = false, features = ["protocol-ws"]}
 surrealdb_id = "0.1.2"
 thiserror = "1.0.61"
