@@ -30,8 +30,8 @@ pub trait PoolResource<P>: Send + Sync where P: Send + Sync {
 ///     - PoolResponse is implement Deref to resource
 pub struct PoolAllocator <T, P> where T: PoolResource<P> + 'static,  P: Send + Sync + 'static {
     pool: Arc<RwLock<Vec<PoolItem<T, P>>>>,
-    min_pool_size: i8,
-    max_pool_size: i8,
+    min_pool_size: u16,
+    max_pool_size: u16,
     resource_idle_timeout: Duration,
     new_resource_param: P,
     // Keep the reference, make sure the life time of Cleanup always belong to PoolAllocator
@@ -39,8 +39,8 @@ pub struct PoolAllocator <T, P> where T: PoolResource<P> + 'static,  P: Send + S
 }
 
 pub struct PoolBuilder<P> where P: Send + Sync + 'static {
-    min_pool_size: i8,
-    max_pool_size: i8,
+    min_pool_size: u16,
+    max_pool_size: u16,
     resource_idle_timeout: Duration,
     new_parameter_resource: Option<P>,
     cleanup_strategy: Option<CleanupStrategy>
@@ -57,7 +57,7 @@ impl<P> PoolBuilder<P> where P: Send + Sync + 'static {
         }
     }
 
-    pub fn min_pool_size(mut self, size: i8) -> Self {
+    pub fn min_pool_size(mut self, size: u16) -> Self {
         if size <= 0 {
             panic!("The pool size must be positive");
         }
@@ -67,7 +67,7 @@ impl<P> PoolBuilder<P> where P: Send + Sync + 'static {
         self
     }
 
-    pub fn max_pool_size(mut self, size: i8) -> Self {
+    pub fn max_pool_size(mut self, size: u16) -> Self {
         self.max_pool_size = size;
 
         self

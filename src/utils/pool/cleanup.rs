@@ -6,7 +6,7 @@ use super::allocator::{PoolItem, PoolResource};
 
 pub enum CleanupStrategy {
     Easy,
-    Best {interval: Duration, min_pool_size: u8},
+    Best {interval: Duration, min_pool_size: u16},
 }
 
 pub struct PoolCleanup<T, P> where T: PoolResource<P> + 'static, P: Send + Sync + 'static {
