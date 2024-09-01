@@ -4,7 +4,7 @@ use schema::misc::datetime::Datetime;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use surreal_devl::serialize::SurrealSerialize;
-use surreal_devl::wrapper::{SurrealQR, SurrealResponseError};
+use surreal_devl::wrapper::SurrealQR;
 use surrealdb::method::Stats;
 use surrealdb::opt::{QueryResult, RecordId};
 use surrealdb::Response as QueryResponse;

@@ -1,10 +1,10 @@
 #[cfg(test)]
 pub mod test {
-    use std::{sync::Arc, time::Duration};
+    use std::time::Duration;
 
     use tokio::time::sleep;
 
-    use crate::utils::{pool::{allocator::{PoolBuilder, PoolResource}, request::PoolRequestBuilder}, pool_allocator::*};
+    use crate::utils::pool::{allocator::{PoolBuilder, PoolResource}, request::PoolRequestBuilder};
 
     pub struct Db {}
 
