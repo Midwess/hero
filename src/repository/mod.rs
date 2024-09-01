@@ -135,13 +135,12 @@ impl OneState {
 
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum TrustedOne<T> {
-    Exist(T, Option<OneState>),
-    SoftDeleted(T, OneState),
+pub enum TrustedOne<T> where T: From<surrealdb::sql::Value> {
+    Some(T),
     None,
 }
 
-impl<T: DeserializeOwned> QueryResult<TrustedOne<T>> for usize {
+impl<T: DeserializeOwned> QueryResult<TrustedOne<T>> for usize where T: From<surrealdb::sql::Value> {
     fn query_result(self, response: &mut QueryResponse) -> surrealdb::Result<TrustedOne<T>> {
         let mut value = response.take::<surrealdb::sql::Value>(0)?;
 
@@ -169,6 +168,7 @@ impl<T: DeserializeOwned> QueryResult<TrustedOne<T>> for usize {
 
                 let mut key = removed_keys.pop();
                 while key.is_some() {
+                    entries.insert(key.unwrap(), surrealdb::sql::Value::None);
                     key = removed_keys.pop();
                 }
 
@@ -206,7 +206,7 @@ impl<T: DeserializeOwned> QueryResult<TrustedOne<T>> for usize {
             }
         }
 
-        surrealdb::Result::Ok(TrustedOne::None)
+        surrealdb::Result::Ok(TrustedOne::Some(T::from(value)))
     }
 
     fn stats(&self, _: &QueryResponse) -> Option<Stats> {
@@ -243,9 +243,6 @@ pub mod test {
         };
 
         let one_state = OneState::new_now();
-
-        let one = One::Exist(user, Some(one_state));
-        let json = serde_json::to_string(&one).unwrap();
 
         println!("Json: {}", json);
     }
