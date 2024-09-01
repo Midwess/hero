@@ -2,6 +2,7 @@ use core_services::db::{SurrealDbConnection, SurrealDbConnectionInfo};
 use core_services::utils::pool::request::PoolRequest;
 use core_services::{s3::S3Client, smtp::client::SmtpClient};
 use lettre::{SmtpTransport, Transport};
+use crate::grpc::middleware::auth::AuthInterceptor;
 use crate::repository::surrealdb::user::UserRepositorySurrealDb;
 use crate::repository::user::UserRepository;
 use crate::services::token::TokenService;
@@ -14,10 +15,11 @@ pub trait DependenciesInjection {
     fn user_repository(&self) -> Box<dyn UserRepository>;
     fn s3_client(&self) -> S3Client;
     fn smtp_client(&self) -> SmtpClient;
+    fn get_grpc_middleware_auth(&'static self) -> AuthInterceptor;
 }
 
 pub struct SharingResource {
-    pub smtp_client: PoolRequest<SmtpTransport, ()>,
+    pub smtp_transport: PoolRequest<SmtpTransport, ()>,
     pub s3: PoolRequest<aws_sdk_s3::client::Client, ()>,
     pub devlog_db: PoolRequest<SurrealDbConnection, SurrealDbConnectionInfo> 
 }
@@ -74,8 +76,12 @@ impl DependenciesInjection for DevlogSdk {
 
     fn smtp_client(&self) -> SmtpClient {
         SmtpClient {
-            transport: self.sharing_resource.smtp_client.clone()
+            transport: self.sharing_resource.smtp_transport.clone(),
         }
+    }
+
+    fn get_grpc_middleware_auth(&'static self) -> AuthInterceptor {
+        AuthInterceptor::new(self)
     }
 }
 

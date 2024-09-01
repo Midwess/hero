@@ -2,7 +2,6 @@ use schema::devlog::entities::User;
 use log::*;
 use core_services::services::{base::Service, errors::Errors};
 
-use tokio::sync::OnceCell;
 use tonic::{async_trait, Status};
 use tonic::codegen::http::Request;
 use tonic::transport::Body;
@@ -10,13 +9,14 @@ use tonic_middleware::RequestInterceptor;
 use crate::sdk::DependenciesInjection;
 use crate::{sdk::DevlogSdk, services::{token::{ReadFrom, TokenService}, user::GenerateGuestParams}};
 
+#[derive(Clone)]
 pub struct AuthInterceptor<'a> {
     pub white_list: Vec<String>,
-    pub sdk: &'a OnceCell<DevlogSdk>
+    pub sdk: &'a DevlogSdk
 }
 
 impl<'a> AuthInterceptor<'a> {
-    pub fn new(sdk: &'a OnceCell<DevlogSdk>) -> Self {
+    pub fn new(sdk: &'a DevlogSdk) -> Self {
         Self {
             white_list: vec![
                 String::from("/devlog.devblog.rpc.PostService/interact"),
@@ -53,7 +53,7 @@ impl<'a> RequestInterceptor for AuthInterceptor<'a>
                     return Err(Errors::UnAuthorized("Missing authentication information".to_owned()).into())
                 }
 
-                let service = self.sdk.get().unwrap().generate_guest_service();
+                let service = self.sdk.generate_guest_service();
                 let params = GenerateGuestParams::ToFullFill();
                 let guest_user = service.execute(params).await?; req.extensions_mut().insert(guest_user); Ok(req)
             }
