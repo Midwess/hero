@@ -1,3 +1,4 @@
+pub mod trusted;
 use std::ops::Deref;
 
 use surrealdb::{engine::remote::ws::{Client, Ws}, opt::auth::Database, Surreal};
