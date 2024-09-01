@@ -116,10 +116,29 @@ impl OneState {
 // The option by default can not be null
 // it only be null in case we take it out of the wrapper TrustedOne
 #[derive(Serialize, Deserialize)]
-pub struct TrustedOne(Option<surrealdb::sql::Value>);
+pub struct TrustedOne(SurrealQR);
+
+impl TrustedOne {
+    pub fn none() -> Self {
+        Self(SurrealQR(surrealdb::sql::Value::None))
+    }
+}
+
+impl Into<SurrealQR> for TrustedOne {
+    fn into(self) -> SurrealQR {
+        self.0
+    }
+}
+
+impl Into<surrealdb::sql::Value> for TrustedOne {
+    fn into(self) -> surrealdb::sql::Value {
+        let value: SurrealQR = self.into();
+        value.into()
+    }
+}
 
 impl Deref for TrustedOne {
-    type Target = Option<surrealdb::sql::Value>;
+    type Target = SurrealQR;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -132,49 +151,17 @@ impl DerefMut for TrustedOne {
     }
 }
 
-impl<T> TryFrom<TrustedOne> for Vec<T> where T: From<surrealdb::sql::Value> {
-    type Error = SurrealResponseError;
-
-    fn try_from(mut value: TrustedOne) -> Result<Self, Self::Error> {
-        let value = value.take().unwrap();
-        let surrealqr = SurrealQR(value);
-        if surrealqr.is_none() {
-            return Ok(vec![])
-        }
-
-        let mut arr = surrealqr.array()?;
-        if arr.is_none() {
-            return Ok(vec![])
-        }
-
-        Ok(arr.take().unwrap().into_iter().map(|it| {
-            T::from(it)
-        }).collect())
+impl<T> From<TrustedOne> for Vec<T> where T: From<surrealdb::sql::Value> {
+    fn from(value: TrustedOne) -> Self {
+        let value: SurrealQR = value.into();
+        value.into()
     }
 }
 
 impl<T> From<TrustedOne> for Option<T> where T: From<surrealdb::sql::Value> {
-    fn from(mut value: TrustedOne) -> Self {
-        let value = value.take().unwrap();
-        let surrealqr = SurrealQR(value);
-        if surrealqr.is_none() {
-            return Self::None
-        }
-
-        let object = surrealqr.object();
-        if object.is_err() {
-            return None
-        }
-
-        let mut object = object.unwrap();
-
-        if object.is_none() {
-            return None;
-        }
-
-        let object = object.take().unwrap();
-
-        Self::Some(surrealdb::sql::Value::Object(object).into())
+    fn from(value: TrustedOne) -> Self {
+        let value: SurrealQR = value.into();
+        value.into()
     }
 }
 
@@ -183,7 +170,7 @@ impl QueryResult<TrustedOne> for usize {
         let mut value = response.take::<surrealdb::sql::Value>(self)?;
 
         if value.is_none() || value.is_null() {
-            return surrealdb::Result::Ok(TrustedOne(Some(surrealdb::sql::Value::None)))
+            return surrealdb::Result::Ok(TrustedOne::none())
         }
         
         let mut stack = vec![&mut value];
@@ -245,7 +232,7 @@ impl QueryResult<TrustedOne> for usize {
             }
         }
 
-        surrealdb::Result::Ok(TrustedOne(Some(value)))
+        surrealdb::Result::Ok(TrustedOne(SurrealQR(value)))
     }
 
     fn stats(&self, _: &QueryResponse) -> Option<Stats> {
@@ -345,7 +332,7 @@ async fn test_query_result_with_mixed_soft_deleted_data() -> Result<(), SurrealE
     db.query("CREATE user SET name = 'Soft Deleted User', password = '123', email = 'email', deleted_at = time::now();").await.unwrap();
 
     let response: TrustedOne = db.query("SELECT * FROM user").await.unwrap().take(0).unwrap();
-    let response: Vec<User> = response.try_into().unwrap();
+    let response: Vec<User> = response.into();
 
     // Ensure that only the non-soft-deleted users are returned
     assert_eq!(response.len(), 1);
@@ -368,7 +355,7 @@ async fn test_query_result_with_only_soft_deleted_data() -> Result<(), SurrealEr
     db.query("CREATE user SET name = 'Soft Deleted Only User', password = '123', email = 'email', deleted_at = time::now();").await.unwrap();
 
     let response: TrustedOne = db.query("SELECT * FROM user").await.unwrap().take(0).unwrap();
-    let response: Vec<User> = response.try_into().unwrap();
+    let response: Vec<User> = response.into();
 
     // Ensure that the result is empty because all users are soft-deleted
     assert_eq!(response.len(), 0);

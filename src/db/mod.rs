@@ -1,7 +1,9 @@
 pub mod trusted;
+pub mod builder;
+
 use std::ops::Deref;
 
-use surrealdb::{engine::remote::ws::{Client, Ws}, opt::auth::Database, Surreal};
+use surrealdb::{engine::remote::ws::Ws, opt::auth::Database};
 
 use crate::{utils::pool::allocator::PoolResource, Db};
 
@@ -37,8 +39,6 @@ impl PoolResource<SurrealDbConnectionInfo> for SurrealDbConnection {
             username: param.db_username.as_str(),
             password: param.db_password.as_str()
         }).await.unwrap();
-
-        let db_version = db.version().await.expect("Failed to get the surreal db version");
 
         Self {
             connection: db,

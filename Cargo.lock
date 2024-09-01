@@ -4222,9 +4222,9 @@ dependencies = [
 
 [[package]]
 name = "surreal_devl"
-version = "1.0.9"
+version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e00555a2edb38445b90fdf1fed0314104fbff45bb5d605d0a76ae4348fc1dfd8"
+checksum = "7498d9497fed03bfdf364ca75c7d43c242c9618a41d2837512531e1b3088c8f6"
 dependencies = [
  "cargo_metadata",
  "serde",
