@@ -1,71 +1,75 @@
-use aws_sdk_s3::{error::SdkError, presigning::PresigningConfigError};
+use aws_sdk_s3::error::SdkError;
+use aws_sdk_s3::presigning::PresigningConfigError;
 use log::info;
 use surreal_devl::wrapper::SurrealResponseError;
 use thiserror::Error;
 use tonic::Status;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug,)]
 pub enum Errors {
     #[error("Operation on db name {} got error {}", .db_name, .message)]
-    DatabaseError { message: String, db_name: String},
+    DatabaseError { message: String, db_name: String, },
     #[error("Bad request {}", .0)]
-    BadRequest(String),
+    BadRequest(String,),
     #[error("User {} already exist", .0)]
-    UserAlreadyExist(String),
+    UserAlreadyExist(String,),
     #[error("Already exist {}", .0)]
-    AlreadyExist(String),
+    AlreadyExist(String,),
     #[error("Failed to generate auth token {:?}", .0)]
-    GenerateTokenFailed(#[from] jsonwebtoken::errors::Error),
+    GenerateTokenFailed(#[from] jsonwebtoken::errors::Error,),
     #[error("UnAuthorize {}", .0)]
-    UnAuthorized(String),
+    UnAuthorized(String,),
     #[error("Resource got error {:?}", .0)]
-    AwsS3Error(String),
+    AwsS3Error(String,),
     #[error("Unexpected data format {}", .0)]
-    UnexpectedDataFormat(String),
+    UnexpectedDataFormat(String,),
     #[error("Resource not found {}", .0)]
-    ResourceNotFound(String),
+    ResourceNotFound(String,),
     #[error("Failed to send email {}", .0)]
-    FailedToSendEmail(String)
+    FailedToSendEmail(String,),
 }
 
-impl From<surrealdb::Error> for Errors {
-    fn from(value: surrealdb::Error) -> Self {
-        Self::DatabaseError { message: value.to_string(), db_name: "surrealdb".to_owned() }
+impl From<surrealdb::Error,> for Errors {
+    fn from(value: surrealdb::Error,) -> Self {
+        Self::DatabaseError {
+            message: value.to_string(),
+            db_name: "surrealdb".to_owned(),
+        }
     }
 }
 
-impl From<SurrealResponseError> for Errors {
-    fn from(value: SurrealResponseError) -> Self {
-        Self::UnexpectedDataFormat(format!("{:?}", &value))
+impl From<SurrealResponseError,> for Errors {
+    fn from(value: SurrealResponseError,) -> Self {
+        Self::UnexpectedDataFormat(format!("{:?}", &value),)
     }
 }
 
-impl <E, R> From<SdkError<E, R>> for Errors {
-    fn from(value: SdkError<E, R>) -> Self {
-        return Self::AwsS3Error(value.to_string())
+impl<E, R,> From<SdkError<E, R,>,> for Errors {
+    fn from(value: SdkError<E, R,>,) -> Self {
+        return Self::AwsS3Error(value.to_string(),)
     }
 }
 
-impl From<PresigningConfigError> for Errors {
-    fn from(value: PresigningConfigError) -> Self {
-        return Self::AwsS3Error(value.to_string())
+impl From<PresigningConfigError,> for Errors {
+    fn from(value: PresigningConfigError,) -> Self {
+        return Self::AwsS3Error(value.to_string(),)
     }
 }
 
-impl From<Errors> for Status {
-    fn from(value: Errors) -> Self {
+impl From<Errors,> for Status {
+    fn from(value: Errors,) -> Self {
         info!(target: "error-anounced", "Error happen during the execution {:?}", &value);
         match value {
-            Errors::DatabaseError { message, db_name: _ } => Self::aborted(message),
-            Errors::UserAlreadyExist(_) => Self::already_exists("User already exist".to_owned()),
-            Errors::GenerateTokenFailed(_) => Self::unauthenticated("Invalid token"),
-            Errors::UnAuthorized(_) => Self::unauthenticated("You are not allow to access this operation"),
-            Errors::AwsS3Error(message) => Self::aborted(format!("Resource busy, please contact support {message}")),
-            Errors::BadRequest(message) => Self::invalid_argument(message),
-            Errors::UnexpectedDataFormat(_) => Self::aborted("Internal error, contact support"),
-            Errors::AlreadyExist(message) => Self::already_exists(format!("Already exist {}", message)),
-            Errors::ResourceNotFound(message) => Self::not_found(message.to_owned()),
-            Errors::FailedToSendEmail(_) => Self::internal("Failed to send email"),
+            Errors::DatabaseError { message, db_name: _, } => Self::aborted(message,),
+            Errors::UserAlreadyExist(_,) => Self::already_exists("User already exist".to_owned(),),
+            Errors::GenerateTokenFailed(_,) => Self::unauthenticated("Invalid token",),
+            Errors::UnAuthorized(_,) => Self::unauthenticated("You are not allow to access this operation",),
+            Errors::AwsS3Error(message,) => Self::aborted(format!("Resource busy, please contact support {message}"),),
+            Errors::BadRequest(message,) => Self::invalid_argument(message,),
+            Errors::UnexpectedDataFormat(_,) => Self::aborted("Internal error, contact support",),
+            Errors::AlreadyExist(message,) => Self::already_exists(format!("Already exist {}", message),),
+            Errors::ResourceNotFound(message,) => Self::not_found(message.to_owned(),),
+            Errors::FailedToSendEmail(_,) => Self::internal("Failed to send email",),
         }
     }
 }

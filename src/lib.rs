@@ -2,19 +2,19 @@
 #![feature(duration_constructors)]
 #![feature(type_alias_impl_trait)]
 
-use surrealdb::{engine::remote::ws::Client, Surreal};
+use surrealdb::engine::remote::ws::Client;
+use surrealdb::Surreal;
 
 pub type S3Connection = aws_sdk_s3::client::Client;
 pub type SmtpTransport = lettre::SmtpTransport;
 
-pub mod services;
-pub mod s3;
 pub mod config;
+pub mod db;
 pub mod grpc;
 pub mod logger;
-pub mod utils;
+pub mod s3;
+pub mod services;
 pub mod smtp;
-pub mod db;
+pub mod utils;
 
-pub type Db = Surreal<Client>;
-
+pub type Db = Surreal<Client,>;
