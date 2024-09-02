@@ -2,16 +2,18 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use log::*;
 
 use tokio::sync::RwLock;
 
 use super::cleanup::{CleanupStrategy, PoolCleanup};
 
+#[async_trait::async_trait]
 pub trait PoolResource<P>: Send + Sync
 where
     P: Send + Sync
 {
-    fn new(param: &P) -> impl std::future::Future<Output = Self>;
+    async fn new(param: &P) -> Self where P: 'async_trait;
 }
 
 /// Pool to provide a set of the same resource such as Http connection, Database connection, Socket connection.
@@ -36,7 +38,7 @@ where
 ///     - PoolResponse is implement Deref to resource
 pub struct PoolAllocator<T, P>
 where
-    T: PoolResource<P> + 'static,
+    T: PoolResource<P> + 'static + Send + Sync,
     P: Send + Sync + 'static
 {
     pool: Arc<RwLock<Vec<PoolItem<T, P>>>>,
@@ -102,7 +104,7 @@ where
         T: PoolResource<P> + 'static,
         P: Send + Sync + 'static
     {
-        let pool = Vec::with_capacity(self.min_pool_size as usize);
+        let pool = Vec::with_capacity(0);
 
         if self.max_pool_size < self.min_pool_size {
             panic!("The max pool size can not less than min pool size");
@@ -166,7 +168,7 @@ where
 
 impl<T, P> PoolItem<T, P>
 where
-    T: PoolResource<P>,
+    T: PoolResource<P> + Send + Sync,
     P: Send + Sync
 {
     pub async fn new(param: &P, max_idling_timeout: Option<Duration>) -> Self {
@@ -203,15 +205,28 @@ where
 
 impl<T, P> PoolAllocator<T, P>
 where
-    T: PoolResource<P>,
+    T: PoolResource<P> + Send + Sync,
     P: Send + Sync
 {
-    pub async fn init(&mut self) {
-        let mut pool = self.pool.write().await;
-        for _i in 0..self.min_pool_size {
-            pool.push(PoolItem::new(&self.new_resource_param, Some(self.resource_idle_timeout)).await)
-        }
+    pub async fn init(&mut self) where Self: Send {
+        let params = &self.new_resource_param;
+        tokio_scoped::scope(|scope| {
+            for _i in 0..self.min_pool_size {
+                let pool = self.pool.clone();
+                scope.spawn(async move {
+                    let pool_item: PoolItem<T, P> = PoolItem::new(
+                        params,
+                        None
+                    ).await;
 
+                    let mut pool = pool.write().await;
+                    pool.push(pool_item);
+                });
+            };
+        });
+
+        let pool = self.pool.read().await;
+        info!(target: "pool-allocator", "Initialized {} resources to fit the min_pool_size={}", pool.len(), self.min_pool_size);
         self.pool_cleanup.start_background();
     }
 

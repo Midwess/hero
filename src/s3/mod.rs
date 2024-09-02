@@ -11,6 +11,7 @@ use schema::misc::s3::s3_object::Content;
 use schema::misc::s3::S3Object;
 use std::time::Duration;
 
+#[async_trait::async_trait]
 impl PoolResource<()> for Client {
     async fn new(_param: &()) -> Self {
         let region_provider = RegionProviderChain::default_provider().or_else("us-east-1");

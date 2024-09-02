@@ -15,6 +15,7 @@ use schema::crafter::crafter_request::Template;
 use schema::crafter::{CrafterRequest, CrafterResponse, WelcomeTemplate};
 use schema::misc::datetime::Datetime;
 
+#[async_trait::async_trait]
 impl PoolResource<()> for SmtpTransport {
     async fn new(_p: &()) -> Self {
         let creds = Credentials::new(CONFIGS.smtp.username.clone(), CONFIGS.smtp.password.clone());

@@ -9,6 +9,7 @@ pub mod test {
 
     pub struct Db {}
 
+    #[async_trait::async_trait]
     impl PoolResource<()> for Db {
         async fn new(param: &()) -> Self {
             Self {}

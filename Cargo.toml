@@ -39,6 +39,7 @@ log = "0.4.22"
 lettre = "0.11.7"
 reqwest = "0.12.5"
 async-trait = "0.1.13"
+tokio-scoped = "0.2.0"
 
 [build-dependencies]
 tonic-build = "0.11"

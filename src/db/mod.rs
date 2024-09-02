@@ -31,6 +31,7 @@ impl Deref for SurrealDbConnection {
     }
 }
 
+#[async_trait::async_trait]
 impl PoolResource<SurrealDbConnectionInfo> for SurrealDbConnection {
     async fn new(param: &SurrealDbConnectionInfo) -> Self {
         let db = Db::init();

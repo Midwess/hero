@@ -8,7 +8,7 @@ use super::reponse::PoolResponse;
 
 pub struct PoolRequest<T, P>
 where
-    T: PoolResource<P> + 'static,
+    T: PoolResource<P> + 'static + Send + Sync,
     P: Send + Sync + 'static
 {
     _marker: PhantomData<T>,
@@ -18,7 +18,7 @@ where
 
 pub struct PoolRequestBuilder<T, P>
 where
-    T: PoolResource<P> + 'static,
+    T: PoolResource<P> + 'static + Send + Sync,
     P: Send + Sync + 'static
 {
     _marker: PhantomData<T>,
@@ -28,7 +28,7 @@ where
 
 impl<T, P> PoolRequestBuilder<T, P>
 where
-    T: PoolResource<P>,
+    T: PoolResource<P> + Send + Sync,
     P: Send + Sync
 {
     pub fn new() -> Self {
@@ -60,7 +60,7 @@ where
 
 impl<T, P> Clone for PoolRequest<T, P>
 where
-    T: PoolResource<P>,
+    T: PoolResource<P> + Send + Sync,
     P: Send + Sync
 {
     fn clone(&self) -> Self {
@@ -74,7 +74,7 @@ where
 
 impl<T, P> PoolRequest<T, P>
 where
-    T: PoolResource<P>,
+    T: PoolResource<P> + Send + Sync,
     P: Send + Sync + 'static
 {
     pub async fn retreive(&self) -> Option<PoolResponse<T, P>> {
