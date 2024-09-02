@@ -67,8 +67,14 @@ impl<T> From<DbIntent<T>> for RecordId
 where
     T: SurrealSerialize
 {
-    fn from(_: DbIntent<T>) -> Self {
-        panic!("The DbIntent can not be use directly but must use as part of the content");
+    fn from(intent: DbIntent<T>) -> Self {
+        let data = match intent {
+            DbIntent::New(data) => data,
+            DbIntent::Update(data) => data,
+            DbIntent::SoftDelete(data) => data
+        };
+
+        data.into()
     }
 }
 

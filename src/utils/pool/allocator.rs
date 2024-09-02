@@ -1,8 +1,8 @@
+use log::*;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use log::*;
 
 use tokio::sync::RwLock;
 
@@ -13,7 +13,9 @@ pub trait PoolResource<P>: Send + Sync
 where
     P: Send + Sync
 {
-    async fn new(param: &P) -> Self where P: 'async_trait;
+    async fn new(param: &P) -> Self
+    where
+        P: 'async_trait;
 }
 
 /// Pool to provide a set of the same resource such as Http connection, Database connection, Socket connection.
@@ -208,25 +210,31 @@ where
     T: PoolResource<P> + Send + Sync,
     P: Send + Sync
 {
-    pub async fn init(&mut self) where Self: Send {
+    pub async fn init(&mut self)
+    where
+        Self: Send
+    {
         let params = &self.new_resource_param;
         tokio_scoped::scope(|scope| {
             for _i in 0..self.min_pool_size {
                 let pool = self.pool.clone();
                 scope.spawn(async move {
-                    let pool_item: PoolItem<T, P> = PoolItem::new(
-                        params,
-                        None
-                    ).await;
+                    let pool_item: PoolItem<T, P> = PoolItem::new(params, None).await;
 
                     let mut pool = pool.write().await;
                     pool.push(pool_item);
                 });
-            };
+            }
         });
 
         let pool = self.pool.read().await;
-        info!(target: "pool-allocator", "Initialized {} resources to fit the min_pool_size={}", pool.len(), self.min_pool_size);
+        info!(
+            target: "pool-allocator",
+            "Initialized {} resources to fit the min_pool_size={}",
+            pool.len(),
+            self.min_pool_size
+        );
+
         self.pool_cleanup.start_background();
     }
 
