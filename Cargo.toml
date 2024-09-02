@@ -14,8 +14,8 @@ opt-level = 1
 opt-level = 3
 
 [dependencies]
-core-services = { git="ssh://git@github.com/dev-logs/core-services.git" }
-schema = { git="ssh://git@github.com/dev-logs/schema.git" }
+core-services = { path="../core-services" }
+schema = { path="../schema/rust" }
 surreal_derive_plus = "1.0.9"
 surreal_devl = "1.0.10"
 surrealdb = {version="1.5.4", default-features = false, features = ["protocol-ws"]}
