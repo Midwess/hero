@@ -17,4 +17,4 @@ pub mod services;
 pub mod smtp;
 pub mod utils;
 
-pub type Db = Surreal<Client,>;
+pub type Db = Surreal<Client>;

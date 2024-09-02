@@ -15,91 +15,91 @@ use schema::crafter::crafter_request::Template;
 use schema::crafter::{CrafterRequest, CrafterResponse, WelcomeTemplate};
 use schema::misc::datetime::Datetime;
 
-impl PoolResource<(),> for SmtpTransport {
-    async fn new(_p: &(),) -> Self {
-        let creds = Credentials::new(CONFIGS.smtp.username.clone(), CONFIGS.smtp.password.clone(),);
+impl PoolResource<()> for SmtpTransport {
+    async fn new(_p: &()) -> Self {
+        let creds = Credentials::new(CONFIGS.smtp.username.clone(), CONFIGS.smtp.password.clone());
         let connection_string = format!("{}", CONFIGS.smtp.host);
-        SmtpTransport::relay(connection_string.as_str(),).unwrap().credentials(creds,).build()
+        SmtpTransport::relay(connection_string.as_str()).unwrap().credentials(creds).build()
     }
 }
 
-#[derive(Clone,)]
+#[derive(Clone)]
 pub struct SmtpClient {
-    pub transport: PoolRequest<SmtpTransport, (),>,
+    pub transport: PoolRequest<SmtpTransport, ()>
 }
 
 impl SmtpClient {
-    pub async fn send(&self, template: EmailTemplate,) -> Resolve<(),> {
+    pub async fn send(&self, template: EmailTemplate) -> Resolve<()> {
         let subject = match &template {
-            EmailTemplate::WelcomeNewMember(_,) => "Welcome our new members",
+            EmailTemplate::WelcomeNewMember(_) => "Welcome our new members"
         };
 
         let user = match &template {
-            EmailTemplate::WelcomeNewMember(u,) => u,
+            EmailTemplate::WelcomeNewMember(u) => u
         };
 
-        let html = self.get_html_template(&template,).await?;
+        let html = self.get_html_template(&template).await?;
         let message = lettre::Message::builder()
-            .from(format!("Devlog studio <{}>", CONFIGS.smtp.username).parse().unwrap(),)
-            .to(user.email.clone().parse().unwrap(),)
-            .subject(subject,)
-            .header(ContentType::TEXT_HTML,)
-            .body(html,)
+            .from(format!("Devlog studio <{}>", CONFIGS.smtp.username).parse().unwrap())
+            .to(user.email.clone().parse().unwrap())
+            .subject(subject)
+            .header(ContentType::TEXT_HTML)
+            .body(html)
             .unwrap();
 
         let transport = self.transport.retreive().await.unwrap();
         transport
-            .send(&message,)
-            .map_err(|e| Errors::FailedToSendEmail(format!("Failed to send email, error={:?}", e),),)?;
+            .send(&message)
+            .map_err(|e| Errors::FailedToSendEmail(format!("Failed to send email, error={:?}", e)))?;
 
-        Ok((),)
+        Ok(())
     }
 
-    async fn get_html_template(&self, template: &EmailTemplate,) -> Resolve<String,> {
+    async fn get_html_template(&self, template: &EmailTemplate) -> Resolve<String> {
         let client = reqwest::Client::new();
         let schema = match template {
-            EmailTemplate::WelcomeNewMember(user,) => WelcomeTemplate {
+            EmailTemplate::WelcomeNewMember(user) => WelcomeTemplate {
                 user_name: match user.name.is_empty() {
                     true => user.email.clone(),
-                    false => user.name.clone(),
+                    false => user.name.clone()
                 },
-                datetime: Some(Datetime::now(),),
-            },
+                datetime: Some(Datetime::now())
+            }
         };
 
         let crafter_request = CrafterRequest {
-            template: Some(Template::Welcome(schema,),),
+            template: Some(Template::Welcome(schema))
         };
 
         let mut buffer = Vec::new();
-        crafter_request.encode(&mut buffer,).expect("Not able to serialize crafter request to a buffer",);
+        crafter_request.encode(&mut buffer).expect("Not able to serialize crafter request to a buffer");
 
         let mut headers = HeaderMap::new();
-        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/octet-stream",),);
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/octet-stream"));
         let res = client
-            .post(format!("{}/email/welcome", CONFIGS.crafter.url),)
-            .body(buffer,)
-            .headers(headers,)
+            .post(format!("{}/email/welcome", CONFIGS.crafter.url))
+            .body(buffer)
+            .headers(headers)
             .send()
             .await
             .map_err(|e| {
-                Errors::FailedToSendEmail(format!("Failed to generate email template from crafter service {:?}", e),)
-            },)?;
+                Errors::FailedToSendEmail(format!("Failed to generate email template from crafter service {:?}", e))
+            })?;
 
         if res.status() != StatusCode::OK {
             return Err(Errors::FailedToSendEmail(format!(
                 "The crafter service response with error {:?}",
                 res.error_for_status()
-            ),),)
+            )))
         }
 
-        let bytes = res.bytes().await.expect("The response must be in binary format",);
+        let bytes = res.bytes().await.expect("The response must be in binary format");
 
-        let crafter_response = CrafterResponse::decode(bytes,).expect("The response must be schema instance",);
+        let crafter_response = CrafterResponse::decode(bytes).expect("The response must be schema instance");
         info!(
             target: "smtp-client",
             "Received generated content for template={:?} from crafter, html={} chars",
             &template, crafter_response.html.len());
-        Ok(crafter_response.html,)
+        Ok(crafter_response.html)
     }
 }

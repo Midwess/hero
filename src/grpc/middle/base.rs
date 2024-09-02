@@ -4,6 +4,6 @@ use tonic::transport::Body;
 use tonic::{codegen, Status};
 
 pub trait GrpcServiceBound:
-    codegen::Service<Request<Body,>, Response = Response<BoxBody,>, Error = Status,> + Send + Clone + 'static
+    codegen::Service<Request<Body>, Response = Response<BoxBody>, Error = Status> + Send + Clone + 'static
 {
 }
