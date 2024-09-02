@@ -17,7 +17,7 @@ opt-level = 3
 prost = "0.12.6"
 prost-types = "0.12.6"
 serde = {version="1.0.203", features=["derive"]}
-schema = { git ="ssh://git@github.com/dev-logs/schema.git" }
+schema = { path = "../schema/rust" }
 serde_derive = "1.0.203"
 serde_json = "1.0.117"
 surreal_derive_plus = "1.0.9"
