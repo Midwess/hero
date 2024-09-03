@@ -21,7 +21,7 @@ impl<'a> Service<GenerateGuestParams, User> for UserService {
 
                 let token = self.token_service.generate_jwt(
                     claims,
-                    Duration::from_mins(1),
+                    Duration::new(60, 0),
                     CONFIGS.token.jwt_access_token_private_key.clone()
                 )?;
 

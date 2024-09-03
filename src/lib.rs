@@ -1,4 +1,3 @@
-#![feature(duration_constructors)]
 pub mod config;
 pub mod grpc;
 pub mod repository;
