@@ -9,8 +9,11 @@ use crate::utils::pool::reponse::PoolResponse;
 use super::trusted::TrustedOne;
 use super::{SurrealDbConnection, SurrealDbConnectionInfo};
 
-pub trait SendSync = Sized + Sync + Send;
-pub trait SurrealDerive = SendSync + SurrealSerialize + Into<RecordId> + From<Value>;
+pub trait SendSync: Sized + Sync + Send {}
+pub trait SurrealDerive: SendSync + SurrealSerialize + Into<RecordId> + From<Value> {}
+
+impl<T> SendSync for T where T: Sized + Sync + Send {}
+impl<T> SurrealDerive for T where T: SendSync + SurrealSerialize + Into<RecordId> + From<Value> {}
 
 #[async_trait::async_trait]
 pub trait Repository<T, I>

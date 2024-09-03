@@ -1,7 +1,3 @@
-#![feature(trait_alias)]
-#![feature(duration_constructors)]
-#![feature(type_alias_impl_trait)]
-
 use surrealdb::engine::remote::ws::Client;
 use surrealdb::Surreal;
 
