@@ -32,7 +32,7 @@ pub struct SmtpClient {
 impl SmtpClient {
     pub async fn send(&self, template: EmailTemplate) -> Resolve<()> {
         let subject = match &template {
-            EmailTemplate::WelcomeNewMember(_) => "Welcome our new members"
+            EmailTemplate::WelcomeNewMember(_) => "Thank you for your subscription"
         };
 
         let user = match &template {
