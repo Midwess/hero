@@ -1,108 +1,83 @@
-use std::marker::PhantomData;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
-use tokio::sync::RwLock;
+use std::time::Duration;
 
-use super::allocator::{PoolAllocator, PoolResource};
+use super::allocator::PoolAllocator;
 use super::reponse::PoolResponse;
 
-pub struct PoolRequest<T, P>
+pub struct PoolRequest<T>
 where
-    T: PoolResource<P> + 'static + Send + Sync,
-    P: Send + Sync + 'static
+    T: Send + Sync + 'static,
 {
-    _marker: PhantomData<T>,
-    retreving_timeout: Option<Duration>,
-    pub pool: Arc<PoolAllocator<T, P>>
+    pub retrieving_timeout: Option<Duration>,
+    pub pool: Arc<PoolAllocator<T>>
 }
 
-pub struct PoolRequestBuilder<T, P>
+pub struct PoolRequestBuilder<T>
 where
-    T: PoolResource<P> + 'static + Send + Sync,
-    P: Send + Sync + 'static
+    T: 'static + Send + Sync
 {
-    _marker: PhantomData<T>,
-    retreiving_timeout: Option<Duration>,
-    pool_sync: Option<Arc<PoolAllocator<T, P>>>
+    pub retrieving_timeout: Option<Duration>,
+    pub pool_sync: Option<Arc<PoolAllocator<T>>>
 }
 
-impl<T, P> PoolRequestBuilder<T, P>
+impl<T> PoolRequestBuilder<T>
 where
-    T: PoolResource<P> + Send + Sync,
-    P: Send + Sync
+    T: Send + Sync + 'static,
 {
     pub fn new() -> Self {
         Self {
-            _marker: PhantomData,
-            retreiving_timeout: None,
+            retrieving_timeout: None,
             pool_sync: None
         }
     }
 
-    pub fn retreiving_timeout(mut self, timeout: Duration) -> Self {
-        self.retreiving_timeout = Some(timeout);
+    pub fn retrieving_timeout(mut self, timeout: Duration) -> Self {
+        self.retrieving_timeout = Some(timeout);
         self
     }
 
-    pub fn pool(mut self, pool: Arc<PoolAllocator<T, P>>) -> Self {
+    pub fn pool(mut self, pool: Arc<PoolAllocator<T>>) -> Self {
         self.pool_sync = Some(pool);
         self
     }
 
-    pub fn build(mut self) -> PoolRequest<T, P> {
+    pub fn build(mut self) -> PoolRequest<T> {
         PoolRequest {
-            _marker: PhantomData::default(),
-            retreving_timeout: self.retreiving_timeout,
+            retrieving_timeout: self.retrieving_timeout,
             pool: self.pool_sync.take().expect("Pool must be set")
         }
     }
 }
 
-impl<T, P> Clone for PoolRequest<T, P>
+impl<T> Clone for PoolRequest<T>
 where
-    T: PoolResource<P> + Send + Sync,
-    P: Send + Sync
+    T: Send + Sync + 'static,
 {
     fn clone(&self) -> Self {
         Self {
-            _marker: PhantomData::default(),
             pool: self.pool.clone(),
-            retreving_timeout: self.retreving_timeout.clone()
+            retrieving_timeout: self.retrieving_timeout.clone()
         }
     }
 }
 
-impl<T, P> PoolRequest<T, P>
+impl<T> PoolRequest<T>
 where
-    T: PoolResource<P> + Send + Sync,
-    P: Send + Sync + 'static
+    T: Send + Sync + 'static
 {
-    pub async fn retreive(&self) -> Option<PoolResponse<T, P>> {
-        let resource = self.pool.retrieve().await;
-
-        if resource.is_none() {
-            if self.retreving_timeout.is_none() {
-                return None
-            }
-
-            // Wait for available resource within timeout
-            let now = Instant::now();
-            let mut elapsed = Duration::new(0, 0);
-
-            while elapsed.lt(self.retreving_timeout.as_ref().unwrap()) {
-                let resource = self.pool.retrieve().await;
-                if resource.is_some() {
-                    return Some(PoolResponse::new(resource.unwrap(), self.pool.clone()));
+    pub async fn retrieve(&self) -> Option<PoolResponse<T>> {
+        match (self.retrieving_timeout, self.pool.retrieve().await) {
+            (_, Ok(resource)) => Some(PoolResponse::new(resource, self.pool.clone())),
+            (Some(timeout), Err(Some(waiter))) => {
+                match tokio::time::timeout(timeout, waiter).await {
+                    Ok(Ok(value)) => Some(PoolResponse::new(value, self.pool.clone())),
+                    _ => None,
                 }
-
-                elapsed = now.elapsed();
+            },
+            _ => {
+                None
             }
-
-            return None
         }
-
-        let response = PoolResponse::new(resource.unwrap(), self.pool.clone());
-
-        Some(response)
     }
 }
+

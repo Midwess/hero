@@ -1,7 +1,7 @@
 use crate::config::CONFIGS;
 use crate::services::base::Resolve;
 use crate::services::errors::Errors;
-use crate::utils::pool::allocator::PoolResource;
+use crate::utils::pool::allocator::PoolResourceProvider;
 use crate::utils::pool::request::PoolRequest;
 use aws_config::meta::region::RegionProviderChain;
 use aws_sdk_s3::presigning::PresigningConfig;
@@ -11,9 +11,11 @@ use schema::misc::s3::s3_object::Content;
 use schema::misc::s3::S3Object;
 use std::time::Duration;
 
+pub struct S3ClientResourceProvider;
+
 #[async_trait::async_trait]
-impl PoolResource<()> for Client {
-    async fn new(_param: &()) -> Self {
+impl PoolResourceProvider<Client> for S3ClientResourceProvider {
+    async fn new(&self) -> Client {
         let region_provider = RegionProviderChain::default_provider().or_else("us-east-1");
         let config = aws_config::from_env().region(region_provider).load().await;
         Client::new(&config)
@@ -22,12 +24,12 @@ impl PoolResource<()> for Client {
 
 #[derive(Clone)]
 pub struct S3Client {
-    pub client: PoolRequest<Client, ()>
+    pub client: PoolRequest<Client>
 }
 
 impl S3Client {
     pub async fn get_objects(&self, prefix: String) -> Resolve<Vec<S3Object>> {
-        let client = self.client.retreive().await.unwrap();
+        let client = self.client.retrieve().await.unwrap();
         let list_objects_resp = client
             .list_objects_v2()
             .bucket(CONFIGS.aws_s3.bucket_name.clone())
@@ -78,7 +80,7 @@ impl S3Client {
         };
 
         let presigning_config = PresigningConfig::expires_in(duration)?;
-        let client = self.client.retreive().await.unwrap();
+        let client = self.client.retrieve().await.unwrap();
         let presigned_req = client
             .get_object()
             .bucket(CONFIGS.aws_s3.bucket_name.clone())

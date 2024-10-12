@@ -1,47 +1,84 @@
 #[cfg(test)]
 pub mod test {
-    use std::time::Duration;
+    use std::{sync::Arc, time::{Duration, Instant}};
+    use tokio::sync::{OnceCell, RwLock};
+    use crate::utils::pool::{allocator::{PoolAllocator, PoolBuilder, PoolResourceProvider}, cleanup::CleanupStrategy, request::PoolRequest};
 
-    use tokio::time::sleep;
+    pub struct DbConnection {}
 
-    use crate::utils::pool::allocator::{PoolBuilder, PoolResource};
-    use crate::utils::pool::request::PoolRequestBuilder;
-
-    pub struct Db {}
-
-    #[async_trait::async_trait]
-    impl PoolResource<()> for Db {
-        async fn new(param: &()) -> Self {
+    impl DbConnection {
+        pub async fn new(_: String) -> Self {
             Self {}
+        }
+
+        pub async fn query(&self) {
+            tokio::time::sleep(Duration::from_millis(10)).await; // 200ms
         }
     }
 
-    #[tokio::test]
+    pub struct DbPoolResourceProvider {
+        connection_string: String
+    }
+
+    #[async_trait::async_trait]
+    impl PoolResourceProvider<DbConnection> for DbPoolResourceProvider {
+        async fn new(&self) -> DbConnection {
+           DbConnection::new(self.connection_string.clone()).await
+        }
+    }
+ 
+    pub static DB_POOL: OnceCell<Arc<PoolAllocator<DbConnection>>> = OnceCell::const_new();
+
+    #[tokio::test(flavor = "multi_thread")]
     pub async fn test_pool() {
-        let builder = PoolBuilder::new(());
-        let pool = builder.min_pool_size(1).max_pool_size(3).build::<Db>().await;
+        DB_POOL.get_or_init(|| async move {
+            let resource_provider = DbPoolResourceProvider {
+                connection_string: String::from("mydb://root@root")
+            };
 
-        let requester = PoolRequestBuilder::new().pool(pool).retreiving_timeout(Duration::new(10, 0)).build();
+            let pool = PoolBuilder::new(Box::new(resource_provider))
+                .min_pool_size(1000)
+                .max_pool_size(10000)
+                .resource_idle_timeout(Duration::from_millis(10))
+                .build().await;
 
-        let response = requester.retreive().await;
+            Arc::new(pool)
+        }).await;
 
-        assert_eq!(response.is_some(), true);
-        let response = requester.retreive().await;
+        let request = PoolRequest {
+            pool: DB_POOL.get().unwrap().clone(),
+            retrieving_timeout: Some(Duration::from_millis(100))
+        };
 
-        let response = requester.retreive().await;
+        let number_of_tasks: usize = 100000;
+        let success_counter: Arc<RwLock<i32>> = Arc::new(RwLock::new(0));
 
-        let response = requester.retreive().await;
+        let elapsed = Instant::now();
+        tokio_scoped::scope(|scope| {
+            for _ in 0..number_of_tasks {
+                let request = request.clone();
+                let success_counter = success_counter.clone();
+                scope.spawn(async move {
+                    let db = request.retrieve().await;
+                    if db.is_none() {
+                        return
+                    }
 
-        let response = requester.retreive().await;
+                    let db = db.unwrap();
+                    db.query().await;
+                    drop(db);
 
-        let response = requester.retreive().await;
-        drop(response);
-        let response = requester.retreive().await;
-        assert_eq!(response.is_some(), true);
-        let response = requester.retreive().await;
-        //let response = requester.retreive().await;
-        assert_eq!(response.is_some(), true);
-        drop(response);
-        sleep(Duration::new(100, 0)).await;
+                    let mut success_counter = success_counter.write().await;
+                    *success_counter += 1;
+
+                    // You might want to make the resource return back to the pool more early by
+                    // calling drop(db)
+                    // Or if you don't it still able to return to the pool at the end of it's scope
+                });
+            }
+        });
+
+        println!("Number of success requests are {}/{} took {}ms", success_counter.read().await, number_of_tasks, elapsed.elapsed().as_millis());
     }
 }
+

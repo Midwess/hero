@@ -1,38 +1,33 @@
-use std::marker::PhantomData;
+use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::spawn;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
-use super::allocator::{PoolItem, PoolResource};
+use super::allocator::PoolItem;
 
 pub enum CleanupStrategy {
-    Easy,
-    Best { interval: Duration, min_pool_size: u16 }
+    Relax { interval: Duration }
 }
 
-pub struct PoolCleanup<T, P>
+pub struct PoolCleaner<T>
 where
-    T: PoolResource<P> + 'static,
-    P: Send + Sync + 'static
+    T: Send + Sync + 'static
 {
-    _marker: PhantomData<P>,
     strategy: CleanupStrategy,
-    pool: Arc<RwLock<Vec<PoolItem<T, P>>>>,
+    pool: Arc<Mutex<VecDeque<PoolItem<T>>>>,
     background_handler: Option<JoinHandle<()>>
 }
 
-impl<T, P> PoolCleanup<T, P>
+impl<T> PoolCleaner<T>
 where
-    T: PoolResource<P> + 'static,
-    P: Send + Sync + 'static
+    T: Send + Sync + 'static,
 {
-    pub fn new(pool: Arc<RwLock<Vec<PoolItem<T, P>>>>, strategy: CleanupStrategy) -> Self {
+    pub fn new(pool: Arc<Mutex<VecDeque<PoolItem<T>>>>, strategy: CleanupStrategy) -> Self {
         Self {
-            _marker: PhantomData::default(),
             strategy,
             pool,
             background_handler: None
@@ -41,16 +36,15 @@ where
 
     pub fn start_background(&mut self) {
         match self.strategy {
-            CleanupStrategy::Best {
-                interval,
-                min_pool_size
+            CleanupStrategy::Relax {
+                interval
             } => {
                 let interval = interval.clone();
                 let pool = self.pool.clone();
                 let handler = spawn(async move {
                     loop {
                         sleep(interval).await;
-                        Self::request_cleanup_loop(&pool, min_pool_size as usize).await
+                        Self::request_cleanup_loop(&pool).await
                     }
                 });
 
@@ -68,37 +62,18 @@ where
         }
     }
 
-    pub async fn request_cleanup_loop(pool: &Arc<RwLock<Vec<PoolItem<T, P>>>>, from_index: usize) {
-        let mut pool = pool.write().await;
-        let mut out_dated_indices = Vec::<usize>::new();
-        for (index, pool_item) in pool.iter_mut().enumerate() {
-            if index >= from_index {
-                if pool_item.invalidate() {
-                    out_dated_indices.push(index);
-                }
-            }
-        }
+    pub async fn request_cleanup_loop(pool_sync: &Arc<Mutex<VecDeque<PoolItem<T>>>>) {
+        let mut pool = pool_sync.lock().await;
 
-        for out_dated_indice in out_dated_indices {
-            loop {
-                let item = pool.get(out_dated_indice);
-                if item.is_some() && item.unwrap().resource.is_some() {
-                    pool.swap_remove(out_dated_indice);
-                } else {
-                    break;
-                }
-            }
-        }
+        pool.retain_mut(|it| !it.invalidate());
     }
 }
 
-impl<T, P> Drop for PoolCleanup<T, P>
+impl<T> Drop for PoolCleaner<T>
 where
-    T: PoolResource<P> + 'static,
-    P: Send + Sync + 'static
+    T: Send + Sync + 'static,
 {
     fn drop(&mut self) {
-        print!("Dropped cleanup");
         self.stop_background();
     }
 }

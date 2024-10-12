@@ -2,7 +2,7 @@ use crate::config::CONFIGS;
 use crate::services::base::Resolve;
 use crate::services::errors::Errors;
 use crate::smtp::template::EmailTemplate;
-use crate::utils::pool::allocator::PoolResource;
+use crate::utils::pool::allocator::PoolResourceProvider;
 use crate::utils::pool::request::PoolRequest;
 use lettre::message::header::ContentType;
 use lettre::transport::smtp::authentication::Credentials;
@@ -15,9 +15,11 @@ use schema::crafter::crafter_request::Template;
 use schema::crafter::{CrafterRequest, CrafterResponse, WelcomeTemplate};
 use schema::misc::datetime::Datetime;
 
+pub struct SmtpPoolResourceProvider;
+
 #[async_trait::async_trait]
-impl PoolResource<()> for SmtpTransport {
-    async fn new(_p: &()) -> Self {
+impl PoolResourceProvider<SmtpTransport> for SmtpPoolResourceProvider {
+    async fn new(&self) -> SmtpTransport {
         let creds = Credentials::new(CONFIGS.smtp.username.clone(), CONFIGS.smtp.password.clone());
         let connection_string = format!("{}", CONFIGS.smtp.host);
         SmtpTransport::relay(connection_string.as_str()).unwrap().credentials(creds).build()
@@ -26,13 +28,13 @@ impl PoolResource<()> for SmtpTransport {
 
 #[derive(Clone)]
 pub struct SmtpClient {
-    pub transport: PoolRequest<SmtpTransport, ()>
+    pub transport: PoolRequest<SmtpTransport>
 }
 
 impl SmtpClient {
     pub async fn send(&self, template: EmailTemplate) -> Resolve<()> {
         let subject = match &template {
-            EmailTemplate::WelcomeNewMember(_) => "Thank you for your subscription"
+            EmailTemplate::WelcomeNewMember(_) => "Welcome new member"
         };
 
         let user = match &template {
@@ -48,7 +50,7 @@ impl SmtpClient {
             .body(html)
             .unwrap();
 
-        let transport = self.transport.retreive().await.unwrap();
+        let transport = self.transport.retrieve().await.unwrap();
         transport
             .send(&message)
             .map_err(|e| Errors::FailedToSendEmail(format!("Failed to send email, error={:?}", e)))?;

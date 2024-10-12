@@ -6,8 +6,8 @@ use surrealdb::sql::Value;
 use crate::services::base::Resolve;
 use crate::utils::pool::reponse::PoolResponse;
 
-use super::trusted::TrustedOne;
-use super::{SurrealDbConnection, SurrealDbConnectionInfo};
+use super::trusted::{DbIntent, TrustedOne};
+use super::SurrealDbConnection;
 
 pub trait SendSync: Sized + Sync + Send {}
 pub trait SurrealDerive: SendSync + SurrealSerialize + Into<RecordId> + From<Value> {}
@@ -21,7 +21,7 @@ where
     T: SendSync,
     I: SendSync
 {
-    async fn create(&self, data: &T) -> Resolve<T>;
+    async fn create(&self, data: T) -> Resolve<T> where T: 'async_trait;
 
     async fn get(&self, id: &I) -> Resolve<Option<T>>;
 
@@ -34,11 +34,12 @@ where
     T: SurrealDerive,
     I: SurrealDerive
 {
-    async fn get_db(&self) -> PoolResponse<SurrealDbConnection, SurrealDbConnectionInfo>;
+    async fn get_db(&self) -> PoolResponse<SurrealDbConnection>;
 
-    async fn create(&self, data: &T) -> Resolve<T> {
+    async fn create(&self, data: T) -> Resolve<T> where T: 'async_trait {
+        let data = DbIntent::New(data);
         let db = self.get_db().await;
-        let result: TrustedOne = db.query(surreal_quote!("CREATE #record(data)")).await?.take(0)?;
+        let result: TrustedOne = db.query(surreal_quote!("CREATE #record(&data)")).await?.take(0)?;
         let value: Value = result.into();
         Ok(value.into())
     }
@@ -64,7 +65,7 @@ where
     T: SurrealDerive,
     I: SurrealDerive
 {
-    async fn create(&self, data: &T) -> Resolve<T> {
+    async fn create(&self, data: T) -> Resolve<T> where T: 'async_trait {
         SurrealDbRepository::create(self, data).await
     }
 
