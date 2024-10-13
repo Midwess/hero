@@ -2,12 +2,13 @@
 pub mod test {
     use std::{sync::Arc, time::{Duration, Instant}};
     use tokio::sync::{OnceCell, RwLock};
-    use crate::utils::pool::{allocator::{PoolAllocator, PoolBuilder, PoolResourceProvider}, cleanup::CleanupStrategy, request::PoolRequest};
+    use crate::utils::pool::{allocator::{PoolAllocator, PoolBuilder, PoolResourceProvider}, request::PoolRequest};
 
     pub struct DbConnection {}
 
     impl DbConnection {
         pub async fn new(_: String) -> Self {
+            tokio::time::sleep(Duration::from_millis(1000)).await; // 200ms
             Self {}
         }
 
@@ -37,17 +38,17 @@ pub mod test {
             };
 
             let pool = PoolBuilder::new(Box::new(resource_provider))
-                .min_pool_size(1000)
-                .max_pool_size(10000)
+                .min_pool_size(100)
+                .max_pool_size(1000)
                 .resource_idle_timeout(Duration::from_millis(10))
                 .build().await;
 
-            Arc::new(pool)
+            pool
         }).await;
 
         let request = PoolRequest {
             pool: DB_POOL.get().unwrap().clone(),
-            retrieving_timeout: Some(Duration::from_millis(100))
+            retrieving_timeout: Some(Duration::from_millis(1000))
         };
 
         let number_of_tasks: usize = 100000;

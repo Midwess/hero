@@ -2,13 +2,13 @@ use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use tokio::spawn;
 
-use super::allocator::PoolAllocator;
+use super::allocator::{PoolAllocator, PoolItem};
 
 pub struct PoolResponse<T>
 where
     T: Send + Sync + 'static,
 {
-    resource: Option<Box<T>>,
+    resource: Option<PoolItem<T>>,
     pool: Option<Arc<PoolAllocator<T>>>
 }
 
@@ -16,7 +16,7 @@ impl<T> PoolResponse<T>
 where
     T: Send + Sync + 'static
 {
-    pub fn new(resource: Box<T>, pool: Arc<PoolAllocator<T>>) -> Self {
+    pub fn new(resource: PoolItem<T>, pool: Arc<PoolAllocator<T>>) -> Self {
         Self {
             resource: Some(resource),
             pool: Some(pool)
@@ -31,7 +31,7 @@ where
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        self.resource.as_ref().expect("Cannot access returned resource")
+        self.resource.as_ref().expect("Cannot access returned resource").deref()
     }
 }
 
@@ -39,7 +39,7 @@ impl<T> DerefMut for PoolResponse<T>
     where T: Send + Sync + 'static
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.resource.as_mut().expect("Cannnot access the returned resource")
+        self.resource.as_mut().expect("Cannnot access the returned resource").deref_mut()
     }
 }
 
@@ -58,3 +58,4 @@ where
         });
     }
 }
+
