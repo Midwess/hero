@@ -67,11 +67,11 @@ where
 {
     pub async fn retrieve(&self) -> Option<PoolResponse<T>> {
         match (self.retrieving_timeout, self.pool.retrieve().await) {
-            (_, Ok(resource)) => Some(PoolResponse::new(resource, self.pool.clone())),
-            (Some(timeout), Err(Some(waiter))) => {
+            (_, Ok(resource)) => Some(resource),
+            (Some(timeout), Err(waiter)) => {
                 match tokio::time::timeout(timeout, waiter).await {
-                    Ok(Ok(value)) => Some(PoolResponse::new(value, self.pool.clone())),
-                    _ => None,
+                    Ok(Ok(value)) => Some(value),
+                    _ => None
                 }
             },
             _ => {

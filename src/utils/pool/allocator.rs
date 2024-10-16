@@ -1,7 +1,9 @@
 use log::*;
 use tokio::spawn;
 use tokio::task::{yield_now, JoinHandle};
+use tokio::time::sleep;
 use std::borrow::BorrowMut;
+use std::cmp::min;
 use std::collections::VecDeque;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
@@ -9,11 +11,13 @@ use std::time::{Duration, Instant};
 
 use tokio::sync::{oneshot, Mutex};
 
-struct Pool<T> where T: Send + Sync + 'static {
+use super::reponse::PoolResponse;
+
+pub struct Pool<T> where T: Send + Sync + 'static {
     max_size: usize,
     min_size: usize,
     items: Mutex<VecDeque<PoolItem<T>>>,
-    pool_size: Mutex<usize>,
+    counter: Mutex<usize>,
 }
 
 impl<T> Pool<T> where T: Send + Sync + 'static {
@@ -24,49 +28,79 @@ impl<T> Pool<T> where T: Send + Sync + 'static {
 
         Self {
            items: Mutex::new(VecDeque::with_capacity(min_size)),
-           pool_size: Mutex::new(0),
+           counter: Mutex::new(0),
            min_size,
            max_size
         } 
     }
 
     async fn add_new_item(&self, item: PoolItem<T>) {
-        let mut pool_size = self.pool_size.lock().await;
-        if *pool_size <= self.max_size {
+        if self.increase_counter().await.is_ok() {
             self.items.lock().await.push_front(item);
-            *pool_size += 1;
         }
     }
 
-    // Take an item out without reducing pool_size.
-    // Because the item 'promised that it' will be returned (Visit PoolResponse for more detailed).
-    async fn take_will_return(&self) -> Option<PoolItem<T>> {
+    async fn borrow_item(&self) -> Option<PoolItem<T>> {
         self.items.lock().await.pop_front()
     }
 
-    // Return the resource to the pool
-    // No need to increased pool_size count since it's already counted
-    async fn return_old_item(&self, mut item: PoolItem<T>) {
-        let mut current_size = self.pool_size.lock().await;
+    async fn return_borrowed_item(&self, mut item: PoolItem<T>) {
+        let mut counter = self.counter.lock().await;
 
-        if *current_size <= self.max_size {
+        if *counter <= self.max_size {
             item.borrow_mut().refresh();
+            drop(counter);
             self.items.lock().await.push_front(item);
         }
         else {
-            *current_size -= 1;
+            *counter -= 1;
             // Discard orphan resource
+            // This only occured when there is an item
+            // that not belong to this pool.
         }
     }
 
-    async fn invalidate(&self, index: usize) {
-        let mut items = self.items.lock().await;
-        let item = items.get_mut(index);
-        if item.is_some() && item.unwrap().invalidate() {
-            let mut pool_size = self.pool_size.lock().await;
-            items.swap_remove_back(index);
-            *pool_size -= 1;
+    async fn increase_counter(&self) -> Result<usize, usize> {
+        let mut counter = self.counter.lock().await;
+
+        if *counter < self.max_size {
+            *counter += 1;
+            return Ok(*counter)
         }
+
+        Err(*counter)
+    }
+
+    async fn decrease_counter(&self) -> Result<usize, usize> {
+        let mut counter = self.counter.lock().await;
+        if *counter > self.min_size {
+            *counter -= 1;
+            return Ok(*counter);
+        }
+
+        Err(*counter)
+    }
+
+    async fn invalidate(&self, index: usize) -> Result<(), Duration> {
+        let mut items = self.items.lock().await;
+        let item = items.get(index);
+        if item.is_none() {
+            return Ok(())
+        }
+
+        let timeleft = item.as_ref().unwrap().timeleft();
+        if !timeleft.is_zero() {
+            return Err(timeleft)
+        }
+
+        if let Some(removed_item) = items.swap_remove_back(index) {
+            drop(items);
+            if let Err(_) = self.decrease_counter().await {
+                self.items.lock().await.push_back(removed_item);
+            }
+        }
+
+        Ok(())
     }
 
     async fn number_of_available_items(&self) -> usize {
@@ -74,7 +108,20 @@ impl<T> Pool<T> where T: Send + Sync + 'static {
     }
 
     async fn is_exceed_min_size(&self) -> bool {
-        *self.pool_size.lock().await > self.min_size
+        *self.counter.lock().await > self.min_size
+    }
+
+    // Wait until no requests to the pool and the cleanup has finished it's job
+    pub async fn wait_for_idle(&self) {
+        loop {
+            if self.min_size == *self.counter.lock().await && // The pool is scaled down to min size
+               self.min_size == self.number_of_available_items().await // All items has returned 
+            {
+                break;
+            }
+
+            yield_now().await;
+        }
     }
 }
 
@@ -85,58 +132,71 @@ pub trait PoolResourceProvider<T>: Send + Sync
     async fn new(&self) -> T where Self: 'async_trait;
 }
 
-pub struct PoolCleaner<T> where T: Send + Sync + 'static {
+struct PoolCleaner<T> where T: Send + Sync + 'static {
     pool: Arc<Pool<T>>,
     background_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
-    is_cleanup_running: Arc<Mutex<bool>>,
 }
 
 impl<T> PoolCleaner<T> where T: Send + Sync {
     fn new(pool: Arc<Pool<T>>) -> Self {
         Self {
-            pool, background_handle: Arc::new(Mutex::new(None)), is_cleanup_running: Arc::new(Mutex::new(false))
+            pool,
+            background_handle: Arc::new(Mutex::new(None))
         }
     }
 
     async fn request_cleanup_loop(&self) {
-        let mut acquire_running_status_until_job_is_start = self.is_cleanup_running.lock().await;
-        let is_cleanup_running = *acquire_running_status_until_job_is_start;
-        if is_cleanup_running {
+        if !self.pool.is_exceed_min_size().await {
+            return
+        }
+
+        let mut background_handle = self.background_handle.lock().await;
+        if background_handle.is_some() && !background_handle.as_ref().unwrap().is_finished() { 
             return
         }
 
         let pool = self.pool.clone();
-        *self.background_handle.lock().await = {
-            let background_job_update_running = self.is_cleanup_running.clone();
+        *background_handle = {
             Some(spawn(async move {
                 let pool = pool;
                 let mut curr_index = pool.min_size;
+                let mut min_timeout: Option<Duration> = None;
 
                 loop {
                     // yield first to make sure every lock can be quickly released
                     yield_now().await;
 
                     if !pool.is_exceed_min_size().await {
-                        *background_job_update_running.lock().await = false;
                         break;
                     }
 
                     let number_of_idle_items = pool.number_of_available_items().await;
+
                     if number_of_idle_items == 0 {
-                        continue;
+                        break;
                     }
 
                     if curr_index >= number_of_idle_items {
+                        if let Some(timeout) = min_timeout {
+                            min_timeout = None;
+                            sleep(timeout).await;
+                        }
+
                         curr_index = 0;
+                        continue;
                     }
 
-                    pool.invalidate(curr_index).await;
+                    if let Err(timeleft) = pool.invalidate(curr_index).await {
+                        min_timeout = Some(min_timeout
+                            .map(|it| min(timeleft, it))
+                            .unwrap_or(timeleft)
+                        );
+                    }
+
                     curr_index += 1;
-                } 
+                }
             }))
         };
-
-        *acquire_running_status_until_job_is_start = true;
     }
 }
 
@@ -156,12 +216,10 @@ pub struct PoolAllocator<T>
 where
     T: 'static + Send + Sync
 {
-    pool: Arc<Pool<T>>,
-    min_pool_size: usize,
-    max_pool_size: usize,
+    pub pool: Arc<Pool<T>>,
     resource_idle_timeout: Duration,
     resource_provider: Box<dyn PoolResourceProvider<T> + 'static>,
-    waiters: Mutex<VecDeque<oneshot::Sender<PoolItem<T>>>>,
+    waiters: Mutex<VecDeque<oneshot::Sender<PoolResponse<T>>>>,
 
     cleaner: PoolCleaner<T>
 }
@@ -220,9 +278,7 @@ impl<T> PoolBuilder<T> where T: Send + Sync + 'static
 
         let cleaner = PoolCleaner::new(pool.clone());
 
-        let mut pool_allocator = PoolAllocator {
-            max_pool_size: self.max_pool_size,
-            min_pool_size: self.min_pool_size,
+        let pool_allocator = PoolAllocator {
             resource_provider: self.pool_resource_provider.take().expect("The resource_provider is required"),
             resource_idle_timeout: self.resource_idle_timeout,
             pool,
@@ -238,7 +294,7 @@ impl<T> PoolBuilder<T> where T: Send + Sync + 'static
 
 pub struct PoolItem<T>
 where
-    T: Send + Sync + 'static,
+    T: Send + Sync + 'static
 {
     resource: Box<T>,
     start_time: Instant,
@@ -259,9 +315,13 @@ impl<T> PoolItem<T> where T: Send + Sync + 'static
         self.start_time = Instant::now();
     }
 
-    pub fn invalidate(&mut self) -> bool {
+    pub fn timeleft(&self) -> Duration {
        let elapsed = self.start_time.elapsed();
-       elapsed.gt(&self.max_idling_timeout)
+       if elapsed.gt(&self.max_idling_timeout) {
+           return Duration::ZERO
+       }
+
+       self.max_idling_timeout - elapsed
     }
 }
 
@@ -281,10 +341,10 @@ impl<T> DerefMut for PoolItem<T> where T: Send + Sync + 'static {
 
 impl<T> PoolAllocator<T> where T: Send + Sync + 'static
 {
-    pub async fn init(&mut self)
+    pub async fn init(&self)
     {
         tokio_scoped::scope(|scope| {
-            for _i in 0..self.min_pool_size {
+            for _i in 0..self.pool.min_size {
                 let pool = self.pool.clone();
                 let resource_provider = &self.resource_provider;
                 let idle_timeout = self.resource_idle_timeout.clone();
@@ -300,69 +360,59 @@ impl<T> PoolAllocator<T> where T: Send + Sync + 'static
         info!(
             target: "pool-allocator",
             "Initialized {} resources to fit the min_pool_size={}",
-            self.pool.pool_size.lock().await,
-            self.min_pool_size
+            self.pool.number_of_available_items().await,
+            self.pool.min_size
         );
     }
 
-    pub async fn retrieve(&self) -> Result<PoolItem<T>, Option<oneshot::Receiver<PoolItem<T>>>> {
-        // Take an available resource
-        let available_item = self.pool.take_will_return().await;
+    pub async fn retrieve(self: &Arc<Self>) -> Result<PoolResponse<T>, oneshot::Receiver<PoolResponse<T>>> {
+        let available_item = self.pool.borrow_item().await;
         if available_item.is_some() {
-            return Ok(available_item.unwrap()); 
+            return Ok(PoolResponse::new(available_item.unwrap(), self.clone())); 
         }
 
-        // If there is no available resources, and the pool has not exceed max_pool_size
-        // we will create a new resource
-        // that resource will be instantly provide to client without adding to the pool
-        // because it will go back to the pool after it's complete the duty.
-        let mut current_pool_size_write = self.pool.pool_size.lock().await;
-        if *current_pool_size_write < self.max_pool_size {
-            *current_pool_size_write += 1;
-            drop(current_pool_size_write);
+        // If there is not enough resources, we will create a new one until
+        // it reached max_pool_size limit.
+        if self.pool.increase_counter().await.is_ok() {
+            let new_resource = self.resource_provider.new().await;
+            let borrowed_item = PoolItem::new(
+                Box::new(new_resource),
+                self.resource_idle_timeout);
 
-            let resource = self.resource_provider.new().await;
-            return Ok(PoolItem::new(Box::new(resource), self.resource_idle_timeout))
+            return Ok(PoolResponse::new(borrowed_item, self.clone()))
         }
 
-        // If the max_pool_size also exceeded
-        // We add the request to a queue. Waiting for a new
-        // resource to come.
-        drop(current_pool_size_write);
-        let (sender, receiver) = oneshot::channel::<PoolItem<T>>();
+        // If the pool still not have enough available resources
+        // we will init a waiter queue to wait for others resource return.
+        let (sender, receiver) = oneshot::channel::<PoolResponse<T>>();
         self.waiters.lock().await.push_back(sender);
-        Err(Some(receiver))
+        Err(receiver)
     }
 
-    pub async fn put(&self, resource: PoolItem<T>) {
-        // Serving the waiters queue first.
-        // Only add resource to the pool if no request is waiting.
+    /// Put back resource to the pool
+    /// If there are waiters in the queue, we will serve waiters first
+    /// Otherwise the resource will be returned to the pool.
+    /// The cleanup also being triggered if the pool has exceed it's min_size.
+    pub async fn put(self: &Arc<Self>, resource: PoolItem<T>) {
         let resource = 'serve_waiter_first: {
             let mut waiters = self.waiters.lock().await;
-            let waiter = waiters.pop_front();
-            drop(waiters);
+            let mut resource = Some(resource);
+            while let Some(waiter) = waiters.pop_front() {
+                resource = waiter
+                    .send(PoolResponse::new(resource.unwrap(), self.clone()))
+                    .err()
+                    .map(|it| it.try_into().unwrap());
 
-            if let Some(waiter) = waiter {
-                if let Err(returned_resource) = waiter.send(resource) {
-                    break 'serve_waiter_first Some(returned_resource)
+                if resource.is_none() {
+                    break 'serve_waiter_first None
                 }
-
-                break 'serve_waiter_first None
             }
 
-            Some(resource)
+            resource
         };
 
-        if resource.is_none() {
-            return
-        }
-
-        self.pool.return_old_item(resource.unwrap()).await;
-
-        // If the returned resource not belong to min_pool_size
-        // Then we trigger a cleanup loop to cleanup
-        // idle resources base on idle timeout.
-        if self.pool.is_exceed_min_size().await {
+        if resource.is_some() {
+            self.pool.return_borrowed_item(resource.unwrap()).await;
             self.cleaner.request_cleanup_loop().await;
         }
     }

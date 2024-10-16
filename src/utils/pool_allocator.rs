@@ -1,14 +1,13 @@
 #[cfg(test)]
 pub mod test {
-    use std::{sync::Arc, time::{Duration, Instant}};
-    use tokio::sync::{OnceCell, RwLock};
+    use std::{sync::Arc, time::Duration};
+    use tokio::sync::OnceCell;
     use crate::utils::pool::{allocator::{PoolAllocator, PoolBuilder, PoolResourceProvider}, request::PoolRequest};
 
     pub struct DbConnection {}
 
     impl DbConnection {
         pub async fn new(_: String) -> Self {
-            tokio::time::sleep(Duration::from_millis(1000)).await; // 200ms
             Self {}
         }
 
@@ -40,7 +39,7 @@ pub mod test {
             let pool = PoolBuilder::new(Box::new(resource_provider))
                 .min_pool_size(100)
                 .max_pool_size(1000)
-                .resource_idle_timeout(Duration::from_millis(10))
+                .resource_idle_timeout(Duration::from_millis(5000))
                 .build().await;
 
             pool
@@ -51,35 +50,26 @@ pub mod test {
             retrieving_timeout: Some(Duration::from_millis(1000))
         };
 
-        let number_of_tasks: usize = 100000;
-        let success_counter: Arc<RwLock<i32>> = Arc::new(RwLock::new(0));
-
-        let elapsed = Instant::now();
+        let number_of_tasks: usize = 10000;
         tokio_scoped::scope(|scope| {
             for _ in 0..number_of_tasks {
                 let request = request.clone();
-                let success_counter = success_counter.clone();
                 scope.spawn(async move {
                     let db = request.retrieve().await;
                     if db.is_none() {
-                        return
+                        return;
                     }
 
                     let db = db.unwrap();
                     db.query().await;
-                    drop(db);
-
-                    let mut success_counter = success_counter.write().await;
-                    *success_counter += 1;
-
-                    // You might want to make the resource return back to the pool more early by
-                    // calling drop(db)
-                    // Or if you don't it still able to return to the pool at the end of it's scope
+                    // By calling drop early we can quickly return the db conneciton back to the
+                    // pool
+                    drop(db)
                 });
             }
         });
 
-        println!("Number of success requests are {}/{} took {}ms", success_counter.read().await, number_of_tasks, elapsed.elapsed().as_millis());
+        DB_POOL.get().unwrap().pool.wait_for_idle().await;
     }
 }
 

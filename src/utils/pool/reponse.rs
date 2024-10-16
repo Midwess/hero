@@ -24,6 +24,17 @@ where
     }
 }
 
+impl<T> TryInto<PoolItem<T>> for PoolResponse<T> where T: Send + Sync {
+    type Error = ();
+
+    fn try_into(mut self) -> Result<PoolItem<T>, Self::Error> {
+        match self.resource.take() {
+            Some(resource) => Ok(resource),
+            None => Err(()),
+        }
+    }
+}
+
 impl<T> Deref for PoolResponse<T>
 where
     T: Send + Sync + 'static,
@@ -50,6 +61,9 @@ where
     fn drop(&mut self) {
         let pool = self.pool.take();
         let resource = self.resource.take();
+        if resource.is_none() {
+            return;
+        }
 
         spawn(async move {
             pool.expect("This response already dropped")
