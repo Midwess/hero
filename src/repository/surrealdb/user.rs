@@ -9,14 +9,14 @@ use surreal_devl::wrapper::SurrealQR;
 use crate::repository::user::{UserFind, UserRepository};
 
 pub struct UserRepositorySurrealDb {
-    pub db: PoolRequest<SurrealDbConnection, SurrealDbConnectionInfo>
+    pub db: PoolRequest<SurrealDbConnection>
 }
 
 #[async_trait]
 impl UserRepository for UserRepositorySurrealDb {
     async fn create(&self, user: User) -> Resolve<User> {
         let created_user: SurrealQR = {
-            let db = self.db.retreive().await.unwrap();
+            let db = self.db.retrieve().await.unwrap();
             db.query(surreal_quote!("CREATE #record(&user)")).await?.take(0)?
         };
 
@@ -27,7 +27,7 @@ impl UserRepository for UserRepositorySurrealDb {
     async fn find_one<'a>(&self, finding: UserFind<'a>) -> Resolve<Option<User>> {
         let result = match finding {
             UserFind::UserId(by_user_id) => {
-                let db = self.db.retreive().await.unwrap();
+                let db = self.db.retrieve().await.unwrap();
                 let value: SurrealQR = db.query(surreal_quote!(r#"SELECT * FROM #val(by_user_id)"#)).await?.take(0)?;
                 value.object()?
             }

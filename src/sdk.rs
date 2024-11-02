@@ -20,9 +20,9 @@ pub trait DependenciesInjection {
 }
 
 pub struct SharingResource {
-    pub smtp_transport: PoolRequest<SmtpTransport, ()>,
-    pub s3: PoolRequest<aws_sdk_s3::client::Client, ()>,
-    pub devlog_db: PoolRequest<SurrealDbConnection, SurrealDbConnectionInfo>
+    pub smtp_transport: PoolRequest<SmtpTransport>,
+    pub s3: PoolRequest<aws_sdk_s3::client::Client>,
+    pub devlog_db: PoolRequest<SurrealDbConnection>
 }
 
 pub struct DevlogSdk {
