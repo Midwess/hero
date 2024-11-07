@@ -26,7 +26,13 @@ pub enum Errors {
     #[error("Resource not found {}", .0)]
     ResourceNotFound(String),
     #[error("Failed to send email {}", .0)]
-    FailedToSendEmail(String)
+    FailedToSendEmail(String),
+    #[error("IO Error, {}", .0)]
+    IoError(#[from] std::io::Error),
+    #[error("All resource is busy")]
+    ResourceBusy(),
+    #[error("Unsupported resource")] 
+    UnSupportedResource(),
 }
 
 impl From<surrealdb::Error> for Errors {
@@ -69,7 +75,10 @@ impl From<Errors> for Status {
             Errors::UnexpectedDataFormat(_) => Self::aborted("Internal error, contact support"),
             Errors::AlreadyExist(message) => Self::already_exists(format!("Already exist {}", message)),
             Errors::ResourceNotFound(message) => Self::not_found(message.to_owned()),
-            Errors::FailedToSendEmail(_) => Self::internal("Failed to send email")
+            Errors::FailedToSendEmail(_) => Self::internal("Failed to send email"),
+            Errors::IoError(_) => Self::internal("Internal error"),
+            Errors::ResourceBusy() => Self::internal("Not resource left, please try again later"),
+            Errors::UnSupportedResource() => Self::internal("Unsupported resource")
         }
     }
 }

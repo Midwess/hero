@@ -12,5 +12,6 @@ pub mod s3;
 pub mod services;
 pub mod smtp;
 pub mod utils;
+pub mod host_machine;
 
 pub type Db = Surreal<Client>;
