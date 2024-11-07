@@ -6,7 +6,7 @@ use super::reponse::PoolResponse;
 
 pub struct PoolRequest<T>
 where
-    T: Send + Sync + 'static,
+    T: Send + Sync + 'static
 {
     pub retrieving_timeout: Option<Duration>,
     pub pool: Arc<PoolAllocator<T>>
@@ -22,7 +22,7 @@ where
 
 impl<T> PoolRequestBuilder<T>
 where
-    T: Send + Sync + 'static,
+    T: Send + Sync + 'static
 {
     pub fn new() -> Self {
         Self {
@@ -51,7 +51,7 @@ where
 
 impl<T> Clone for PoolRequest<T>
 where
-    T: Send + Sync + 'static,
+    T: Send + Sync + 'static
 {
     fn clone(&self) -> Self {
         Self {
@@ -68,16 +68,11 @@ where
     pub async fn retrieve(&self) -> Option<PoolResponse<T>> {
         match (self.retrieving_timeout, self.pool.retrieve().await) {
             (_, Ok(resource)) => Some(resource),
-            (Some(timeout), Err(waiter)) => {
-                match tokio::time::timeout(timeout, waiter).await {
-                    Ok(Ok(value)) => Some(value),
-                    _ => None
-                }
+            (Some(timeout), Err(waiter)) => match tokio::time::timeout(timeout, waiter).await {
+                Ok(Ok(value)) => Some(value),
+                _ => None
             },
-            _ => {
-                None
-            }
+            _ => None
         }
     }
 }
-

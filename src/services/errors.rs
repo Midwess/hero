@@ -31,8 +31,8 @@ pub enum Errors {
     IoError(#[from] std::io::Error),
     #[error("All resource is busy")]
     ResourceBusy(),
-    #[error("Unsupported resource")] 
-    UnSupportedResource(),
+    #[error("Unsupported resource")]
+    UnSupportedResource()
 }
 
 impl From<surrealdb::Error> for Errors {

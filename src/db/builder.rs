@@ -21,7 +21,9 @@ where
     T: SendSync,
     I: SendSync
 {
-    async fn create(&self, data: T) -> Resolve<T> where T: 'async_trait;
+    async fn create(&self, data: T) -> Resolve<T>
+    where
+        T: 'async_trait;
 
     async fn get(&self, id: &I) -> Resolve<Option<T>>;
 
@@ -36,7 +38,10 @@ where
 {
     async fn get_db(&self) -> PoolResponse<SurrealDbConnection>;
 
-    async fn create(&self, data: T) -> Resolve<T> where T: 'async_trait {
+    async fn create(&self, data: T) -> Resolve<T>
+    where
+        T: 'async_trait
+    {
         let data = DbIntent::New(data);
         let db = self.get_db().await;
         let result: TrustedOne = db.query(surreal_quote!("CREATE #record(&data)")).await?.take(0)?;
@@ -65,7 +70,10 @@ where
     T: SurrealDerive,
     I: SurrealDerive
 {
-    async fn create(&self, data: T) -> Resolve<T> where T: 'async_trait {
+    async fn create(&self, data: T) -> Resolve<T>
+    where
+        T: 'async_trait
+    {
         SurrealDbRepository::create(self, data).await
     }
 

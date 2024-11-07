@@ -6,7 +6,7 @@ use super::allocator::{PoolAllocator, PoolItem};
 
 pub struct PoolResponse<T>
 where
-    T: Send + Sync + 'static,
+    T: Send + Sync + 'static
 {
     resource: Option<PoolItem<T>>,
     pool: Option<Arc<PoolAllocator<T>>>
@@ -24,20 +24,23 @@ where
     }
 }
 
-impl<T> TryInto<PoolItem<T>> for PoolResponse<T> where T: Send + Sync {
+impl<T> TryInto<PoolItem<T>> for PoolResponse<T>
+where
+    T: Send + Sync
+{
     type Error = ();
 
     fn try_into(mut self) -> Result<PoolItem<T>, Self::Error> {
         match self.resource.take() {
             Some(resource) => Ok(resource),
-            None => Err(()),
+            None => Err(())
         }
     }
 }
 
 impl<T> Deref for PoolResponse<T>
 where
-    T: Send + Sync + 'static,
+    T: Send + Sync + 'static
 {
     type Target = T;
 
@@ -47,7 +50,8 @@ where
 }
 
 impl<T> DerefMut for PoolResponse<T>
-    where T: Send + Sync + 'static
+where
+    T: Send + Sync + 'static
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.resource.as_mut().expect("Cannnot access the returned resource").deref_mut()
@@ -72,4 +76,3 @@ where
         });
     }
 }
-

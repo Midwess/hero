@@ -1,8 +1,10 @@
 #[cfg(test)]
 pub mod test {
-    use std::{sync::Arc, time::Duration};
+    use crate::utils::pool::allocator::{PoolAllocator, PoolBuilder, PoolResourceProvider};
+    use crate::utils::pool::request::PoolRequest;
+    use std::sync::Arc;
+    use std::time::Duration;
     use tokio::sync::OnceCell;
-    use crate::utils::pool::{allocator::{PoolAllocator, PoolBuilder, PoolResourceProvider}, request::PoolRequest};
 
     pub struct DbConnection {}
 
@@ -23,27 +25,30 @@ pub mod test {
     #[async_trait::async_trait]
     impl PoolResourceProvider<DbConnection> for DbPoolResourceProvider {
         async fn new(&self) -> DbConnection {
-           DbConnection::new(self.connection_string.clone()).await
+            DbConnection::new(self.connection_string.clone()).await
         }
     }
- 
+
     pub static DB_POOL: OnceCell<Arc<PoolAllocator<DbConnection>>> = OnceCell::const_new();
 
     #[tokio::test(flavor = "multi_thread")]
     pub async fn test_pool() {
-        DB_POOL.get_or_init(|| async move {
-            let resource_provider = DbPoolResourceProvider {
-                connection_string: String::from("mydb://root@root")
-            };
+        DB_POOL
+            .get_or_init(|| async move {
+                let resource_provider = DbPoolResourceProvider {
+                    connection_string: String::from("mydb://root@root")
+                };
 
-            let pool = PoolBuilder::new(Box::new(resource_provider))
-                .min_pool_size(100)
-                .max_pool_size(1000)
-                .resource_idle_timeout(Duration::from_millis(5000))
-                .build().await;
+                let pool = PoolBuilder::new(Box::new(resource_provider))
+                    .min_pool_size(100)
+                    .max_pool_size(1000)
+                    .resource_idle_timeout(Duration::from_millis(5000))
+                    .build()
+                    .await;
 
-            pool
-        }).await;
+                pool
+            })
+            .await;
 
         let request = PoolRequest {
             pool: DB_POOL.get().unwrap().clone(),
@@ -72,4 +77,3 @@ pub mod test {
         DB_POOL.get().unwrap().pool.wait_for_idle().await;
     }
 }
-

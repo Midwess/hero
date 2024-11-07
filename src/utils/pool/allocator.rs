@@ -1,37 +1,43 @@
 use log::*;
-use tokio::spawn;
-use tokio::task::{yield_now, JoinHandle};
-use tokio::time::sleep;
 use std::borrow::BorrowMut;
 use std::cmp::min;
 use std::collections::VecDeque;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tokio::spawn;
+use tokio::task::{yield_now, JoinHandle};
+use tokio::time::sleep;
 
 use tokio::sync::{oneshot, Mutex};
 
 use super::reponse::PoolResponse;
 
-pub struct Pool<T> where T: Send + Sync + 'static {
+pub struct Pool<T>
+where
+    T: Send + Sync + 'static
+{
     max_size: usize,
     min_size: usize,
     items: Mutex<VecDeque<PoolItem<T>>>,
-    counter: Mutex<usize>,
+    counter: Mutex<usize>
 }
 
-impl<T> Pool<T> where T: Send + Sync + 'static {
+impl<T> Pool<T>
+where
+    T: Send + Sync + 'static
+{
     fn new(min_size: usize, max_size: usize) -> Self {
         if min_size > max_size {
             panic!("The min size can not be greater than max size");
         }
 
         Self {
-           items: Mutex::new(VecDeque::with_capacity(min_size)),
-           counter: Mutex::new(0),
-           min_size,
-           max_size
-        } 
+            items: Mutex::new(VecDeque::with_capacity(min_size)),
+            counter: Mutex::new(0),
+            min_size,
+            max_size
+        }
     }
 
     async fn add_new_item(&self, item: PoolItem<T>) {
@@ -51,8 +57,7 @@ impl<T> Pool<T> where T: Send + Sync + 'static {
             item.borrow_mut().refresh();
             drop(counter);
             self.items.lock().await.push_front(item);
-        }
-        else {
+        } else {
             *counter -= 1;
             // Discard orphan resource
             // This only occured when there is an item
@@ -115,7 +120,8 @@ impl<T> Pool<T> where T: Send + Sync + 'static {
     pub async fn wait_for_idle(&self) {
         loop {
             if self.min_size == *self.counter.lock().await && // The pool is scaled down to min size
-               self.min_size == self.number_of_available_items().await // All items has returned 
+               self.min_size == self.number_of_available_items().await
+            // All items has returned
             {
                 break;
             }
@@ -127,17 +133,26 @@ impl<T> Pool<T> where T: Send + Sync + 'static {
 
 #[async_trait::async_trait]
 pub trait PoolResourceProvider<T>: Send + Sync
-    where T: Send + Sync
+where
+    T: Send + Sync
 {
-    async fn new(&self) -> T where Self: 'async_trait;
+    async fn new(&self) -> T
+    where
+        Self: 'async_trait;
 }
 
-struct PoolCleaner<T> where T: Send + Sync + 'static {
+struct PoolCleaner<T>
+where
+    T: Send + Sync + 'static
+{
     pool: Arc<Pool<T>>,
-    background_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
+    background_handle: Arc<Mutex<Option<JoinHandle<()>>>>
 }
 
-impl<T> PoolCleaner<T> where T: Send + Sync {
+impl<T> PoolCleaner<T>
+where
+    T: Send + Sync
+{
     fn new(pool: Arc<Pool<T>>) -> Self {
         Self {
             pool,
@@ -151,7 +166,7 @@ impl<T> PoolCleaner<T> where T: Send + Sync {
         }
 
         let mut background_handle = self.background_handle.lock().await;
-        if background_handle.is_some() && !background_handle.as_ref().unwrap().is_finished() { 
+        if background_handle.is_some() && !background_handle.as_ref().unwrap().is_finished() {
             return
         }
 
@@ -187,10 +202,7 @@ impl<T> PoolCleaner<T> where T: Send + Sync {
                     }
 
                     if let Err(timeleft) = pool.invalidate(curr_index).await {
-                        min_timeout = Some(min_timeout
-                            .map(|it| min(timeleft, it))
-                            .unwrap_or(timeleft)
-                        );
+                        min_timeout = Some(min_timeout.map(|it| min(timeleft, it)).unwrap_or(timeleft));
                     }
 
                     curr_index += 1;
@@ -200,7 +212,10 @@ impl<T> PoolCleaner<T> where T: Send + Sync {
     }
 }
 
-impl<T> Drop for PoolCleaner<T> where T: Send + Sync {
+impl<T> Drop for PoolCleaner<T>
+where
+    T: Send + Sync
+{
     fn drop(&mut self) {
         let background_handle = self.background_handle.clone();
         spawn(async move {
@@ -224,22 +239,26 @@ where
     cleaner: PoolCleaner<T>
 }
 
-pub struct PoolBuilder<T> where T: Send + Sync + 'static
+pub struct PoolBuilder<T>
+where
+    T: Send + Sync + 'static
 {
     min_pool_size: usize,
     max_pool_size: usize,
     resource_idle_timeout: Duration,
-    pool_resource_provider: Option<Box<dyn PoolResourceProvider<T> + 'static>>,
+    pool_resource_provider: Option<Box<dyn PoolResourceProvider<T> + 'static>>
 }
 
-impl<T> PoolBuilder<T> where T: Send + Sync + 'static
+impl<T> PoolBuilder<T>
+where
+    T: Send + Sync + 'static
 {
     pub fn new(resource_provider: Box<dyn PoolResourceProvider<T> + 'static>) -> Self {
         Self {
             min_pool_size: 10,
             max_pool_size: 20,
             resource_idle_timeout: Duration::new(10, 0),
-            pool_resource_provider: Some(resource_provider),
+            pool_resource_provider: Some(resource_provider)
         }
     }
 
@@ -268,8 +287,7 @@ impl<T> PoolBuilder<T> where T: Send + Sync + 'static
         self
     }
 
-    pub async fn build(mut self) -> Arc<PoolAllocator<T>>
-    {
+    pub async fn build(mut self) -> Arc<PoolAllocator<T>> {
         if self.max_pool_size < self.min_pool_size {
             panic!("The max pool size can not less than min pool size");
         }
@@ -283,7 +301,7 @@ impl<T> PoolBuilder<T> where T: Send + Sync + 'static
             resource_idle_timeout: self.resource_idle_timeout,
             pool,
             cleaner,
-            waiters: Mutex::new(VecDeque::new()),
+            waiters: Mutex::new(VecDeque::new())
         };
 
         pool_allocator.init().await;
@@ -301,7 +319,9 @@ where
     max_idling_timeout: Duration
 }
 
-impl<T> PoolItem<T> where T: Send + Sync + 'static
+impl<T> PoolItem<T>
+where
+    T: Send + Sync + 'static
 {
     pub fn new(resource: Box<T>, max_idling_timeout: Duration) -> Self {
         Self {
@@ -316,16 +336,19 @@ impl<T> PoolItem<T> where T: Send + Sync + 'static
     }
 
     pub fn timeleft(&self) -> Duration {
-       let elapsed = self.start_time.elapsed();
-       if elapsed.gt(&self.max_idling_timeout) {
-           return Duration::ZERO
-       }
+        let elapsed = self.start_time.elapsed();
+        if elapsed.gt(&self.max_idling_timeout) {
+            return Duration::ZERO
+        }
 
-       self.max_idling_timeout - elapsed
+        self.max_idling_timeout - elapsed
     }
 }
 
-impl<T> Deref for PoolItem<T> where T: Send + Sync + 'static {
+impl<T> Deref for PoolItem<T>
+where
+    T: Send + Sync + 'static
+{
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -333,16 +356,20 @@ impl<T> Deref for PoolItem<T> where T: Send + Sync + 'static {
     }
 }
 
-impl<T> DerefMut for PoolItem<T> where T: Send + Sync + 'static {
+impl<T> DerefMut for PoolItem<T>
+where
+    T: Send + Sync + 'static
+{
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.resource.borrow_mut()
     }
 }
 
-impl<T> PoolAllocator<T> where T: Send + Sync + 'static
+impl<T> PoolAllocator<T>
+where
+    T: Send + Sync + 'static
 {
-    pub async fn init(&self)
-    {
+    pub async fn init(&self) {
         tokio_scoped::scope(|scope| {
             for _i in 0..self.pool.min_size {
                 let pool = self.pool.clone();
@@ -368,16 +395,14 @@ impl<T> PoolAllocator<T> where T: Send + Sync + 'static
     pub async fn retrieve(self: &Arc<Self>) -> Result<PoolResponse<T>, oneshot::Receiver<PoolResponse<T>>> {
         let available_item = self.pool.borrow_item().await;
         if available_item.is_some() {
-            return Ok(PoolResponse::new(available_item.unwrap(), self.clone())); 
+            return Ok(PoolResponse::new(available_item.unwrap(), self.clone()));
         }
 
         // If there is not enough resources, we will create a new one until
         // it reached max_pool_size limit.
         if self.pool.increase_counter().await.is_ok() {
             let new_resource = self.resource_provider.new().await;
-            let borrowed_item = PoolItem::new(
-                Box::new(new_resource),
-                self.resource_idle_timeout);
+            let borrowed_item = PoolItem::new(Box::new(new_resource), self.resource_idle_timeout);
 
             return Ok(PoolResponse::new(borrowed_item, self.clone()))
         }
@@ -417,4 +442,3 @@ impl<T> PoolAllocator<T> where T: Send + Sync + 'static
         }
     }
 }
-

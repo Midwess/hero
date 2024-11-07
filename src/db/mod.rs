@@ -50,6 +50,6 @@ impl PoolResourceProvider<SurrealDbConnection> for SurrealDbPoolResourceProvider
         .await
         .unwrap();
 
-        SurrealDbConnection {connection: db}
+        SurrealDbConnection { connection: db }
     }
 }
