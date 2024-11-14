@@ -54,7 +54,7 @@ impl Temp {
             return Ok(Self::File(path, Some(file)))
         }
 
-        let file = File::create_new(path.as_path()).await?;
+        let file = File::create(path.as_path()).await?;
         Ok(Self::File(path, Some(file)))
     }
 
