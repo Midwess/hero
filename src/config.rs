@@ -4,6 +4,21 @@ use std::env;
 use std::time::Duration;
 
 #[derive(Debug)]
+pub struct KongGatewayConfig {
+    pub admin_url: String,
+    pub url: String
+}
+
+impl Default for KongGatewayConfig {
+    fn default() -> Self {
+        Self {
+            admin_url: env::var("DEVLOG_KONG_GATEWAY_ADMIN_URL").unwrap_or("http://localhost:8001".to_owned()),
+            url: env::var("DEVLOG_KONG_GATEWAY_URL").unwrap_or("http://localhost:8000".to_owned())
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct TokenConfig {
     pub jwt_refresh_token_private_key: String,
     pub jwt_access_token_private_key: String,
@@ -36,13 +51,15 @@ impl Default for TokenConfig {
 #[derive(Debug)]
 pub struct Config {
     pub token: TokenConfig,
-    pub surrealdb: SurrealDbConnectionInfo
+    pub surrealdb: SurrealDbConnectionInfo,
+    pub kong: KongGatewayConfig
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             token: Default::default(),
+            kong: Default::default(),
             surrealdb: SurrealDbConnectionInfo {
                 socket_address: env::var("DEVLOG_SURREAL_DB_SOCKET_ADDRESS").unwrap_or("127.0.0.1:8000".to_owned()),
                 db_name: env::var("DEVLOG_SURREAL_DB_NAME").unwrap_or("devlog".to_owned()),

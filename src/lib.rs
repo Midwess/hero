@@ -1,3 +1,4 @@
+pub mod api_gateway;
 pub mod config;
 pub mod grpc;
 pub mod repository;
