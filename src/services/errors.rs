@@ -36,7 +36,7 @@ pub enum Errors {
     #[error("Failed to register service to api gateway {}", .0)]
     UnnableToRegisterApiGateway(String),
     #[error("Gateway operation failed {}", .0)]
-    GatewayOperationFailed(String),
+    GatewayOperationFailed(String)
 }
 
 impl From<surrealdb::Error> for Errors {
