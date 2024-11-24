@@ -36,7 +36,9 @@ pub enum Errors {
     #[error("Failed to register service to api gateway {}", .0)]
     UnnableToRegisterApiGateway(String),
     #[error("Gateway operation failed {}", .0)]
-    GatewayOperationFailed(String)
+    GatewayOperationFailed(String),
+    #[error("Tcp failure {}", .0)]
+    TcpFailure(String)
 }
 
 impl From<surrealdb::Error> for Errors {
@@ -84,7 +86,8 @@ impl From<Errors> for Status {
             Errors::ResourceBusy() => Self::internal("Not resource left, please try again later"),
             Errors::UnSupportedResource() => Self::internal("Unsupported resource"),
             Errors::UnnableToRegisterApiGateway(_) => Self::internal("Service failed to start"),
-            Errors::GatewayOperationFailed(_) => Self::internal("Service failed to start")
+            Errors::GatewayOperationFailed(_) => Self::internal("Service failed to start"),
+            Errors::TcpFailure(_) => Self::internal("Service failed to start"),
         }
     }
 }
