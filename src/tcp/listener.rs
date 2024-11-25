@@ -16,7 +16,7 @@ pub async fn find_listener() -> Resolve<TcpConnection> {
     let mut port = base_port;
 
     let listener = loop {
-        let addr: SocketAddr = format!("127.0.0.1:{}", port).parse().expect("Invalid address");
+        let addr: SocketAddr = format!("0.0.0.0:{}", port).parse().expect("Invalid address");
 
         match TcpIncoming::new(addr, true, None) {
             Ok(listener) => {
