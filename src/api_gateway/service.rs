@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -35,7 +37,8 @@ pub struct GatewayRoute {
     pub methods: Option<Vec<String>>,
     pub protocols: Option<Vec<String>>,
     pub strip_path: bool,
-    pub preserve_host: bool
+    pub preserve_host: bool,
+    pub headers: HashMap<String, Vec<String>>
 }
 
 #[derive(Debug, Default)]
@@ -45,9 +48,9 @@ pub struct GatewayRouteBuilder {
     pub methods: Option<Vec<String>>,
     pub protocols: Option<Vec<String>>,
     pub strip_path: Option<bool>,
-    pub preserve_host: Option<bool>
+    pub preserve_host: Option<bool>,
+    pub is_public: Option<bool>
 }
-
 impl GatewayRouteBuilder {
     pub fn new() -> Self {
         Self::default()
@@ -70,6 +73,11 @@ impl GatewayRouteBuilder {
 
     pub fn protocols(mut self, protocols: Vec<String>) -> Self {
         self.protocols = Some(protocols);
+        self
+    }
+
+    pub fn public(mut self, is_public: bool) -> Self {
+        self.is_public = Some(is_public);
         self
     }
 
@@ -100,13 +108,21 @@ impl GatewayRouteBuilder {
     }
 
     pub fn build(self) -> GatewayRoute {
+        let mut headers: HashMap<String, Vec<String>> = HashMap::new();
+        let is_public = self.is_public.unwrap_or(false);
+
+        if !is_public {
+            headers.insert("x-internal".to_owned(), vec!["true".to_owned()]);
+        }
+
         GatewayRoute {
             name: self.name.expect("Route name is required"),
             paths: self.paths,
             methods: self.methods,
             protocols: self.protocols,
             strip_path: self.strip_path.unwrap_or(false),
-            preserve_host: self.preserve_host.unwrap_or(true)
+            preserve_host: self.preserve_host.unwrap_or(true),
+            headers
         }
     }
 }
