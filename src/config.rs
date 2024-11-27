@@ -6,14 +6,16 @@ use std::time::Duration;
 #[derive(Debug)]
 pub struct KongGatewayConfig {
     pub admin_url: String,
-    pub url: String
+    pub url: String,
+    pub host: String
 }
 
 impl Default for KongGatewayConfig {
     fn default() -> Self {
         Self {
             admin_url: env::var("DEVLOG_KONG_GATEWAY_ADMIN_URL").unwrap_or("http://localhost:8001".to_owned()),
-            url: env::var("DEVLOG_KONG_GATEWAY_URL").unwrap_or("http://localhost:8000".to_owned())
+            url: env::var("DEVLOG_KONG_GATEWAY_URL").unwrap_or("http://localhost:8000".to_owned()),
+            host: env::var("DEVLOG_KONG_GATEWAY_HOST").unwrap_or("localhost".to_owned()),
         }
     }
 }
