@@ -1,5 +1,4 @@
 use std::future::Future;
-use std::io::stderr;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
