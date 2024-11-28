@@ -1,6 +1,7 @@
 use std::fs::{create_dir_all, remove_dir_all};
 use std::path::{Path, PathBuf};
 
+use log::info;
 use tokio::fs::{remove_file, File};
 use tokio::spawn;
 
@@ -68,17 +69,18 @@ impl Temp {
 
 impl Drop for Temp {
     fn drop(&mut self) {
+        info!(target: "temp", "Removing temp file");
         match self {
             Temp::Directory(path) => {
                 let path = path.clone();
                 spawn(async move {
-                    let _ = remove_dir_all(path.as_path());
+                    //let _ = remove_dir_all(path.as_path());
                 });
             }
             Temp::File(path, Some(_)) => {
                 let path = path.clone();
                 spawn(async move {
-                    let _ = remove_file(path.as_path()).await;
+                    //let _ = remove_file(path.as_path()).await;
                 });
             }
             _ => {}
