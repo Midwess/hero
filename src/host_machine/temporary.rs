@@ -74,13 +74,13 @@ impl Drop for Temp {
             Temp::Directory(path) => {
                 let path = path.clone();
                 spawn(async move {
-                    //let _ = remove_dir_all(path.as_path());
+                    let _ = remove_dir_all(path.as_path());
                 });
             }
             Temp::File(path, Some(_)) => {
                 let path = path.clone();
                 spawn(async move {
-                    //let _ = remove_file(path.as_path()).await;
+                    let _ = remove_file(path.as_path()).await;
                 });
             }
             _ => {}
