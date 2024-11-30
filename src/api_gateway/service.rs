@@ -5,29 +5,28 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GatewayService {
     pub name: String,
-    pub host: String,
-    pub port: u16,
-    pub path: Option<String>,
-    pub protocol: String,
+    pub url: String,
     #[serde(skip_serializing, skip_deserializing)]
     pub routes: Vec<GatewayRoute>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub retries: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub connect_timeout: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub write_timeout: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub read_timeout: Option<u32>
 }
 
 #[derive(Debug, Default)]
 pub struct GatewayServiceBuilder {
     pub name: Option<String>,
-    pub host: Option<String>,
-    pub port: Option<u16>,
-    pub protocol: Option<String>,
+    pub url: Option<String>,
     pub routes: Option<Vec<GatewayRoute>>,
     pub retries: Option<u8>,
     pub connect_timeout: Option<u32>,
     pub write_timeout: Option<u32>,
-    pub read_timeout: Option<u32>
+    pub read_timeout: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,7 +37,9 @@ pub struct GatewayRoute {
     pub protocols: Option<Vec<String>>,
     pub strip_path: bool,
     pub preserve_host: bool,
-    pub headers: HashMap<String, Vec<String>>
+    pub headers: HashMap<String, Vec<String>>,
+    #[serde(skip_serializing)]
+    pub enable_web: bool
 }
 
 #[derive(Debug, Default)]
@@ -49,7 +50,8 @@ pub struct GatewayRouteBuilder {
     pub protocols: Option<Vec<String>>,
     pub strip_path: Option<bool>,
     pub preserve_host: Option<bool>,
-    pub is_public: Option<bool>
+    pub is_public: Option<bool>,
+    pub enable_web: bool
 }
 impl GatewayRouteBuilder {
     pub fn new() -> Self {
@@ -58,6 +60,11 @@ impl GatewayRouteBuilder {
 
     pub fn name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
+        self
+    }
+
+    pub fn enable_web(mut self) -> Self {
+        self.enable_web = true;
         self
     }
 
@@ -96,6 +103,7 @@ impl GatewayRouteBuilder {
             "grpc".to_string(),
             "grpcs".to_string(),
         ]);
+
         self
     }
 
@@ -104,6 +112,9 @@ impl GatewayRouteBuilder {
             "http".to_string(),
             "https".to_string(),
         ]);
+
+        self.enable_web = true;
+
         self
     }
 
@@ -119,10 +130,11 @@ impl GatewayRouteBuilder {
             name: self.name.expect("Route name is required"),
             paths: self.paths,
             methods: self.methods,
-            protocols: self.protocols,
+            protocols: Some(self.protocols.expect("Protocols is required")),
             strip_path: self.strip_path.unwrap_or(false),
             preserve_host: self.preserve_host.unwrap_or(true),
-            headers
+            headers,
+            enable_web: self.enable_web
         }
     }
 }
@@ -134,16 +146,6 @@ impl GatewayServiceBuilder {
 
     pub fn name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
-        self
-    }
-
-    pub fn host(mut self, host: impl Into<String>) -> Self {
-        self.host = Some(host.into());
-        self
-    }
-
-    pub fn protocol(mut self, protocol: impl Into<String>) -> Self {
-        self.protocol = Some(protocol.into());
         self
     }
 
@@ -173,28 +175,15 @@ impl GatewayServiceBuilder {
     }
 
     // Add gRPC support by setting a default gRPC service URL
-    pub fn grpc(mut self, grpc_host: impl Into<String>, grpc_port: u16) -> Self {
-        self.protocol = Some("grpc".to_string());
-        self.host = Some(grpc_host.into());
-        self.port = Some(grpc_port);
-        self
-    }
-
-    // Add gRPC support by setting a default gRPC service URL
-    pub fn grpc_web(mut self, grpc_host: impl Into<String>, grpc_port: u16) -> Self {
-        self.protocol = Some("http".to_string());
-        self.host = Some(grpc_host.into());
-        self.port = Some(grpc_port);
+    pub fn grpc(mut self, grpc_host: String, grpc_port: u16) -> Self {
+        self.url = Some(format!("grpc://{}:{}", grpc_host, grpc_port));
         self
     }
 
     pub fn build(self) -> GatewayService {
         GatewayService {
             name: self.name.expect("Service name is required"),
-            host: self.host.expect("Service host must be defined"),
-            port: self.port.expect("Service port must be defined"),
-            path: Some("/".to_owned()),
-            protocol: self.protocol.expect("Service protocol must be defined"),
+            url: self.url.expect("Service url is required"),
             routes: self.routes.unwrap_or(vec![]),
             retries: self.retries,
             connect_timeout: self.connect_timeout,
