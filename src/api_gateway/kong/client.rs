@@ -30,7 +30,7 @@ impl KongGatewayAdminClient {
                     ))
                 })?;
 
-            if !resp.status().is_success() {
+            if !resp.status().is_success() && StatusCode::CONFLICT != resp.status() {
                 return Err(Errors::UnnableToRegisterApiGateway(format!(
                     "Failed to enable grpc-web plugin: {} {:?}",
                     resp.status(),
@@ -78,7 +78,7 @@ impl KongGatewayAdminClient {
                     })
                 })
             {
-                let delete_resp = client
+                let _ = client
                     .delete(format!("{kong_url}/plugins/{plugin_id}"))
                     .send()
                     .await
@@ -88,14 +88,6 @@ impl KongGatewayAdminClient {
                             it.to_string()
                         ))
                     })?;
-
-                if !delete_resp.status().is_success() {
-                    return Err(Errors::UnnableToRegisterApiGateway(format!(
-                        "Failed to delete grpc-web plugin: {} {:?}",
-                        delete_resp.status(),
-                        delete_resp.text().await.unwrap()
-                    )));
-                }
             }
         }
 
