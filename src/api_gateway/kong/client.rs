@@ -8,7 +8,7 @@ use crate::api_gateway::client::ApiGatewayClient;
 use crate::api_gateway::service::GatewayService;
 
 pub struct KongGatewayAdminClient {
-    pub url: String,
+    pub url: String
 }
 
 impl KongGatewayAdminClient {
@@ -24,10 +24,7 @@ impl KongGatewayAdminClient {
                 .send()
                 .await
                 .map_err(|it| {
-                    Errors::UnnableToRegisterApiGateway(format!(
-                        "Unable to enable grpc-web plugin: {}",
-                        it.to_string()
-                    ))
+                    Errors::UnnableToRegisterApiGateway(format!("Unable to enable grpc-web plugin: {}", it.to_string()))
                 })?;
 
             if !resp.status().is_success() && StatusCode::CONFLICT != resp.status() {
@@ -39,16 +36,13 @@ impl KongGatewayAdminClient {
             }
         } else {
             // Find all plugins associated with the route
-            let resp = client
-                .get(format!("{kong_url}/routes/{route_name}/plugins"))
-                .send()
-                .await
-                .map_err(|it| {
-                    Errors::UnnableToRegisterApiGateway(format!(
-                        "Failed to retrieve plugins for route {}: {}",
-                        route_name, it.to_string()
-                    ))
-                })?;
+            let resp = client.get(format!("{kong_url}/routes/{route_name}/plugins")).send().await.map_err(|it| {
+                Errors::UnnableToRegisterApiGateway(format!(
+                    "Failed to retrieve plugins for route {}: {}",
+                    route_name,
+                    it.to_string()
+                ))
+            })?;
 
             if !resp.status().is_success() {
                 return Err(Errors::UnnableToRegisterApiGateway(format!(
@@ -59,35 +53,22 @@ impl KongGatewayAdminClient {
             }
 
             let plugins: serde_json::Value = resp.json().await.map_err(|it| {
-                Errors::UnnableToRegisterApiGateway(format!(
-                    "Failed to parse plugins response: {}",
-                    it.to_string()
-                ))
+                Errors::UnnableToRegisterApiGateway(format!("Failed to parse plugins response: {}", it.to_string()))
             })?;
 
             // Find and delete the grpc-web plugin
-            if let Some(plugin_id) = plugins["data"]
-                .as_array()
-                .and_then(|plugins| {
-                    plugins.iter().find_map(|plugin| {
-                        if plugin["name"] == "grpc-web" {
-                            plugin["id"].as_str().map(|id| id.to_string())
-                        } else {
-                            None
-                        }
-                    })
+            if let Some(plugin_id) = plugins["data"].as_array().and_then(|plugins| {
+                plugins.iter().find_map(|plugin| {
+                    if plugin["name"] == "grpc-web" {
+                        plugin["id"].as_str().map(|id| id.to_string())
+                    } else {
+                        None
+                    }
                 })
-            {
-                let _ = client
-                    .delete(format!("{kong_url}/plugins/{plugin_id}"))
-                    .send()
-                    .await
-                    .map_err(|it| {
-                        Errors::UnnableToRegisterApiGateway(format!(
-                            "Failed to delete grpc-web plugin: {}",
-                            it.to_string()
-                        ))
-                    })?;
+            }) {
+                let _ = client.delete(format!("{kong_url}/plugins/{plugin_id}")).send().await.map_err(|it| {
+                    Errors::UnnableToRegisterApiGateway(format!("Failed to delete grpc-web plugin: {}", it.to_string()))
+                })?;
             }
         }
 
@@ -109,33 +90,24 @@ impl ApiGatewayClient for KongGatewayAdminClient {
                 .send()
                 .await
                 .map_err(|it| {
-                    Errors::UnnableToRegisterApiGateway(format!(
-                        "Unnable to register route {}",
-                        it.to_string()
-                    ))
+                    Errors::UnnableToRegisterApiGateway(format!("Unnable to register route {}", it.to_string()))
                 })?;
 
             let resp = match resp.status() {
                 StatusCode::CONFLICT => {
                     info!(target: "kong-admin", "Service already exist, change to update");
                     let resp = client
-                        .patch(format!(
-                            "{kong_url}/services/{service_name}/routes/{}",
-                            &route.name
-                        ))
+                        .patch(format!("{kong_url}/services/{service_name}/routes/{}", &route.name))
                         .json(&route)
                         .send()
                         .await
                         .map_err(|it| {
-                            Errors::UnnableToRegisterApiGateway(format!(
-                                "Unnable to register route {}",
-                                it.to_string()
-                            ))
+                            Errors::UnnableToRegisterApiGateway(format!("Unnable to register route {}", it.to_string()))
                         })?;
 
                     resp
                 }
-                _ => resp,
+                _ => resp
             };
 
             if !resp.status().is_success() {
@@ -157,17 +129,12 @@ impl ApiGatewayClient for KongGatewayAdminClient {
         let client = reqwest::Client::new();
 
         info!(target: "kong-admin", "Creating service {}", json!({"body": service}));
-        let resp = client
-            .post(format!("{kong_url}/services"))
-            .json(&service)
-            .send()
-            .await
-            .map_err(|it| {
-                Errors::UnnableToRegisterApiGateway(format!(
-                    "Unnable to register service, failed to create {}",
-                    it.to_string()
-                ))
-            })?;
+        let resp = client.post(format!("{kong_url}/services")).json(&service).send().await.map_err(|it| {
+            Errors::UnnableToRegisterApiGateway(format!(
+                "Unnable to register service, failed to create {}",
+                it.to_string()
+            ))
+        })?;
 
         let resp = match resp.status() {
             StatusCode::CONFLICT => {
@@ -177,14 +144,14 @@ impl ApiGatewayClient for KongGatewayAdminClient {
                     .send()
                     .await
                     .map_err(|it| {
-                        Errors::UnnableToRegisterApiGateway(format!(
-                            "Unnable to register service, failed to update {}",
-                            it.to_string()
-                        ))
-                    })?;
+                    Errors::UnnableToRegisterApiGateway(format!(
+                        "Unnable to register service, failed to update {}",
+                        it.to_string()
+                    ))
+                })?;
                 resp
             }
-            _ => resp,
+            _ => resp
         };
 
         if !resp.status().is_success() {
@@ -205,18 +172,14 @@ impl ApiGatewayClient for KongGatewayAdminClient {
         let kong_url = self.url.as_str();
         let resp = reqwest::get(format!("{kong_url}/services/{service_name}"))
             .await
-            .map_err(|_it| {
-                Errors::GatewayOperationFailed("Failed to retrieving service info".to_owned())
-            })?;
+            .map_err(|_it| Errors::GatewayOperationFailed("Failed to retrieving service info".to_owned()))?;
 
         if resp.status() == StatusCode::NOT_FOUND {
             return Ok(None);
         }
 
-        let service: GatewayService =
-            resp.json().await.map_err(|it| Errors::GatewayOperationFailed(it.to_string()))?;
+        let service: GatewayService = resp.json().await.map_err(|it| Errors::GatewayOperationFailed(it.to_string()))?;
 
         return Ok(Some(service));
     }
 }
-

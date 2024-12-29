@@ -1,6 +1,8 @@
-use std::{env, net::SocketAddr};
+use std::env;
+use std::net::SocketAddr;
 
-use core_services::services::{base::Resolve, errors::Errors};
+use core_services::services::base::Resolve;
+use core_services::services::errors::Errors;
 use log::error;
 use tonic::transport::server::TcpIncoming;
 
@@ -42,4 +44,3 @@ pub async fn find_listener() -> Resolve<TcpConnection> {
             .unwrap_or("host.docker.internal".to_owned())
     })
 }
-

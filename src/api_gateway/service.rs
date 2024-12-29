@@ -26,7 +26,7 @@ pub struct GatewayServiceBuilder {
     pub retries: Option<u8>,
     pub connect_timeout: Option<u32>,
     pub write_timeout: Option<u32>,
-    pub read_timeout: Option<u32>,
+    pub read_timeout: Option<u32>
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
