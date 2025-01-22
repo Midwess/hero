@@ -1,7 +1,6 @@
 use crate::config::CONFIGS;
 use crate::services::base::Resolve;
 use crate::services::errors::Errors;
-use crate::smtp::template::EmailTemplate;
 use crate::utils::pool::allocator::PoolResourceProvider;
 use crate::utils::pool::request::PoolRequest;
 use lettre::message::header::ContentType;
@@ -11,9 +10,8 @@ use log::info;
 use prost::Message;
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use reqwest::StatusCode;
-use schema::crafter::crafter_request::Template;
-use schema::crafter::{CrafterRequest, CrafterResponse, WelcomeTemplate};
-use schema::misc::datetime::Datetime;
+use schema::crafter::email_template::Template;
+use schema::crafter::{CrafterRequest, CrafterResponse, EmailTemplate};
 
 pub struct SmtpPoolResourceProvider;
 
@@ -33,18 +31,23 @@ pub struct SmtpClient {
 
 impl SmtpClient {
     pub async fn send(&self, template: EmailTemplate) -> Resolve<()> {
-        let subject = match &template {
-            EmailTemplate::WelcomeNewMember(_) => "Welcome new member"
+        let subject = match &template.template {
+            Some(Template::Otp(_)) => "OTP verification".to_owned(),
+            Some(Template::Welcome(_)) => "Welcome".to_owned(),
+            None => "Devlog studio".to_owned()
         };
-
-        let user = match &template {
-            EmailTemplate::WelcomeNewMember(u) => u
+        let user_email = match &template.template {
+            Some(Template::Welcome(u)) => u.user_name.clone(),
+            Some(Template::Otp(_)) => {
+                todo!()
+            }
+            None => return Err(Errors::BadRequest("Template.template must be defined".to_owned()))
         };
 
         let html = self.get_html_template(&template).await?;
         let message = lettre::Message::builder()
             .from(format!("Devlog studio <{}>", CONFIGS.smtp.username).parse().unwrap())
-            .to(user.email.clone().parse().unwrap())
+            .to(user_email.clone().parse().unwrap())
             .subject(subject)
             .header(ContentType::TEXT_HTML)
             .body(html)
@@ -60,18 +63,8 @@ impl SmtpClient {
 
     async fn get_html_template(&self, template: &EmailTemplate) -> Resolve<String> {
         let client = reqwest::Client::new();
-        let schema = match template {
-            EmailTemplate::WelcomeNewMember(user) => WelcomeTemplate {
-                user_name: match user.name.is_empty() {
-                    true => user.email.clone(),
-                    false => user.name.clone()
-                },
-                datetime: Some(Datetime::now())
-            }
-        };
-
         let crafter_request = CrafterRequest {
-            template: Some(Template::Welcome(schema))
+            template: template.clone()
         };
 
         let mut buffer = Vec::new();

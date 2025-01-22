@@ -3,15 +3,8 @@ name = "core-services"
 version = "0.1.0"
 edition = "2021"
 
-[target.aarch64-apple-darwin]
-linker = "clang"
-rustflags = ["-C", "link-arg=-fuse-ld=/usr/local/bin/mold"]
-
 [profile.dev]
 opt-level = 1
-
-[profile.dev.package."*"]
-opt-level = 3
 
 [dependencies]
 prost = "0.12.6"
@@ -20,10 +13,9 @@ serde = {version="1.0.203", features=["derive"]}
 schema = { path = "../schema/rust" }
 serde_derive = "1.0.203"
 serde_json = "1.0.117"
-surreal_derive_plus = "1.0.9"
-surreal_devl = "1.0.10"
-surrealdb = {version="1.5.4", default-features = false, features = ["protocol-ws", "kv-mem"]}
-surrealdb_id = "0.1.2"
+surrealdb = {version="2.1.4", default-features = false, features = ["protocol-ws"]}
+surreal_devl = "2.2.0"
+surreal_derive_plus = "2.2.0"
 thiserror = "1.0.61"
 tonic = "0.11.0"
 jsonwebtoken = "9.3.0"

@@ -2,7 +2,6 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use log::info;
 use tokio::spawn;
 use tokio::sync::Mutex;
 

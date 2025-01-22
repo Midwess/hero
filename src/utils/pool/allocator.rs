@@ -119,10 +119,7 @@ where
     // Wait until no requests to the pool and the cleanup has finished it's job
     pub async fn wait_for_idle(&self) {
         loop {
-            if self.min_size == *self.counter.lock().await && // The pool is scaled down to min size
-               self.min_size == self.number_of_available_items().await
-            // All items has returned
-            {
+            if self.min_size == *self.counter.lock().await && self.min_size == self.number_of_available_items().await {
                 break;
             }
 

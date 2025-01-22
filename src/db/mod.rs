@@ -1,6 +1,5 @@
-pub mod builder;
-pub mod trusted;
-
+pub mod repository;
+pub mod result;
 use std::ops::Deref;
 
 use surrealdb::engine::remote::ws::Ws;
@@ -50,6 +49,7 @@ impl PoolResourceProvider<SurrealDbConnection> for SurrealDbPoolResourceProvider
         .await
         .unwrap();
 
+        log::info!(target: "db", "Connected to surreal db using {:?}", param);
         SurrealDbConnection { connection: db }
     }
 }

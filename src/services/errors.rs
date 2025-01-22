@@ -1,7 +1,7 @@
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::presigning::PresigningConfigError;
 use log::info;
-use surreal_devl::wrapper::SurrealResponseError;
+use surreal_devl::surreal_qr::SurrealResponseError;
 use thiserror::Error;
 use tonic::Status;
 
@@ -38,7 +38,9 @@ pub enum Errors {
     #[error("Gateway operation failed {}", .0)]
     GatewayOperationFailed(String),
     #[error("Tcp failure {}", .0)]
-    TcpFailure(String)
+    TcpFailure(String),
+    #[error("Failed to download file {}", .0)]
+    FailedToDownloadFile(String)
 }
 
 impl From<surrealdb::Error> for Errors {
@@ -88,6 +90,7 @@ impl From<Errors> for Status {
             Errors::UnnableToRegisterApiGateway(_) => Self::internal("Service failed to start"),
             Errors::GatewayOperationFailed(_) => Self::internal("Service failed to start"),
             Errors::TcpFailure(_) => Self::internal("Service failed to start"),
+            Errors::FailedToDownloadFile(_) => Self::internal("Failed to download file")
         }
     }
 }

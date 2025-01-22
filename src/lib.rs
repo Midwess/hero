@@ -9,6 +9,7 @@ pub mod db;
 pub mod grpc;
 pub mod host_machine;
 pub mod logger;
+pub mod retry;
 pub mod s3;
 pub mod services;
 pub mod smtp;
