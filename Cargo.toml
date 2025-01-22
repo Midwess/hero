@@ -3,23 +3,15 @@ name = "devlog-sdk"
 version = "0.1.0"
 edition = "2021"
 
-[target.aarch64-apple-darwin]
-linker = "clang"
-rustflags = ["-C", "link-arg=-fuse-ld=/usr/local/bin/mold"]
-
 [profile.dev]
 opt-level = 1
-
-[profile.dev.package."*"]
-opt-level = 3
 
 [dependencies]
 core-services = { path="../core-services" }
 schema = { path="../schema/rust" }
-surreal_derive_plus = "1.0.9"
-surreal_devl = "1.0.10"
-surrealdb = {version="1.5.4", default-features = false, features = ["protocol-ws"]}
-surrealdb_id = "0.1.2"
+surreal_derive_plus = "2.2.0"
+surreal_devl = "2.2.0"
+surrealdb = {version="2.1.4", default-features = false, features = ["protocol-ws"]}
 lazy_static = "1.5.0"
 log = "0.4.22"
 chrono = "0.4.38"

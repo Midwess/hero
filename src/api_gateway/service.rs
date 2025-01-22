@@ -118,6 +118,14 @@ impl GatewayRouteBuilder {
         self
     }
 
+    pub fn http(mut self) -> Self {
+        self.protocols = Some(vec![
+            "http".to_string(),
+            "https".to_string(),
+        ]);
+        self
+    }
+
     pub fn build(self) -> GatewayRoute {
         let mut headers: HashMap<String, Vec<String>> = HashMap::new();
         let is_public = self.is_public.unwrap_or(false);
@@ -177,6 +185,11 @@ impl GatewayServiceBuilder {
     // Add gRPC support by setting a default gRPC service URL
     pub fn grpc(mut self, grpc_host: String, grpc_port: u16) -> Self {
         self.url = Some(format!("grpc://{}:{}", grpc_host, grpc_port));
+        self
+    }
+
+    pub fn http(mut self, http_host: String, http_port: u16) -> Self {
+        self.url = Some(format!("http://{}:{}", http_host, http_port));
         self
     }
 

@@ -1,21 +1,19 @@
 use chrono::{DateTime, Utc};
-use core_services::db::trusted::TrustedOne;
 use core_services::db::SurrealDbConnection;
 use core_services::retry;
 use core_services::utils::pool::request::PoolRequest;
-use once_cell::sync::Lazy;
-use schema::misc::datetime::Datetime as DbDateTime;
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use surreal_derive_plus::{surreal_quote, SurrealDerive};
-use surrealdb::opt::RecordId;
-use surrealdb::sql::Id;
+use surreal_devl::surreal_id::SurrealId;
+use surreal_devl::surreal_qr::RPath;
+use surrealdb::sql::{Id, Thing};
 use surrealdb::Error;
 use thiserror::Error;
 
-pub static EPOCH_SINCE: Lazy<DateTime<Utc>> =
-    Lazy::new(|| "2024-12-29T00:00:00Z".parse::<DateTime<Utc>>().expect("EPOCH_SINCE is not valid"));
+pub static EPOCH_SINCE: u64 = 1735405200000; // 2024-12-29T00:00:00Z
 
-pub static CONCURRENT_COLLISION_THRESHOLD: u64 = (2 ^ 13) / 2;
+pub static CONCURRENT_COLLISION_THRESHOLD: u64 = 4096;
 
 pub static MAX_ID_IN_MS: u64 = 1024;
 
@@ -31,11 +29,17 @@ pub enum DistributedIdError {
     WorkerOutOfBound(String, String)
 }
 
-#[derive(Debug, SurrealDerive, Clone)]
+#[derive(Debug, SurrealDerive, Clone, Serialize, Deserialize)]
 pub struct Worker {
     distributed_id: u64,
     name: String,
-    created_at: DbDateTime
+    created_at: DateTime<Utc>
+}
+
+impl SurrealId for Worker {
+    fn id(&self) -> surrealdb::sql::Thing {
+        Thing::from(("worker", Id::Number(self.distributed_id as i64)))
+    }
 }
 
 impl Worker {
@@ -54,11 +58,11 @@ impl Worker {
         let new_worker = Worker {
             distributed_id,
             name,
-            created_at: DbDateTime::now()
+            created_at: Utc::now()
         };
 
-        let created_worker: TrustedOne = db.query(surreal_quote!(r#"CREATE #record(&new_worker)"#)).await?.take(0)?;
-        let created_worker: Option<Worker> = created_worker.into();
+        let created_worker: Option<Worker> =
+            db.query(surreal_quote!(r#"CREATE #record(&new_worker)"#)).await?.take(RPath::from(0))?;
         return Ok(created_worker.unwrap())
     }
 
@@ -73,10 +77,10 @@ impl Worker {
 
         let db = db.unwrap();
 
-        let latest_worker: TrustedOne = db
+        let latest_worker: Option<Worker> = db
             .query(surreal_quote!(r#"SELECT * FROM worker ORDER BY distributed_id DESC LIMIT 1"#))
             .await?
-            .take(0)?;
+            .take(RPath::from(0))?;
         let latest_worker: Option<Worker> = latest_worker.into();
         if latest_worker.is_none() {
             return Self::create_worker(1, name, db_req.clone()).await
@@ -85,7 +89,19 @@ impl Worker {
         let latest_worker_node = latest_worker.unwrap();
 
         if latest_worker_node.distributed_id >= CONCURRENT_COLLISION_THRESHOLD * 2 {
-            let latest_worker: TrustedOne = db.query(surreal_quote!(r#"SELECT * FROM distributed_id < r#(CONCURRENT_COLLISION_THRESHOLD - 1) ORDER BY distributed_id DESC LIMIT 1"#)).await?.take(0)?;
+            let latest_worker: Option<Worker> = db
+                .query(surreal_quote!(
+                    r#"
+                    SELECT *
+                    FROM worker
+                    WHERE distributed_id < #(CONCURRENT_COLLISION_THRESHOLD)
+                    ORDER BY distributed_id
+                    DESC
+                    LIMIT 1
+                "#
+                ))
+                .await?
+                .take(RPath::from(0))?;
             let latest_worker: Option<Worker> = latest_worker.into();
             if let Some(latest_worker) = latest_worker {
                 let created_worker =
@@ -110,15 +126,9 @@ impl Worker {
     }
 }
 
-impl From<Worker> for RecordId {
-    fn from(value: Worker) -> Self {
-        Self::from(("worker", Id::Number(value.distributed_id as i64)))
-    }
-}
-
 pub struct DistributedIdGenerator {
     pub worker: Worker,
-    pub last_timestamp: i64,
+    pub last_timestamp: u64,
     // Sequence counter for IDs generated in that same ms
     pub sequence: u64
 }
@@ -126,8 +136,8 @@ pub struct DistributedIdGenerator {
 impl DistributedIdGenerator {
     pub async fn init(name: String, db: PoolRequest<SurrealDbConnection>) -> Result<Self, DistributedIdError> {
         let created_worker = retry!(
-            retries = 3,
-            delay = std::time::Duration::new(0, 100000000), // 100 ms
+            retries = 10,
+            delay = std::time::Duration::from_millis(500),
             |_e: &DistributedIdError| { return true },
             { Worker::get_or_create_worker(name.clone(), db.clone()).await }
         )?;
@@ -140,15 +150,14 @@ impl DistributedIdGenerator {
     }
 
     /// Generates a 64-bit ID with the layout:
-    /// [41 bits: timestamp in seconds since EPOCH_SINCE]
+    /// [41 bits: timestamp in ms since EPOCH_SINCE]
     /// [13 bits: worker ID]
-    /// [10 bits: sequence for that second]
-    async fn next_id(&mut self) -> Result<i64, DistributedIdError> {
+    /// [10 bits: sequence for that ms]
+    pub async fn next_id(&mut self) -> Result<u64, DistributedIdError> {
         let now_utc = Utc::now();
-        let epoch_since_seconds = EPOCH_SINCE.timestamp();
-        let current_seconds = now_utc.timestamp();
+        let current_ms = now_utc.timestamp_millis();
 
-        let mut timestamp = current_seconds - epoch_since_seconds;
+        let mut timestamp = current_ms as u64 - EPOCH_SINCE;
         if timestamp < 0 {
             timestamp = 0;
         }
@@ -161,9 +170,9 @@ impl DistributedIdGenerator {
                 while timestamp == self.last_timestamp {
                     tokio::time::sleep(Duration::from_millis(1)).await;
                     let new_now_utc = Utc::now();
-                    let new_seconds = new_now_utc.timestamp() - epoch_since_seconds;
-                    if new_seconds > timestamp {
-                        timestamp = new_seconds;
+                    let new_ms = new_now_utc.timestamp_millis() as u64 - EPOCH_SINCE;
+                    if new_ms > timestamp {
+                        timestamp = new_ms;
                         break;
                     }
                 }
@@ -171,16 +180,17 @@ impl DistributedIdGenerator {
                 self.sequence = 0;
                 self.last_timestamp = timestamp;
             }
-        } else {
+        } 
+        else {
             self.sequence = 0;
             self.last_timestamp = timestamp;
         }
 
         // Construct the 64-bit ID
         // 41 bits of timestamp | 13 bits of worker | 10 bits of sequence
-        let timestamp_41 = (timestamp as i64) & ((1 << 41) - 1);
-        let worker_13 = (self.worker.distributed_id as i64) & ((1 << 13) - 1);
-        let seq_10 = (self.sequence as i64) & ((1 << 10) - 1);
+        let timestamp_41 = timestamp & ((1 << 41) - 1);
+        let worker_13 = self.worker.distributed_id & ((1 << 13) - 1);
+        let seq_10 = self.sequence & ((1 << 10) - 1);
 
         let id = (timestamp_41 << 23) | (worker_13 << 10) | seq_10;
 
@@ -191,15 +201,13 @@ impl DistributedIdGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
-    use schema::misc::datetime::Datetime as DbDateTime;
 
     #[tokio::test]
     async fn test_next_id_increments() -> Result<(), Box<dyn std::error::Error>> {
         let worker = Worker {
             distributed_id: 42,
             name: "test_worker".to_string(),
-            created_at: DbDateTime::now()
+            created_at: Utc::now()
         };
 
         let mut generator = DistributedIdGenerator {
@@ -228,7 +236,7 @@ mod tests {
         let worker = Worker {
             distributed_id: 1,
             name: "rollover_test".to_string(),
-            created_at: DbDateTime::now()
+            created_at: Utc::now()
         };
 
         let mut generator = DistributedIdGenerator {
