@@ -22,6 +22,12 @@ pub struct DevlogSdk {
     devlog_db_allocator: OnceCell<Arc<PoolAllocator<SurrealDbConnection>>>
 }
 
+impl Default for DevlogSdk {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DevlogSdk {
     pub fn new() -> Self {
         Self {

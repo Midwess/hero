@@ -63,7 +63,7 @@ impl Worker {
 
         let created_worker: Option<Worker> =
             db.query(surreal_quote!(r#"CREATE #record(&new_worker)"#)).await?.take(RPath::from(0))?;
-        return Ok(created_worker.unwrap())
+        Ok(created_worker.unwrap())
     }
 
     async fn get_or_create_worker(
@@ -81,7 +81,7 @@ impl Worker {
             .query(surreal_quote!(r#"SELECT * FROM worker ORDER BY distributed_id DESC LIMIT 1"#))
             .await?
             .take(RPath::from(0))?;
-        let latest_worker: Option<Worker> = latest_worker.into();
+        let latest_worker: Option<Worker> = latest_worker;
         if latest_worker.is_none() {
             return Self::create_worker(1, name, db_req.clone()).await
         }
@@ -102,7 +102,7 @@ impl Worker {
                 ))
                 .await?
                 .take(RPath::from(0))?;
-            let latest_worker: Option<Worker> = latest_worker.into();
+            let latest_worker: Option<Worker> = latest_worker;
             if let Some(latest_worker) = latest_worker {
                 let created_worker =
                     Self::create_worker(latest_worker.distributed_id + 1, name, db_req.clone()).await?;
@@ -110,9 +110,9 @@ impl Worker {
                     db.query(r#"DELETE worker WHERE distributed_id > #(CONCURRENT_COLLISION_THRESHOLD)"#).await?;
                 }
 
-                return Ok(created_worker)
+                Ok(created_worker)
             } else {
-                return Self::create_worker(1, name, db_req.clone()).await;
+                Ok(Self::create_worker(1, name, db_req.clone()).await?)
             }
         } else {
             let created_worker =
@@ -138,7 +138,7 @@ impl DistributedIdGenerator {
         let created_worker = retry!(
             retries = 10,
             delay = std::time::Duration::from_millis(500),
-            |_e: &DistributedIdError| { return true },
+            |_e: &DistributedIdError| true,
             { Worker::get_or_create_worker(name.clone(), db.clone()).await }
         )?;
 
@@ -158,9 +158,6 @@ impl DistributedIdGenerator {
         let current_ms = now_utc.timestamp_millis();
 
         let mut timestamp = current_ms as u64 - EPOCH_SINCE;
-        if timestamp < 0 {
-            timestamp = 0;
-        }
 
         if timestamp == self.last_timestamp {
             self.sequence += 1;
@@ -180,8 +177,7 @@ impl DistributedIdGenerator {
                 self.sequence = 0;
                 self.last_timestamp = timestamp;
             }
-        } 
-        else {
+        } else {
             self.sequence = 0;
             self.last_timestamp = timestamp;
         }

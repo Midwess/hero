@@ -24,7 +24,7 @@ impl KongGatewayAdminClient {
                 .send()
                 .await
                 .map_err(|it| {
-                    Errors::UnnableToRegisterApiGateway(format!("Unable to enable grpc-web plugin: {}", it.to_string()))
+                    Errors::UnnableToRegisterApiGateway(format!("Unable to enable grpc-web plugin: {}", it))
                 })?;
 
             if !resp.status().is_success() && StatusCode::CONFLICT != resp.status() {
@@ -39,8 +39,7 @@ impl KongGatewayAdminClient {
             let resp = client.get(format!("{kong_url}/routes/{route_name}/plugins")).send().await.map_err(|it| {
                 Errors::UnnableToRegisterApiGateway(format!(
                     "Failed to retrieve plugins for route {}: {}",
-                    route_name,
-                    it.to_string()
+                    route_name, it
                 ))
             })?;
 
@@ -53,7 +52,7 @@ impl KongGatewayAdminClient {
             }
 
             let plugins: serde_json::Value = resp.json().await.map_err(|it| {
-                Errors::UnnableToRegisterApiGateway(format!("Failed to parse plugins response: {}", it.to_string()))
+                Errors::UnnableToRegisterApiGateway(format!("Failed to parse plugins response: {}", it))
             })?;
 
             // Find and delete the grpc-web plugin
@@ -67,7 +66,7 @@ impl KongGatewayAdminClient {
                 })
             }) {
                 let _ = client.delete(format!("{kong_url}/plugins/{plugin_id}")).send().await.map_err(|it| {
-                    Errors::UnnableToRegisterApiGateway(format!("Failed to delete grpc-web plugin: {}", it.to_string()))
+                    Errors::UnnableToRegisterApiGateway(format!("Failed to delete grpc-web plugin: {}", it))
                 })?;
             }
         }
@@ -89,23 +88,20 @@ impl ApiGatewayClient for KongGatewayAdminClient {
                 .json(&route)
                 .send()
                 .await
-                .map_err(|it| {
-                    Errors::UnnableToRegisterApiGateway(format!("Unnable to register route {}", it.to_string()))
-                })?;
+                .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unnable to register route {}", it)))?;
 
             let resp = match resp.status() {
                 StatusCode::CONFLICT => {
                     info!(target: "kong-admin", "Service already exist, change to update");
-                    let resp = client
+
+                    client
                         .patch(format!("{kong_url}/services/{service_name}/routes/{}", &route.name))
                         .json(&route)
                         .send()
                         .await
                         .map_err(|it| {
-                            Errors::UnnableToRegisterApiGateway(format!("Unnable to register route {}", it.to_string()))
-                        })?;
-
-                    resp
+                            Errors::UnnableToRegisterApiGateway(format!("Unnable to register route {}", it))
+                        })?
                 }
                 _ => resp
             };
@@ -130,27 +126,18 @@ impl ApiGatewayClient for KongGatewayAdminClient {
 
         info!(target: "kong-admin", "Creating service {}", json!({"body": service}));
         let resp = client.post(format!("{kong_url}/services")).json(&service).send().await.map_err(|it| {
-            Errors::UnnableToRegisterApiGateway(format!(
-                "Unnable to register service, failed to create {}",
-                it.to_string()
-            ))
+            Errors::UnnableToRegisterApiGateway(format!("Unnable to register service, failed to create {}", it))
         })?;
 
         let resp = match resp.status() {
-            StatusCode::CONFLICT => {
-                let resp = client
-                    .patch(format!("{kong_url}/services/{}", &service.name))
-                    .json(&service)
-                    .send()
-                    .await
-                    .map_err(|it| {
-                    Errors::UnnableToRegisterApiGateway(format!(
-                        "Unnable to register service, failed to update {}",
-                        it.to_string()
-                    ))
-                })?;
-                resp
-            }
+            StatusCode::CONFLICT => client
+                .patch(format!("{kong_url}/services/{}", &service.name))
+                .json(&service)
+                .send()
+                .await
+                .map_err(|it| {
+                    Errors::UnnableToRegisterApiGateway(format!("Unnable to register service, failed to update {}", it))
+                })?,
             _ => resp
         };
 
@@ -159,7 +146,7 @@ impl ApiGatewayClient for KongGatewayAdminClient {
         } else if !resp.status().is_success() {
             return Err(Errors::UnnableToRegisterApiGateway(format!(
                 "Failed to update service {} {:?}",
-                resp.status().to_string(),
+                resp.status(),
                 resp.text().await
             )));
         }

@@ -197,7 +197,7 @@ impl GatewayServiceBuilder {
         GatewayService {
             name: self.name.expect("Service name is required"),
             url: self.url.expect("Service url is required"),
-            routes: self.routes.unwrap_or(vec![]),
+            routes: self.routes.unwrap_or_default(),
             retries: self.retries,
             connect_timeout: self.connect_timeout,
             write_timeout: self.write_timeout,

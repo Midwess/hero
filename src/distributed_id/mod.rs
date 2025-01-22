@@ -18,7 +18,7 @@ pub async fn gen_id() -> u64 {
 pub fn id_to_unix_timestamp(id: u64) -> u64 {
     let timestamp = id >> 23;
     let epoch_since_ms = EPOCH_SINCE;
-    epoch_since_ms as u64 + timestamp
+    epoch_since_ms + timestamp
 }
 
 pub async fn init_id_generator(app_name: String, db: PoolRequest<SurrealDbConnection>) {
