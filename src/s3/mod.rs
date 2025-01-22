@@ -42,7 +42,7 @@ impl S3Client {
         let mut result: Vec<StaticResource> = vec![];
         for object in list_objects_resp.contents() {
             let path = object.key().unwrap().to_owned();
-            if (&prefix).ne(&path) {
+            if prefix.ne(&path) {
                 result.push(StaticResource {
                     source: Some(Source::Path(path))
                 })

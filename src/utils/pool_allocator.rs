@@ -39,14 +39,12 @@ pub mod test {
                     connection_string: String::from("mydb://root@root")
                 };
 
-                let pool = PoolBuilder::new(Box::new(resource_provider))
+                PoolBuilder::new(Box::new(resource_provider))
                     .min_pool_size(100)
                     .max_pool_size(1000)
                     .resource_idle_timeout(Duration::from_millis(5000))
                     .build()
-                    .await;
-
-                pool
+                    .await
             })
             .await;
 

@@ -12,6 +12,7 @@ where
     pub pool: Arc<PoolAllocator<T>>
 }
 
+#[derive(Default)]
 pub struct PoolRequestBuilder<T>
 where
     T: 'static + Send + Sync
@@ -56,7 +57,7 @@ where
     fn clone(&self) -> Self {
         Self {
             pool: self.pool.clone(),
-            retrieving_timeout: self.retrieving_timeout.clone()
+            retrieving_timeout: self.retrieving_timeout
         }
     }
 }

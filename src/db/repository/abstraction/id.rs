@@ -2,7 +2,7 @@ use surreal_devl::proxy::default::{SurrealDeserializer, SurrealSerializer};
 use surrealdb::sql::{Id, Thing, Value};
 
 pub trait DbId: SurrealSerializer + Sized + SurrealDeserializer {
-    fn id<'a>(self, tb: &'a str) -> Thing {
+    fn id(self, tb: &str) -> Thing {
         let value: Value = self.serialize();
         let compound_id = match value {
             Value::Array(arr) => arr,

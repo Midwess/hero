@@ -19,8 +19,8 @@ pub struct SmtpPoolResourceProvider;
 impl PoolResourceProvider<SmtpTransport> for SmtpPoolResourceProvider {
     async fn new(&self) -> SmtpTransport {
         let creds = Credentials::new(CONFIGS.smtp.username.clone(), CONFIGS.smtp.password.clone());
-        let connection_string = format!("{}", CONFIGS.smtp.host);
-        SmtpTransport::relay(connection_string.as_str()).unwrap().credentials(creds).build()
+        let connection_string = CONFIGS.smtp.host.to_string();
+        SmtpTransport::relay(&connection_string).unwrap().credentials(creds).build()
     }
 }
 

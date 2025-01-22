@@ -7,7 +7,6 @@ use tokio::process::{Child, ChildStderr, ChildStdout};
 use tokio_stream::Stream;
 
 pub struct StdStream {
-    child: Child,
     stdout: Lines<BufReader<ChildStdout>>,
     stderr: Lines<BufReader<ChildStderr>>
 }
@@ -16,8 +15,7 @@ impl From<Child> for StdStream {
     fn from(mut value: Child) -> Self {
         Self {
             stdout: BufReader::new(value.stdout.take().unwrap()).lines(),
-            stderr: BufReader::new(value.stderr.take().unwrap()).lines(),
-            child: value
+            stderr: BufReader::new(value.stderr.take().unwrap()).lines()
         }
     }
 }
@@ -31,15 +29,15 @@ impl Stream for StdStream {
         let mut stderr = Box::pin(up.stderr.next_line());
 
         match stdout.as_mut().poll(cx) {
-            Poll::Ready(Ok(result)) => return Poll::Ready(result.map(|it| format!("{it}"))),
+            Poll::Ready(Ok(result)) => return Poll::Ready(result.map(|it| it.to_string())),
             Poll::Ready(Err(_)) => return Poll::Ready(None),
             _ => {}
         };
 
         match stderr.as_mut().poll(cx) {
-            Poll::Ready(Ok(result)) => return Poll::Ready(result.map(|it| format!("{it}"))),
-            Poll::Ready(Err(_)) => return Poll::Ready(None),
-            _ => return Poll::Pending
+            Poll::Ready(Ok(result)) => Poll::Ready(result.map(|it| it.to_string())),
+            Poll::Ready(Err(_)) => Poll::Ready(None),
+            _ => Poll::Pending
         }
     }
 }

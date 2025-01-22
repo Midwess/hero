@@ -266,20 +266,12 @@ where
     }
 
     pub fn min_pool_size(mut self, size: usize) -> Self {
-        if size <= 0 {
-            panic!("The min pool size must be positive");
-        }
-
         self.min_pool_size = size;
 
         self
     }
 
     pub fn max_pool_size(mut self, size: usize) -> Self {
-        if size <= 0 {
-            panic!("The max pool size must be positive");
-        }
-
         self.max_pool_size = size;
         self
     }
@@ -371,7 +363,7 @@ where
             for _i in 0..self.pool.min_size {
                 let pool = self.pool.clone();
                 let resource_provider = &self.resource_provider;
-                let idle_timeout = self.resource_idle_timeout.clone();
+                let idle_timeout = self.resource_idle_timeout;
                 scope.spawn(async move {
                     let resource = resource_provider.new().await;
                     let pool_item: PoolItem<T> = PoolItem::new(Box::new(resource), idle_timeout);
@@ -391,8 +383,8 @@ where
 
     pub async fn retrieve(self: &Arc<Self>) -> Result<PoolResponse<T>, oneshot::Receiver<PoolResponse<T>>> {
         let available_item = self.pool.borrow_item().await;
-        if available_item.is_some() {
-            return Ok(PoolResponse::new(available_item.unwrap(), self.clone()));
+        if let Some(available_item) = available_item {
+            return Ok(PoolResponse::new(available_item, self.clone()));
         }
 
         // If there is not enough resources, we will create a new one until

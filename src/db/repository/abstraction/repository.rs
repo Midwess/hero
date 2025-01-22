@@ -74,17 +74,17 @@ where
     async fn find_one(&self, record_id: &Id) -> Resolve<Option<Record>> {
         let db = self.get_db().await;
         let table = Record::get_table();
-        let record_id = format!("{}..", record_id.clone().id(table).to_string());
+        let record_id = format!("{}..", record_id.clone().id(table));
         let result: Option<Record> =
             db.query(surreal_quote!("SELECT * FROM #record_id LIMIT 1")).await?.take(RPath::from(0))?;
-        Ok(result.into())
+        Ok(result)
     }
 
     async fn find_all(&self, r1: Option<&Id>, r2: Option<&Id>, count: Option<usize>) -> Resolve<Vec<Record>> {
         let db = self.get_db().await;
         let table = Record::get_table();
         let from = match r1 {
-            Some(it) => format!("{}..", it.clone().id(table).to_string()),
+            Some(it) => format!("{}..", it.clone().id(table)),
             None => format!("{table}:..")
         };
 
@@ -98,7 +98,7 @@ where
 
         let limit = count.map(|it| format!("LIMIT {it}")).unwrap_or("".to_owned());
         let result: Vec<Record> = db.query(format!("SELECT * FROM {from}{to} {limit}")).await?.take(RPath::from(0))?;
-        Ok(result.into())
+        Ok(result)
     }
 
     async fn delete_one(&self, record_id: &Id) -> Resolve<Record> {

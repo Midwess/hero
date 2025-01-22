@@ -51,7 +51,7 @@ where
             _ => panic!("Standard must be array")
         };
 
-        let soft_deleted = arr.get(0);
+        let soft_deleted = arr.first();
         if soft_deleted.is_none() {
             return Err(SurrealResponseError::ExpectedABool);
         }
@@ -127,7 +127,7 @@ where
                     return Err(SurrealResponseError::NumberOfFieldOfLengthOfDbValueNotMatchLengthOfEnum);
                 }
 
-                let soft_deleted = arr.get(0);
+                let soft_deleted = arr.first();
                 if soft_deleted.is_none() {
                     return Err(SurrealResponseError::ExpectedABool);
                 }
@@ -203,7 +203,7 @@ where
     fn deserialize(value: &Value) -> Result<Self, SurrealResponseError> {
         match &value {
             Value::Array(ref arr) => {
-                let soft_deleted = arr.get(0);
+                let soft_deleted = arr.first();
                 if soft_deleted.is_none() {
                     return Err(SurrealResponseError::ExpectedABool);
                 }

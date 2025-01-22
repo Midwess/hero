@@ -10,9 +10,7 @@ pub type VoidResponse = ();
 pub type Resolve<T> = Result<T, Errors>;
 
 pub fn error_message<T>(resolve: Option<Resolve<T>>) -> Option<String> {
-    if resolve.is_none() {
-        return None;
-    }
+    resolve.as_ref()?;
 
     resolve.unwrap().err().map(|it| it.to_string())
 }

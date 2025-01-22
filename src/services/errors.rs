@@ -60,13 +60,13 @@ impl From<SurrealResponseError> for Errors {
 
 impl<E, R> From<SdkError<E, R>> for Errors {
     fn from(value: SdkError<E, R>) -> Self {
-        return Self::AwsS3Error(value.to_string())
+        Self::AwsS3Error(value.to_string())
     }
 }
 
 impl From<PresigningConfigError> for Errors {
     fn from(value: PresigningConfigError) -> Self {
-        return Self::AwsS3Error(value.to_string())
+        Self::AwsS3Error(value.to_string())
     }
 }
 

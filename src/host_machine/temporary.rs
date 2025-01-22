@@ -42,7 +42,7 @@ impl Temp {
 
         create_dir_all(path.as_path())?;
 
-        return Ok(Self::Directory(path))
+        Ok(Self::Directory(path))
     }
 
     pub async fn file(path: PathBuf) -> Resolve<Self> {

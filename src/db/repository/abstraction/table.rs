@@ -1,6 +1,3 @@
-use surreal_devl::surreal_id::SurrealId;
-use surrealdb::sql::Thing;
-
 use super::id::DbId;
 
 pub trait Table<T>
