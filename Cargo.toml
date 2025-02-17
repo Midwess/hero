@@ -26,7 +26,7 @@ gateway = ["reqwest", "reqwest/json"]
 s3 = ["core-services/s3", "aws-sdk-s3"]
 
 [dependencies]
-core-services = { path="../core-services" }
+core-services = { path="../core-services", default-features = false }
 schema = { path="../schema/rust" }
 log.workspace = true
 chrono.workspace = true
