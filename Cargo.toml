@@ -5,27 +5,40 @@ edition = "2021"
 
 [profile.dev]
 opt-level = 0
+debug = 1
+strip = false
+split-debuginfo = "unpacked"
+incremental = true
+codegen-units = 256
+lto = false
+panic = "unwind"
+debug-assertions = true
+overflow-checks = true
+rpath = false
+
+[features]
+grpc-client = ["tonic/transport", "tonic/codegen", "tonic/prost"]
+grpc-server = ["tonic", "tonic-middleware", "core-services/grpc-server"]
+db = ["surrealdb", "surreal_devl", "surreal_derive_plus", "core-services/retry"]
+gateway = ["reqwest"]
+s3 = ["core-services/s3"]
 
 [dependencies]
 core-services = { path="../core-services" }
 schema = { path="../schema/rust" }
-surreal_derive_plus.workspace = true
-surreal_devl.workspace = true
-surrealdb.workspace = true
 log.workspace = true
 chrono.workspace = true
 serde.workspace = true
 serde_derive.workspace = true
 serde_json.workspace = true
-jsonwebtoken = "9.3.0"
-tonic = "0.11.0"
-once_cell.workspace = true
 lazy_static.workspace = true
-tonic-middleware = "0.1.4"
 tokio.workspace = true
-reqwest.workspace = true
 async-trait.workspace = true
-lettre = "0.11.7"
-aws-sdk-s3 = "1.41.0"
 thiserror.workspace = true
 
+surreal_derive_plus = { workspace = true, optional = true }
+surreal_devl = { workspace = true, optional = true }
+surrealdb = { workspace = true, optional = true }
+tonic-middleware = { version = "0.1.4", optional = true }
+tonic = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }

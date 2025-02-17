@@ -149,6 +149,19 @@ impl DistributedIdGenerator {
         })
     }
 
+
+    pub fn init_scoped(app_name: String) -> Self {
+        Self {
+            worker: Worker {
+                distributed_id: 0,
+                name: app_name.clone(),
+                created_at: Utc::now()
+            },
+            last_timestamp: 0,
+            sequence: 0
+        }
+    }
+
     /// Generates a 64-bit ID with the layout:
     /// [41 bits: timestamp in ms since EPOCH_SINCE]
     /// [13 bits: worker ID]
