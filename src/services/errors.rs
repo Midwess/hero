@@ -1,8 +1,11 @@
+#[cfg(feature = "s3")]
 use aws_sdk_s3::error::SdkError;
+#[cfg(feature = "s3")]
 use aws_sdk_s3::presigning::PresigningConfigError;
 use log::info;
 use surreal_devl::surreal_qr::SurrealResponseError;
 use thiserror::Error;
+#[cfg(feature = "grpc-server")]
 use tonic::Status;
 
 #[derive(Error, Debug)]
@@ -15,6 +18,7 @@ pub enum Errors {
     UserAlreadyExist(String),
     #[error("Already exist {}", .0)]
     AlreadyExist(String),
+    #[cfg(feature = "grpc-server")]
     #[error("Failed to generate auth token {:?}", .0)]
     GenerateTokenFailed(#[from] jsonwebtoken::errors::Error),
     #[error("UnAuthorize {}", .0)]
@@ -58,24 +62,28 @@ impl From<SurrealResponseError> for Errors {
     }
 }
 
+#[cfg(feature = "s3")]
 impl<E, R> From<SdkError<E, R>> for Errors {
     fn from(value: SdkError<E, R>) -> Self {
         Self::AwsS3Error(value.to_string())
     }
 }
 
+#[cfg(feature = "s3")]
 impl From<PresigningConfigError> for Errors {
     fn from(value: PresigningConfigError) -> Self {
         Self::AwsS3Error(value.to_string())
     }
 }
 
+#[cfg(feature = "grpc-server")]
 impl From<Errors> for Status {
     fn from(value: Errors) -> Self {
         info!(target: "error-anounced", "Error happen during the execution {:?}", &value);
         match value {
             Errors::DatabaseError { message, db_name: _ } => Self::aborted(message),
             Errors::UserAlreadyExist(_) => Self::already_exists("User already exist".to_owned()),
+            #[cfg(feature = "grpc-server")]
             Errors::GenerateTokenFailed(_) => Self::unauthenticated("Invalid token"),
             Errors::UnAuthorized(_) => Self::unauthenticated("You are not allow to access this operation"),
             Errors::AwsS3Error(message) => Self::aborted(format!("Resource busy, please contact support {message}")),

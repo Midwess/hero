@@ -18,7 +18,6 @@ rpath = false
 
 [features]
 full = ["db-local", "db-remote", "grpc-client", "grpc-server", "host_machine", "retry", "s3", "services", "smtp"]
-default = ["full"]
 grpc-client = ["tonic/transport", "tonic/codegen", "tonic/prost"]
 grpc-server = ["tonic", "tonic-middleware", "jsonwebtoken"]
 host_machine = ["tokio-stream"]
@@ -51,7 +50,7 @@ tonic-middleware = { version = "0.1.4", optional = true }
 aws-config = { version = "1.1.7", features = ["behavior-version-latest"], optional = true }
 aws-sdk-s3 = { version = "1.41.0", optional = true }
 lettre = { version = "0.11.7", optional = true }
-surrealdb = { workspace = true, features = ["protocol-ws"], optional = true }
+surrealdb = { workspace = true, optional = true }
 surreal_devl = { workspace = true, optional = true }
 surreal_derive_plus = { workspace = true, optional = true }
 jsonwebtoken = { version = "9.3.0", optional = true }

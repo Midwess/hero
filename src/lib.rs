@@ -1,4 +1,6 @@
+#[cfg(feature = "db-remote")]
 use surrealdb::engine::remote::ws::Client;
+#[cfg(any(feature = "db-remote", feature = "db-local"))]
 use surrealdb::Surreal;
 
 #[cfg(feature = "s3")]
