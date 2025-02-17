@@ -57,3 +57,16 @@ reqwest = { workspace = true, optional = true }
 
 [build-dependencies]
 
+[package.metadata]
+# Will log the query command at runtime
+surreal_enable_log = true
+# Will log the generated code at build time
+surreal_enable_compile_log = true
+# Change the naming convention of generated statement into camel case
+surreal_use_camel_case = false
+# The log namespace, apply for both build time log and runtime log
+surreal_namespace = "surrealql"
+# The macro name that use for info log
+surreal_info_log_macro = "log::info"
+# The macro name that use for warning log
+surreal_warn_log_macro = "log::info"
