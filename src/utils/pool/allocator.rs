@@ -360,7 +360,7 @@ where
 {
     pub async fn init(&self) {
         tokio_scoped::scope(|scope| {
-            for _i in 0..self.pool.min_size {
+            for i in 0..self.pool.min_size {
                 let pool = self.pool.clone();
                 let resource_provider = &self.resource_provider;
                 let idle_timeout = self.resource_idle_timeout;

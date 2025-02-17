@@ -33,3 +33,13 @@ impl DbId for Thing {
 
     fn soft_restore(&mut self) {}
 }
+
+impl DbId for i64 {
+    fn soft_deleted(&self) -> bool {
+        false
+    }
+
+    fn soft_delete(&mut self) {}
+
+    fn soft_restore(&mut self) {}
+}

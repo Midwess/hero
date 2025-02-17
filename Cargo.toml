@@ -5,34 +5,55 @@ edition = "2021"
 
 [profile.dev]
 opt-level = 0
+debug = 1
+strip = false
+split-debuginfo = "unpacked"
+incremental = true
+codegen-units = 256
+lto = false
+panic = "unwind"
+debug-assertions = true
+overflow-checks = true
+rpath = false
+
+[features]
+default = ["utils", "db"]
+grpc-client = ["tonic/transport", "tonic/codegen", "tonic/prost"]
+grpc-server = ["tonic", "tonic-middleware", "jsonwebtoken"]
+host_machine = []
+retry = []
+s3 = ["aws-config", "aws-sdk-s3"]
+services = []
+smtp = ["lettre", "reqwest"]
+db = ["surrealdb", "surreal_devl", "surreal_derive_plus"]
+utils = []
 
 [dependencies]
-prost = "0.12.6"
-prost-types = "0.12.6"
-serde = {version="1.0.203", features=["derive"]}
-schema = { path = "../schema/rust" }
+# Always enabled
+serde = { workspace = true, features = ["derive"] }
 serde_derive.workspace = true
 serde_json.workspace = true
-surrealdb = {workspace = true, features = ["protocol-ws"]}
-surreal_devl.workspace = true
-surreal_derive_plus.workspace = true
 thiserror.workspace = true
-tonic = "0.11.0"
-jsonwebtoken = "9.3.0"
-tokio.workspace = true
-aws-config = { version = "1.1.7", features = ["behavior-version-latest"] }
-aws-sdk-s3 = "1.41.0"
-lazy_static.workspace = true
-pretty_env_logger = "0.5.0"
-chrono.workspace = true
-once_cell.workspace = true
-tonic-middleware = "0.1.4"
-log.workspace = true
-lettre = "0.11.7"
-reqwest = "0.12.5"
 async-trait.workspace = true
-tokio-scoped = "0.2.0"
-tokio-stream = "0.1.16"
+tokio.workspace = true
+tokio-scoped.workspace = true
+pretty_env_logger = { version = "0.5.0" }
+log.workspace = true
+schema = { path = "../schema/rust" }
+lazy_static.workspace = true
+chrono.workspace = true
+
+# Optional dependencies based on features
+tonic = { workspace = true, optional = true, default-features = false }
+tonic-middleware = { version = "0.1.4", optional = true }
+aws-config = { version = "1.1.7", features = ["behavior-version-latest"], optional = true }
+aws-sdk-s3 = { version = "1.41.0", optional = true }
+lettre = { version = "0.11.7", optional = true }
+surrealdb = { workspace = true, features = ["protocol-ws"], optional = true }
+surreal_devl = { workspace = true, optional = true }
+surreal_derive_plus = { workspace = true, optional = true }
+jsonwebtoken = { version = "9.3.0", optional = true }
+reqwest = { workspace = true, optional = true }
 
 [build-dependencies]
-tonic-build = "0.11"
+
