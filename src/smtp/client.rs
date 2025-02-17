@@ -7,11 +7,11 @@ use lettre::message::header::ContentType;
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{SmtpTransport, Transport};
 use log::info;
-use prost::Message;
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use reqwest::StatusCode;
 use schema::crafter::email_template::Template;
 use schema::crafter::{CrafterRequest, CrafterResponse, EmailTemplate};
+use prost::Message;
 
 pub struct SmtpPoolResourceProvider;
 
