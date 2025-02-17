@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use core_services::db::{SurrealDbConnection, SurrealDbPoolResourceProvider};
+#[cfg(feature = "db-remote")]
+use core_services::db::remote_surrealdb::{SurrealDbConnection, SurrealDbPoolResourceProvider};
 #[cfg(feature = "s3")]
 use core_services::s3::{S3Client, S3ClientResourceProvider};
 use core_services::utils::pool::allocator::{PoolAllocator, PoolBuilder, PoolResourceProvider};
@@ -13,9 +14,11 @@ use crate::config::CONFIGS;
 pub trait DependenciesInjection {
     #[cfg(feature = "s3")]
     fn s3_client(&self) -> S3Client;
+    #[cfg(feature = "db-remote")]
     fn db(&self) -> PoolRequest<SurrealDbConnection>;
     #[cfg(feature = "s3")]
     async fn enable_s3(&self, min_size: usize, max_size: usize);
+    #[cfg(feature = "db-remote")]
     async fn enable_db(&self, min_size: usize, max_size: usize);
 }
 
@@ -23,6 +26,7 @@ pub struct DevlogSdk {
     #[cfg(feature = "s3")]
     s3_allocator: OnceCell<Arc<PoolAllocator<aws_sdk_s3::client::Client>>>,
 
+    #[cfg(feature = "db-remote")]
     devlog_db_allocator: OnceCell<Arc<PoolAllocator<SurrealDbConnection>>>
 }
 
@@ -37,6 +41,7 @@ impl DevlogSdk {
         Self {
             #[cfg(feature = "s3")]
             s3_allocator: OnceCell::const_new(),
+            #[cfg(feature = "db-remote")]
             devlog_db_allocator: OnceCell::const_new()
         }
     }
@@ -53,6 +58,7 @@ impl DependenciesInjection for DevlogSdk {
         let _ = self.s3_allocator.set(s3_allocator);
     }
 
+    #[cfg(feature = "db-remote")]
     async fn enable_db(&self, min_size: usize, max_size: usize) {
         let db_provider: Box<dyn PoolResourceProvider<SurrealDbConnection>> = Box::new(SurrealDbPoolResourceProvider {
             info: CONFIGS.surrealdb.clone()
@@ -64,6 +70,7 @@ impl DependenciesInjection for DevlogSdk {
         let _ = self.devlog_db_allocator.set(db_allocator);
     }
 
+    #[cfg(feature = "db-remote")]
     fn db(&self) -> PoolRequest<SurrealDbConnection> {
         PoolRequestBuilder::new()
             .pool(self.devlog_db_allocator.get().expect("Devlog db allocator must be enabled").clone())

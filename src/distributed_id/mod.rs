@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use core_services::db::SurrealDbConnection;
+#[cfg(feature = "db-remote")]
+use core_services::db::remote_surrealdb::SurrealDbConnection;
 use core_services::utils::pool::request::PoolRequest;
 use generator::{DistributedIdGenerator, EPOCH_SINCE};
 use tokio::sync::{Mutex, OnceCell};
@@ -21,11 +22,13 @@ pub fn id_to_unix_timestamp(id: u64) -> u64 {
     epoch_since_ms + timestamp
 }
 
+#[cfg(feature = "db-remote")]
 pub async fn init_id_generator(app_name: String, db: PoolRequest<SurrealDbConnection>) {
     let distributed_id_generator = DistributedIdGenerator::init(app_name.clone(), db).await.unwrap();
     let _ = DISTRIBUTED_ID_GENERATOR.set(Arc::new(Mutex::new(distributed_id_generator)));
 }
 
+#[cfg(feature = "db-local")]
 pub fn init_scoped_id_generator(app_name: String) {
     let distributed_id_generator = DistributedIdGenerator::init_scoped(app_name.clone());
     let _ = DISTRIBUTED_ID_GENERATOR.set(Arc::new(Mutex::new(distributed_id_generator)));

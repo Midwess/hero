@@ -1,4 +1,5 @@
-use core_services::db::SurrealDbConnectionInfo;
+#[cfg(feature = "db-remote")]
+use core_services::db::remote_surrealdb::SurrealDbConnectionInfo;
 use lazy_static::lazy_static;
 use std::env;
 use std::time::Duration;
@@ -53,6 +54,7 @@ impl Default for TokenConfig {
 #[derive(Debug)]
 pub struct Config {
     pub token: TokenConfig,
+    #[cfg(feature = "db-remote")]
     pub surrealdb: SurrealDbConnectionInfo,
     pub kong: KongGatewayConfig
 }
@@ -62,6 +64,7 @@ impl Default for Config {
         Self {
             token: Default::default(),
             kong: Default::default(),
+            #[cfg(feature = "db-remote")]
             surrealdb: SurrealDbConnectionInfo {
                 socket_address: env::var("DEVLOG_SURREAL_DB_SOCKET_ADDRESS").unwrap_or("127.0.0.1:8000".to_owned()),
                 db_name: env::var("DEVLOG_SURREAL_DB_NAME").unwrap_or("devlog".to_owned()),
