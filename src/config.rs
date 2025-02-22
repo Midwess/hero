@@ -51,29 +51,12 @@ impl Default for TokenConfig {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Config {
     pub token: TokenConfig,
     #[cfg(feature = "db-remote")]
     pub surrealdb: SurrealDbConnectionInfo,
     pub kong: KongGatewayConfig
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            token: Default::default(),
-            kong: Default::default(),
-            #[cfg(feature = "db-remote")]
-            surrealdb: SurrealDbConnectionInfo {
-                socket_address: env::var("DEVLOG_SURREAL_DB_SOCKET_ADDRESS").unwrap_or("127.0.0.1:8000".to_owned()),
-                db_name: env::var("DEVLOG_SURREAL_DB_NAME").unwrap_or("devlog".to_owned()),
-                namespace: env::var("DEVLOG_SURREAL_DB_NAMESPACE").unwrap_or("dev".to_owned()),
-                db_username: env::var("DEVLOG_SURREAL_DB_USERNAME").unwrap_or("root".to_owned()),
-                db_password: env::var("DEVLOG_SURREAL_DB_PASSWORD").unwrap_or("root".to_owned())
-            }
-        }
-    }
 }
 
 lazy_static! {

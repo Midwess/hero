@@ -1,13 +1,10 @@
 use chrono::{DateTime, Utc};
 #[cfg(feature = "db-remote")]
 use core_services::db::remote_surrealdb::SurrealDbConnection;
-use core_services::retry;
-use core_services::utils::pool::request::PoolRequest;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use surreal_derive_plus::{surreal_quote, SurrealDerive};
+use surreal_derive_plus::SurrealDerive;
 use surreal_devl::surreal_id::SurrealId;
-use surreal_devl::surreal_qr::RPath;
 use surrealdb::sql::{Id, Thing};
 use surrealdb::Error;
 use thiserror::Error;
@@ -152,7 +149,6 @@ impl DistributedIdGenerator {
             sequence: 0
         })
     }
-
 
     pub fn init_scoped(app_name: String) -> Self {
         Self {

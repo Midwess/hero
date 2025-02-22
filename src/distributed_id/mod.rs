@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 #[cfg(feature = "db-remote")]
 use core_services::db::remote_surrealdb::SurrealDbConnection;
-use core_services::utils::pool::request::PoolRequest;
 use generator::{DistributedIdGenerator, EPOCH_SINCE};
 use tokio::sync::{Mutex, OnceCell};
 

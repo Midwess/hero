@@ -1,14 +1,10 @@
-use std::sync::Arc;
-
 #[cfg(feature = "db-remote")]
 use core_services::db::remote_surrealdb::{SurrealDbConnection, SurrealDbPoolResourceProvider};
 #[cfg(feature = "s3")]
 use core_services::s3::{S3Client, S3ClientResourceProvider};
-use core_services::utils::pool::allocator::{PoolAllocator, PoolBuilder, PoolResourceProvider};
-use core_services::utils::pool::request::{PoolRequest, PoolRequestBuilder};
-use tokio::sync::OnceCell;
 
-use crate::config::CONFIGS;
+#[warn(unused_imports)]
+use core_services::utils::pool::allocator::PoolResourceProvider;
 
 #[async_trait::async_trait]
 pub trait DependenciesInjection {

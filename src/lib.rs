@@ -5,5 +5,5 @@ pub mod distributed_id;
 #[cfg(feature = "grpc-server")]
 pub mod tcp;
 
-pub mod sdk;
 pub mod config;
+pub mod sdk;
