@@ -146,4 +146,3 @@ where
         SurrealDbRepository::delete_one(self, record_id).await
     }
 }
-

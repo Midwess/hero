@@ -50,6 +50,19 @@ where
         }
     }
 
+    async fn update_or_create(&self, data: Record) -> Resolve<Record>
+    where
+        Record: 'async_trait
+    {
+        let id = Table::id(&data);
+        let record = self.find_one(&id).await;
+        if let Ok(Some(_record)) = record {
+            self.update_one(data).await
+        } else {
+            self.create(data).await
+        }
+    }
+
     async fn find_one(&self, record_id: &Id) -> Resolve<Option<Record>> {
         let db = self.get_db().await;
         let table = Record::get_table();

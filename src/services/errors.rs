@@ -2,7 +2,6 @@
 use aws_sdk_s3::error::SdkError;
 #[cfg(feature = "s3")]
 use aws_sdk_s3::presigning::PresigningConfigError;
-use log::info;
 use surreal_devl::surreal_qr::SurrealResponseError;
 use thiserror::Error;
 #[cfg(feature = "grpc-server")]
