@@ -10,3 +10,15 @@ pub enum RepositoryError {
     #[error("Error on db side {0}")]
     DbError(String)
 }
+
+#[cfg(feature = "grpc-server")]
+impl From<RepositoryError> for tonic::Status {
+    fn from(value: RepositoryError) -> Self {
+        match value {
+            RepositoryError::NotFound(not_found, _) => tonic::Status::not_found(not_found.to_string()),
+            RepositoryError::Conflict(conflict, _) => tonic::Status::already_exists(conflict.to_string()),
+            RepositoryError::SurrealDbError(surreal_db_error) => tonic::Status::internal(surreal_db_error.to_string()),
+            RepositoryError::DbError(db_error) => tonic::Status::internal(db_error.to_string()),
+        }
+    }
+}

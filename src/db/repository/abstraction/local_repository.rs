@@ -4,7 +4,8 @@ use serde::de::DeserializeOwned;
 use surreal_derive_plus::surreal_quote;
 use surreal_devl::proxy::default::{SurrealDeserializer, SurrealSerializer};
 use surreal_devl::surreal_id::SurrealId;
-use surreal_devl::surreal_qr::RPath;
+use surreal_devl::surreal_qr::{RPath, SurrealQR};
+use surreal_devl::surreal_statement;
 use surrealdb::engine::local::Db;
 use surrealdb::Surreal;
 
@@ -52,10 +53,31 @@ where
 
     async fn find_one(&self, record_id: &Id) -> Resolve<Option<Record>> {
         let db = self.get_db().await;
-        let table = Record::get_table();
-        let record_id = format!("{}..", record_id.clone().id(table));
+        let table = Record::get_table().to_owned();
+        let value = record_id.clone().serialize();
+        let mut id_statement = "".to_owned();
+        match value {
+            surrealdb::sql::Value::Array(array) => {
+                for (index, item) in array.0.iter().enumerate() {
+                    let value = SurrealQR(item.clone());
+                    if value.is_none() {
+                        continue;
+                    }
+
+                    if index == 0 {
+                        id_statement = format!("id[{index}]={}", surreal_statement::val(&value.0));
+                    } else {
+                        id_statement.push_str(&format!(" AND id[{index}]={}", surreal_statement::val(&value.0)));
+                    }
+                }
+            }
+            _ => {
+                id_statement = format!("id={}", surreal_statement::val(&value));
+            }
+        }
+
         let result: Option<Record> =
-            db.query(surreal_quote!("SELECT * FROM #record_id LIMIT 1")).await?.take(RPath::from(0))?;
+            db.query(surreal_quote!("SELECT * FROM #table WHERE #id_statement LIMIT 1")).await?.take(RPath::from(0))?;
         Ok(result)
     }
 

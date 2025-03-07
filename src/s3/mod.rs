@@ -53,7 +53,6 @@ impl S3Client {
     }
 
     pub async fn create_object(&self, prefix: String, content: Vec<u8>) -> Resolve<()> {
-        log::info!(target: "s3", "Creating object {:?} {}", prefix, content.len());
         let client = self.client.retrieve().await.unwrap();
         client
             .put_object()
