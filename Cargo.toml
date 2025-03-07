@@ -17,7 +17,7 @@ overflow-checks = true
 rpath = false
 
 [features]
-full = ["db-local", "db-remote", "grpc-client", "grpc-server", "host_machine", "retry", "s3", "services", "smtp"]
+full = ["db-local", "db-remote", "grpc-client", "grpc-server", "host_machine", "retry", "s3", "services", "smtp", "local-storage"]
 grpc-client = ["tonic/transport"]
 grpc-server = ["tonic", "tonic-middleware", "jsonwebtoken"]
 host_machine = ["tokio-stream"]
@@ -27,6 +27,7 @@ services = []
 smtp = ["lettre", "reqwest", "prost"]
 db-remote = ["surrealdb", "surreal_devl", "surreal_derive_plus", "surrealdb/protocol-ws"]
 db-local = ["surrealdb", "surrealdb/kv-surrealkv", "surreal_devl", "surreal_derive_plus"]
+local-storage = ["md5", "zip"]
 
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
@@ -41,8 +42,11 @@ log.workspace = true
 schema = { path = "../schema/rust" }
 lazy_static.workspace = true
 chrono.workspace = true
+anyhow.workspace = true
 
 # Optional dependencies based on features
+zip = { workspace = true, optional = true }
+md5 = { workspace = true, optional = true }
 tokio-stream = { version = "0.1.17", optional = true }
 tonic = { workspace = true, optional = true, default-features = false }
 prost = { workspace = true, optional = true, default-features = false }

@@ -25,6 +25,9 @@ pub mod smtp;
 #[cfg(feature = "db-remote")]
 pub type Db = Surreal<Client>;
 
+#[cfg(feature = "local-storage")]
+pub mod local_storage;
+
 pub mod config;
 pub mod db;
 pub mod logger;
