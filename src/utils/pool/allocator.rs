@@ -360,7 +360,7 @@ where
 {
     pub async fn init(&self) {
         tokio_scoped::scope(|scope| {
-            for i in 0..self.pool.min_size {
+            for _i in 0..self.pool.min_size {
                 let pool = self.pool.clone();
                 let resource_provider = &self.resource_provider;
                 let idle_timeout = self.resource_idle_timeout;
@@ -408,6 +408,7 @@ where
     /// Otherwise the resource will be returned to the pool.
     /// The cleanup also being triggered if the pool has exceed it's min_size.
     pub async fn put(self: &Arc<Self>, resource: PoolItem<T>) {
+        info!(target: "db-debug", "Put resource to the pool");
         let resource = 'serve_waiter_first: {
             let mut waiters = self.waiters.lock().await;
             let mut resource = Some(resource);
