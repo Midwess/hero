@@ -71,17 +71,21 @@ where
         let mut id_statement = "".to_owned();
         match value {
             surrealdb::sql::Value::Array(array) => {
+                let mut matched_statement = 0;
                 for (index, item) in array.0.iter().enumerate() {
                     let value = SurrealQR(item.clone());
                     if value.is_none() {
                         continue;
                     }
 
-                    if index == 0 {
+                    if matched_statement == 0 {
                         id_statement = format!("id[{index}]={}", surreal_statement::val(&value.0));
-                    } else {
+                    }
+                    else {
                         id_statement.push_str(&format!(" AND id[{index}]={}", surreal_statement::val(&value.0)));
                     }
+
+                    matched_statement += 1;
                 }
             }
             _ => {
@@ -116,13 +120,15 @@ where
     }
 
     async fn delete_one(&self, record_id: &Id) -> Resolve<Record> {
+        let record = self.find_one(record_id).await;
+
         let db = self.get_db().await;
-        let table = Record::get_table();
-        let record_id = record_id.clone().id(table);
-        let result: Option<Record> = db.query(surreal_quote!("DELETE #val(&record_id)")).await?.take(RPath::from(0))?;
-        match result {
-            Some(record) => Ok(record),
-            None => Err(RepositoryError::DbError("Failed to delete record, db return None".to_owned()))
+        if let Ok(Some(record)) = record {
+            let record_id = SurrealId::id(&record);
+            db.query(surreal_quote!("DELETE #val(&record_id)")).await?;
+            return Ok(record);
+        } else {
+            Err(RepositoryError::DbError("Record not found".to_owned()))
         }
     }
 }
