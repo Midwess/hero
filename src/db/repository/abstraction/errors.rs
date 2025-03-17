@@ -18,7 +18,7 @@ impl From<RepositoryError> for tonic::Status {
             RepositoryError::NotFound(not_found, _) => tonic::Status::not_found(not_found.to_string()),
             RepositoryError::Conflict(conflict, _) => tonic::Status::already_exists(conflict.to_string()),
             RepositoryError::SurrealDbError(surreal_db_error) => tonic::Status::internal(surreal_db_error.to_string()),
-            RepositoryError::DbError(db_error) => tonic::Status::internal(db_error.to_string()),
+            RepositoryError::DbError(db_error) => tonic::Status::internal(db_error.to_string())
         }
     }
 }
