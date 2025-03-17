@@ -97,8 +97,10 @@ where
             }
         }
 
-        let result: Option<Record> =
-            db.query(surreal_quote!("SELECT * FROM #table WHERE #id_statement LIMIT 1")).await?.take(RPath::from(0))?;
+        let result: Option<Record> = db
+            .query(surreal_quote!("SELECT * FROM #table WHERE #id_statement LIMIT 1"))
+            .await?
+            .take(RPath::from(0))?;
         Ok(result)
     }
 

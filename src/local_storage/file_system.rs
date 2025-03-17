@@ -135,7 +135,7 @@ impl Metadata {
                     Ok(format!("{:x}", context.compute()))
                 })
                 .await
-                .map(|s| s.clone())
+                .cloned()
         })
     }
 }
