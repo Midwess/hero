@@ -43,6 +43,7 @@ schema = { path = "../schema/rust" }
 lazy_static.workspace = true
 chrono.workspace = true
 anyhow.workspace = true
+rand.workspace = true
 
 # Optional dependencies based on features
 zip = { workspace = true, optional = true }

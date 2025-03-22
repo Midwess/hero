@@ -6,6 +6,7 @@ pub fn setup() {
         log_builder.parse_filters(&filter_env);
     } else {
         log_builder.filter(None, log::LevelFilter::Info);
+        log_builder.filter(Some("webrtc"), log::LevelFilter::Off);
     }
 
     log_builder.init();

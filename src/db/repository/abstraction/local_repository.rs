@@ -80,8 +80,7 @@ where
 
                     if matched_statement == 0 {
                         id_statement = format!("id[{index}]={}", surreal_statement::val(&value.0));
-                    }
-                    else {
+                    } else {
                         id_statement.push_str(&format!(" AND id[{index}]={}", surreal_statement::val(&value.0)));
                     }
 
@@ -93,8 +92,10 @@ where
             }
         }
 
-        let result: Option<Record> =
-            db.query(surreal_quote!("SELECT * FROM #table WHERE #id_statement LIMIT 1")).await?.take(RPath::from(0))?;
+        let result: Option<Record> = db
+            .query(surreal_quote!("SELECT * FROM #table WHERE #id_statement LIMIT 1"))
+            .await?
+            .take(RPath::from(0))?;
         Ok(result)
     }
 
