@@ -78,7 +78,6 @@ impl From<PresigningConfigError> for Errors {
 #[cfg(feature = "grpc-server")]
 impl From<Errors> for Status {
     fn from(value: Errors) -> Self {
-        info!(target: "error-anounced", "Error happen during the execution {:?}", &value);
         match value {
             Errors::DatabaseError { message, db_name: _ } => Self::aborted(message),
             Errors::UserAlreadyExist(_) => Self::already_exists("User already exist".to_owned()),

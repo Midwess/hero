@@ -23,7 +23,7 @@ pub mod s3;
 pub mod smtp;
 
 #[cfg(feature = "db-remote")]
-pub type Db = Surreal<Client>;
+pub type Db = surrealdb::Surreal<Client>;
 
 #[cfg(feature = "local-storage")]
 pub mod local_storage;
