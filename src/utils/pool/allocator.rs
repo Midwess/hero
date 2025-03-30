@@ -382,6 +382,7 @@ where
     }
 
     pub async fn retrieve(self: &Arc<Self>) -> Result<PoolResponse<T>, oneshot::Receiver<PoolResponse<T>>> {
+        let mut waiters = self.waiters.lock().await;
         let available_item = self.pool.borrow_item().await;
         if let Some(available_item) = available_item {
             return Ok(PoolResponse::new(available_item, self.clone()));
@@ -399,7 +400,7 @@ where
         // If the pool still not have enough available resources
         // we will init a waiter queue to wait for others resource return.
         let (sender, receiver) = oneshot::channel::<PoolResponse<T>>();
-        self.waiters.lock().await.push_back(sender);
+        waiters.push_back(sender);
         Err(receiver)
     }
 
@@ -409,8 +410,8 @@ where
     /// The cleanup also being triggered if the pool has exceed it's min_size.
     pub async fn put(self: &Arc<Self>, resource: PoolItem<T>) {
         info!(target: "db-debug", "Put resource to the pool");
+        let mut waiters = self.waiters.lock().await;
         let resource = 'serve_waiter_first: {
-            let mut waiters = self.waiters.lock().await;
             let mut resource = Some(resource);
             while let Some(waiter) = waiters.pop_front() {
                 resource = waiter
