@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::SystemTime;
-use tokio::fs;
-use tokio::io::AsyncReadExt;
+use tokio::fs::{self, OpenOptions};
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tokio::sync::OnceCell;
 use zip::write::FileOptions;
 use zip::ZipWriter;
@@ -36,6 +36,15 @@ pub struct File {
 pub struct Folder {
     pub name: String,
     pub path: PathBuf
+}
+
+/// A cursor for iterating through a file in chunks asynchronously
+#[derive(Debug)]
+pub struct FileCursor {
+    file: tokio::fs::File,
+    buffer_size: usize,
+    position: usize,
+    is_eof: bool
 }
 
 impl Metadata {
@@ -141,6 +150,16 @@ impl Metadata {
 }
 
 impl File {
+    pub async fn existing(path: impl AsRef<Path>) -> Result<Self> {
+        let path = PathBuf::from(path.as_ref());
+        if !path.exists() {
+            return Err(anyhow::anyhow!("File does not exist"));
+        }
+
+        let name = path.file_name().ok_or_else(|| anyhow::anyhow!("Invalid file name"))?.to_string_lossy().into_owned();
+        Ok(Self { name, path })
+    }
+
     pub async fn new(content: Option<Vec<u8>>, path: impl AsRef<Path>) -> Result<Self> {
         let path = PathBuf::from(path.as_ref());
         let name = path.file_name().ok_or_else(|| anyhow::anyhow!("Invalid file name"))?.to_string_lossy().into_owned();
@@ -169,6 +188,12 @@ impl File {
     pub async fn write(&mut self, content: Vec<u8>) -> Result<()> {
         fs::write(&self.path, content).await?;
         Ok(())
+    }
+
+    pub async fn open(&self) -> Result<tokio::fs::File> {
+        let file = OpenOptions::new().create(true).append(true).open(&self.path).await?;
+
+        Ok(file)
     }
 
     pub async fn delete(self) -> Result<()> {
@@ -227,6 +252,22 @@ impl File {
         .await??;
 
         File::new(None, out_path).await
+    }
+
+    pub async fn cursor(&self, start_position: usize, buffer_size: usize) -> Result<FileCursor> {
+        let mut file = fs::File::open(&self.path).await?;
+
+        if start_position > 0 {
+            use tokio::io::AsyncSeekExt;
+            file.seek(std::io::SeekFrom::Start(start_position as u64)).await?;
+        }
+
+        Ok(FileCursor {
+            file,
+            buffer_size,
+            position: start_position,
+            is_eof: false
+        })
     }
 }
 
@@ -397,4 +438,35 @@ async fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<()
     }
 
     Ok(())
+}
+
+impl FileCursor {
+    pub async fn next(&mut self) -> Result<Option<Vec<u8>>> {
+        if self.is_eof {
+            return Ok(None);
+        }
+
+        let mut buffer = vec![0; self.buffer_size];
+        let bytes_read = self.file.read(&mut buffer).await?;
+
+        if bytes_read == 0 {
+            self.is_eof = true;
+            return Ok(None);
+        }
+
+        buffer.truncate(bytes_read);
+
+        self.position += bytes_read;
+        self.file.seek(std::io::SeekFrom::Start(self.position as u64)).await?;
+
+        Ok(Some(buffer.to_vec()))
+    }
+
+    pub fn position(&self) -> usize {
+        self.position
+    }
+
+    pub fn is_eof(&self) -> bool {
+        self.is_eof
+    }
 }

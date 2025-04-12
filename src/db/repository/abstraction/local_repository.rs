@@ -6,7 +6,7 @@ use surreal_devl::proxy::default::{SurrealDeserializer, SurrealSerializer};
 use surreal_devl::surreal_id::SurrealId;
 use surreal_devl::surreal_qr::{RPath, SurrealQR};
 use surreal_devl::surreal_statement;
-use surrealdb::engine::local::Db;
+use surrealdb::engine::any::Any;
 use surrealdb::Surreal;
 
 use crate::utils::pool::reponse::PoolResponse;
@@ -24,7 +24,7 @@ where
     Record: SurrealId + SendSync + SurrealDeserializer + SurrealSerializer + DeserializeOwned + Table<Id> + Clone,
     Id: DbId + SendSync + Clone
 {
-    async fn get_db(&self) -> PoolResponse<Surreal<Db>>;
+    async fn get_db(&self) -> PoolResponse<Surreal<Any>>;
 
     async fn create(&self, data: Record) -> Resolve<Record>
     where
