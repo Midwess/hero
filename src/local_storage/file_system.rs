@@ -42,9 +42,9 @@ pub struct Folder {
 #[derive(Debug)]
 pub struct FileCursor {
     file: tokio::fs::File,
-    buffer_size: usize,
     position: usize,
-    is_eof: bool
+    is_eof: bool,
+    buffer: Vec<u8> // Reusable buffer
 }
 
 impl Metadata {
@@ -264,9 +264,9 @@ impl File {
 
         Ok(FileCursor {
             file,
-            buffer_size,
             position: start_position,
-            is_eof: false
+            is_eof: false,
+            buffer: vec![0; buffer_size]
         })
     }
 }
@@ -441,25 +441,28 @@ async fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<()
 }
 
 impl FileCursor {
-    pub async fn next(&mut self) -> Result<Option<Vec<u8>>> {
+    pub fn new(file: tokio::fs::File, size: usize) -> Self {
+        Self {
+            file,
+            position: 0,
+            is_eof: false,
+            buffer: vec![0; size]
+        }
+    }
+
+    pub async fn next(&mut self) -> Result<Option<bytes::Bytes>> {
         if self.is_eof {
             return Ok(None);
         }
 
-        let mut buffer = vec![0; self.buffer_size];
-        let bytes_read = self.file.read(&mut buffer).await?;
-
+        let bytes_read = self.file.read(&mut self.buffer).await?;
         if bytes_read == 0 {
             self.is_eof = true;
             return Ok(None);
         }
 
-        buffer.truncate(bytes_read);
-
         self.position += bytes_read;
-        self.file.seek(std::io::SeekFrom::Start(self.position as u64)).await?;
-
-        Ok(Some(buffer.to_vec()))
+        Ok(Some(bytes::Bytes::copy_from_slice(&self.buffer[..bytes_read])))
     }
 
     pub fn position(&self) -> usize {
