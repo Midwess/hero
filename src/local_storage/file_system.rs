@@ -153,7 +153,7 @@ impl File {
     pub async fn existing(path: impl AsRef<Path>) -> Result<Self> {
         let path = PathBuf::from(path.as_ref());
         if !path.exists() {
-            return Err(anyhow::anyhow!("File does not exist"));
+            return Err(anyhow::anyhow!("File does not exist {:?}", path));
         }
 
         let name = path.file_name().ok_or_else(|| anyhow::anyhow!("Invalid file name"))?.to_string_lossy().into_owned();
