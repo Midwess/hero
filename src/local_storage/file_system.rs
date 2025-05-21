@@ -7,7 +7,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::fs::{self, OpenOptions};
-use tokio::io::{AsyncReadExt, AsyncSeekExt};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio::sync::OnceCell;
 use zip::write::FileOptions;
 use zip::ZipWriter;
@@ -181,12 +181,33 @@ impl File {
         Ok(Self { name, path })
     }
 
+    pub async fn append(content: Vec<u8>, path: impl AsRef<Path>) -> Result<Self> {
+        let path = PathBuf::from(path.as_ref());
+        let name = path.file_name().ok_or_else(|| anyhow::anyhow!("Invalid file name"))?.to_string_lossy().into_owned();
+
+        if path.is_dir() {
+            return Err(anyhow::anyhow!("Path is a directory"));
+        }
+
+        if !path.parent().unwrap().try_exists().unwrap_or(false) {
+            fs::create_dir_all(path.parent().unwrap()).await?;
+        }
+
+        let mut file = OpenOptions::new().create(true).append(true).open(&path).await?;
+
+        file.write_all(&content).await?;
+
+        Ok(Self { name, path })
+    }
+
     pub async fn metadata(&self) -> Result<Metadata> {
         Metadata::from_path(self.path.clone()).await
     }
 
     pub async fn write(&mut self, content: Vec<u8>) -> Result<()> {
-        fs::write(&self.path, content).await?;
+        let mut file = OpenOptions::new().create(true).append(true).open(&self.path).await?;
+
+        file.write_all(&content).await?;
         Ok(())
     }
 
