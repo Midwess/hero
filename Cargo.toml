@@ -27,7 +27,7 @@ services = []
 smtp = ["lettre", "reqwest", "prost", "lettre/smtp-transport", "lettre/builder", "lettre/default"]
 db-remote = ["surrealdb/default", "surreal_devl", "surreal_derive_plus", "surrealdb/protocol-ws"]
 db-local = ["surrealdb", "surrealdb/kv-surrealkv", "surreal_devl", "surreal_derive_plus"]
-local-storage = ["md5", "zip", "bytes", "flate2", "tar", "notify", "walkdir"]
+local-storage = ["md5", "zip", "bytes", "flate2", "tar"]
 
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
@@ -63,8 +63,6 @@ surreal_derive_plus = { workspace = true, optional = true, default-features = fa
 jsonwebtoken = { version = "9.3.0", optional = true, default-features = false }
 reqwest = { workspace = true, optional = true, default-features = false }
 bytes = { workspace = true, optional = true }
-notify = { workspace = true, optional = true }
-walkdir = { workspace = true, optional = true }
 
 [build-dependencies]
 

@@ -42,10 +42,7 @@ pub enum Errors {
     #[error("Tcp failure {}", .0)]
     TcpFailure(String),
     #[error("Failed to download file {}", .0)]
-    FailedToDownloadFile(String),
-    #[cfg(feature = "local-storage")]
-    #[error("File watcher error: {0}")]
-    NotifyWatcher(#[from] notify::Error)
+    FailedToDownloadFile(String)
 }
 
 #[cfg(feature = "db-local")]
