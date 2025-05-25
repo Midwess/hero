@@ -1,16 +1,75 @@
 use anyhow::Result;
+use bytes::Bytes;
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use md5::Context;
+use notify::event::{ModifyKind, RemoveKind};
+use notify::{Config, Event, EventKind, PollWatcher, RecommendedWatcher, RecursiveMode, Watcher};
+use std::collections::{vec_deque, VecDeque};
 use std::future::Future;
-use std::io::Write;
+use std::io::{Read, Seek, SeekFrom, Write};
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use std::sync::Arc;
-use std::time::SystemTime;
+use std::sync::{Arc, Weak};
+use std::time::{Duration, SystemTime};
 use tokio::fs::{self, OpenOptions};
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
-use tokio::sync::OnceCell;
-use zip::write::FileOptions;
-use zip::ZipWriter;
+use tokio::sync::{broadcast, Mutex, OnceCell};
+
+#[derive(Debug, Clone, PartialEq)]
+struct TarEntry {
+    is_dir: bool,
+    modified_at: std::time::SystemTime,
+    size: u64,
+    relative_path: PathBuf,
+    absolute_path: Option<PathBuf>,
+}
+
+impl TarEntry {
+    fn from_metadata(root_path: PathBuf, current_path: PathBuf) -> Result<Self> {
+        let metadata = current_path.metadata()?;
+        let relative_path = if root_path.eq(&current_path) { 
+            PathBuf::from("") 
+        } else {
+            current_path.strip_prefix(&root_path)
+                .map(|p| p.to_path_buf())
+                .unwrap_or(current_path.clone())
+        };
+
+        Ok(Self {
+            is_dir: metadata.is_dir(),
+            modified_at: metadata.modified()?,
+            size: if metadata.is_dir() { 0u64 } else { metadata.len() },
+            relative_path,
+            absolute_path: Some(current_path)
+        })
+    }
+
+    fn from_tar_header(header: &tar::Header) -> Result<Self> {
+        let relative_path = header.path()?.into_owned();
+
+        let mtime = header.mtime()?;
+        let modified_at = std::time::UNIX_EPOCH + std::time::Duration::from_secs(mtime);
+
+        Ok(Self {
+            is_dir: header.entry_type().is_dir(),
+            modified_at,
+            size: header.size()?,
+            relative_path,
+            absolute_path: None
+        })
+    }
+
+    // If return true, then we don't need to compress again
+    fn is_tar_equal(&self, other: &Self) -> bool {
+        self.is_dir == other.is_dir &&
+        self.size == other.size &&
+        self.relative_path == other.relative_path &&
+        self.modified_at.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() == 
+            other.modified_at.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs()
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Metadata {
@@ -32,19 +91,11 @@ pub struct File {
     pub path: PathBuf
 }
 
-#[derive(Debug, Clone)]
-pub struct Folder {
-    pub name: String,
-    pub path: PathBuf
-}
+type IsCompleted = bool;
 
-/// A cursor for iterating through a file in chunks asynchronously
-#[derive(Debug)]
-pub struct FileCursor {
-    file: tokio::fs::File,
-    position: usize,
-    is_eof: bool,
-    buffer: Vec<u8> // Reusable buffer
+#[async_trait::async_trait]
+pub trait IOCursor: Send + Sync {
+    async fn next(&mut self) -> Result<Option<bytes::Bytes>>;
 }
 
 impl Metadata {
@@ -212,7 +263,7 @@ impl File {
     }
 
     pub async fn open(&self) -> Result<tokio::fs::File> {
-        let file = OpenOptions::new().create(true).append(true).open(&self.path).await?;
+        let file = OpenOptions::new().create(true).append(true).write(true).read(true).open(&self.path).await?;
 
         Ok(file)
     }
@@ -253,29 +304,7 @@ impl File {
         Ok(fs::read(&self.path).await?)
     }
 
-    pub async fn zip(&self, out_path: impl AsRef<Path>) -> Result<File> {
-        let out_path = PathBuf::from(out_path.as_ref());
-        let file = fs::File::create(&out_path).await?.into_std().await;
-        let content = fs::read(&self.path).await?;
-        let name = self.name.clone();
-
-        // Spawn blocking task for ZIP operations
-        tokio::task::spawn_blocking(move || -> Result<()> {
-            let mut zip = ZipWriter::new(file);
-            let options: FileOptions<'_, ()> =
-                FileOptions::default().compression_method(zip::CompressionMethod::ZSTD).unix_permissions(0o755);
-
-            zip.start_file(&name, options)?;
-            zip.write_all(&content)?;
-            zip.finish()?;
-            Ok(())
-        })
-        .await??;
-
-        File::new(None, out_path).await
-    }
-
-    pub async fn cursor(&self, start_position: usize, buffer_size: usize) -> Result<FileCursor> {
+    pub async fn cursor(&self, start_position: usize, buffer_size: usize) -> Result<Box<dyn IOCursor>> {
         let mut file = fs::File::open(&self.path).await?;
 
         if start_position > 0 {
@@ -283,13 +312,19 @@ impl File {
             file.seek(std::io::SeekFrom::Start(start_position as u64)).await?;
         }
 
-        Ok(FileCursor {
+        Ok(Box::new(FileCursor {
             file,
             position: start_position,
             is_eof: false,
             buffer: vec![0; buffer_size]
-        })
+        }))
     }
+}
+
+pub struct Folder {
+    pub name: String,
+    pub path: PathBuf,
+    pub tar_process: Mutex<Option<(PathBuf, IsCompleted, Weak<broadcast::Sender<OnFlyCursorEvent>>)>>
 }
 
 impl Folder {
@@ -309,7 +344,11 @@ impl Folder {
             .to_string_lossy()
             .into_owned();
 
-        Ok(Self { name, path })
+        Ok(Self {
+            name,
+            path,
+            tar_process: Default::default()
+        })
     }
 
     pub async fn metadata(&self) -> Result<Metadata> {
@@ -338,127 +377,171 @@ impl Folder {
         Ok(())
     }
 
-    pub async fn copy_to(&self, new_path: impl AsRef<Path>) -> Result<Folder> {
-        let new_path = PathBuf::from(new_path.as_ref());
-        copy_dir_all(&self.path, &new_path).await?;
-        Folder::new(new_path).await
+    fn new_tar(file: std::fs::File) -> Result<tar::Builder<std::fs::File>> {
+        Ok(tar::Builder::new(file))
     }
 
-    pub async fn add_file(&self, file: File, relative_path: impl AsRef<Path>) -> Result<File> {
-        let target_path = self.path.join(relative_path);
-        if let Some(parent) = target_path.parent() {
-            fs::create_dir_all(parent).await?;
-        }
-        file.copy_to(target_path).await
-    }
+    async fn cursor_tar(&self, out_file_path: PathBuf, buffer_size: usize) -> Result<Box<dyn IOCursor>> {
+        let mut process = self.tar_process.lock().await; 
 
-    pub async fn list_files(&self) -> Result<Vec<File>> {
-        let mut files = Vec::new();
-        let mut entries = fs::read_dir(&self.path).await?;
+        if process.is_none() {
+            let mut out_file = File::new(None, out_file_path.clone()).await?.open().await?;
 
-        while let Some(entry) = entries.next_entry().await? {
-            let metadata = entry.metadata().await?;
-            if metadata.is_file() {
-                files.push(File {
-                    name: entry.file_name().to_string_lossy().into_owned(),
-                    path: entry.path()
-                });
-            }
-        }
+            let mut header_buffer = [0u8; 512];
 
-        Ok(files)
-    }
+            let (broadcast_tx, _) = broadcast::channel(1);
+            let broadcast_tx = Arc::new(broadcast_tx);
 
-    pub async fn list_folders(&self) -> Result<Vec<Folder>> {
-        let mut folders = Vec::new();
-        let mut entries = fs::read_dir(&self.path).await?;
+            let path_clone = out_file_path.clone();
 
-        while let Some(entry) = entries.next_entry().await? {
-            let metadata = entry.metadata().await?;
-            if metadata.is_dir() {
-                folders.push(Folder {
-                    name: entry.file_name().to_string_lossy().into_owned(),
-                    path: entry.path()
-                });
-            }
-        }
+            let broadcast_tx_for_watcher = broadcast_tx.clone();
+            let mut watcher = RecommendedWatcher::new(
+                move |res: Result<Event, _>| match res {
+                    Ok(event) => match event.kind {
+                        EventKind::Modify(ModifyKind::Any) => {
+                            let _ = broadcast_tx_for_watcher.send(OnFlyCursorEvent::Modified);
+                        }
+                        EventKind::Remove(RemoveKind::Any) => {
+                            let _ = broadcast_tx_for_watcher.send(OnFlyCursorEvent::Removed);
+                        }
+                        _ => {}
+                    },
+                    Err(err) => {
+                        let _ = broadcast_tx_for_watcher
+                            .send(OnFlyCursorEvent::WriteFailed(format!("Watcher on event: {err:?}")));
+                    }
+                },
+                Config::default().with_poll_interval(Duration::from_secs(8))
+            )?;
 
-        Ok(folders)
-    }
+            watcher.watch(&path_clone, RecursiveMode::NonRecursive)?;
+            
+            let broadcast_tx_clone = broadcast_tx.clone();
+            let src_path = self.path.clone();
+            let out_file_path_cloned = out_file_path.clone();
+            let mut entries = vec![TarEntry::from_metadata(self.path.clone(), self.path.clone())?];
 
-    pub async fn zip(&self, out_path: impl AsRef<Path>) -> Result<File> {
-        let out_path = PathBuf::from(out_path.as_ref());
-        let file = fs::File::create(&out_path).await?.into_std().await;
-        let base_path = self.path.clone();
+            // We try to restore the last tar progress by
+            // parsing the current file if exist
+            let mut safe_check_point = 0; 
+            out_file.seek(SeekFrom::Start(0)).await?;
+            while let Some(entry) = entries.pop() {
+                if entry.is_dir {
+                    if let Ok(mut dir_entries) = tokio::fs::read_dir(entry.absolute_path.as_ref().unwrap()).await {
+                        while let Some(dir_entry) = dir_entries.next_entry().await? {
+                            let path = dir_entry.path();
+                            if let Ok(tar_entry) = TarEntry::from_metadata(src_path.clone(), path) {
+                                entries.push(tar_entry);
+                            }
+                        }
 
-        // First collect all file contents and paths
-        fn collect_entries(
-            path: PathBuf,
-            base: &Path
-        ) -> Pin<Box<dyn Future<Output = Result<Vec<(String, Option<Vec<u8>>)>>> + Send + '_>> {
-            Box::pin(async move {
-                let mut result = Vec::new();
-                let mut dir = fs::read_dir(&path).await?;
+                        entries.sort_by_key(|entry| entry.modified_at);
+                    }
 
-                while let Some(entry) = dir.next_entry().await? {
-                    let path = entry.path();
-                    let relative_path = path.strip_prefix(base)?.to_string_lossy().into_owned();
-
-                    if entry.metadata().await?.is_dir() {
-                        result.push((relative_path + "/", None));
-                        result.extend(collect_entries(path, base).await?);
-                    } else {
-                        let content = fs::read(&path).await?;
-                        result.push((relative_path, Some(content)));
+                    if entry.relative_path.as_os_str().is_empty() {
+                        continue;
                     }
                 }
-                Ok(result)
-            })
-        }
 
-        let entries = collect_entries(self.path.clone(), &base_path).await?;
+                let old_entry = out_file.read_exact(&mut header_buffer).await.ok().and_then(|_| {
+                    let mut header = tar::Header::new_old();
+                    header.as_mut_bytes().copy_from_slice(&header_buffer);
+                    let result = TarEntry::from_tar_header(&header);
 
-        // Spawn blocking task for ZIP operations
-        tokio::task::spawn_blocking(move || -> Result<()> {
-            let mut zip = ZipWriter::new(file);
-            let options: FileOptions<'_, ()> =
-                FileOptions::default().compression_method(zip::CompressionMethod::ZSTD).unix_permissions(0o755);
+                    result.ok()
+                });
 
-            for (path, content) in entries {
-                if let Some(content) = content {
-                    zip.start_file(&path, options)?;
-                    zip.write_all(&content)?;
-                } else {
-                    zip.add_directory(&path, options)?;
-                }
+                if let Some(old_entry) = old_entry {
+                    if old_entry.is_tar_equal(&entry) {
+                        let data_size = (old_entry.size + 511) & !511;
+                        if out_file.seek(std::io::SeekFrom::Current(data_size as i64)).await.is_ok() {
+                            safe_check_point = out_file.stream_position().await?;
+                            continue;
+                        }
+                    }
+                };
+
+                out_file.seek(SeekFrom::Start(safe_check_point)).await?;
+                out_file.set_len(safe_check_point).await?;
+                break;
             }
 
-            zip.finish()?;
-            Ok(())
-        })
-        .await??;
+            let mut tar = Self::new_tar(out_file.into_std().await)?;
+            tokio::task::spawn_blocking(move || {
+                let _ = tar.get_mut().seek(SeekFrom::Start(safe_check_point));
+                while let Some(entry) = entries.pop() {
+                    if entry.is_dir {
+                        if let Ok(dir_entries) = std::fs::read_dir(entry.absolute_path.as_ref().unwrap()) {
+                            for dir_entry in dir_entries {
+                                if let Ok(dir_entry) = dir_entry {
+                                    let path = dir_entry.path();
+                                    if let Ok(tar_entry) = TarEntry::from_metadata(src_path.clone(), path) {
+                                        entries.push(tar_entry);
+                                    }
+                                }
+                            }
 
-        File::new(None, out_path).await
+                            entries.sort_by_key(|entry| entry.modified_at);
+                        }
+
+                        if entry.relative_path.as_os_str().is_empty() || entry.relative_path == PathBuf::from(".") {
+                            continue;
+                        }
+                    }
+
+                    if entry.is_dir {
+                        if let Err(err) = tar.append_dir(entry.relative_path, entry.absolute_path.as_ref().unwrap()) {
+                            let _ = std::fs::remove_file(&out_file_path_cloned);
+                            let _ = broadcast_tx_clone.send(OnFlyCursorEvent::WriteFailed(format!("Failed to append directory: {err:?}")));
+                            return;
+                        }
+                    }
+                    else {
+                        if let Err(err) = tar.append_path_with_name(entry.absolute_path.as_ref().unwrap(), entry.relative_path) {
+                            let _ = std::fs::remove_file(&out_file_path_cloned);
+                            let _ = broadcast_tx_clone.send(OnFlyCursorEvent::WriteFailed(format!("Failed to append file: {err:?}")));
+                            return;
+                        }
+                    }
+                }
+
+                if let Err(err) = tar.get_mut().flush()
+                    .and_then(|_| tar.get_mut().sync_all())
+                {
+                    let _ = std::fs::remove_file(&out_file_path_cloned);
+                    let _ =
+                        broadcast_tx_clone.send(OnFlyCursorEvent::WriteFailed(format!("Compression failed: {err:?}")));
+                } else {
+                    let _ = broadcast_tx_clone.send(OnFlyCursorEvent::WriteCompleted);
+                }
+            });
+
+            *process = Some((out_file_path.clone(), false, Arc::downgrade(&broadcast_tx)));
+        }
+
+        let (out_file_path, is_completed, broadcast_tx) = process.as_ref().expect("Already set, cannot be undefined");
+
+        if *is_completed {
+            let file = File::existing(out_file_path).await?.cursor(0, buffer_size).await?;
+            return Ok(file)
+        }
+
+        if let Some(broadcast) = broadcast_tx.upgrade() {
+            let notify_rx = broadcast.subscribe();
+            let cursor = OnFlyCursor::new(out_file_path.clone(), buffer_size, notify_rx).await?;
+            return Ok(Box::new(cursor));
+        }
+
+        Err(anyhow::anyhow!("Cannot create a new cursor"))
     }
 }
 
-// Helper function to copy directories recursively
-async fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<()> {
-    fs::create_dir_all(&dst).await?;
-    let mut entries = fs::read_dir(src).await?;
-
-    while let Some(entry) = entries.next_entry().await? {
-        let ty = entry.file_type().await?;
-        let target = dst.as_ref().join(entry.file_name());
-
-        if ty.is_dir() {
-            copy_dir_all(entry.path(), target).await?;
-        } else if ty.is_file() {
-            fs::copy(entry.path(), target).await?;
-        }
-    }
-
-    Ok(())
+#[derive(Debug)]
+pub struct FileCursor {
+    file: tokio::fs::File,
+    position: usize,
+    is_eof: bool,
+    buffer: Vec<u8> // Reusable buffer
 }
 
 impl FileCursor {
@@ -471,7 +554,18 @@ impl FileCursor {
         }
     }
 
-    pub async fn next(&mut self) -> Result<Option<bytes::Bytes>> {
+    pub fn position(&self) -> usize {
+        self.position
+    }
+
+    pub fn is_eof(&self) -> bool {
+        self.is_eof
+    }
+}
+
+#[async_trait::async_trait]
+impl IOCursor for FileCursor {
+    async fn next(&mut self) -> Result<Option<bytes::Bytes>> {
         if self.is_eof {
             return Ok(None);
         }
@@ -485,12 +579,174 @@ impl FileCursor {
         self.position += bytes_read;
         Ok(Some(bytes::Bytes::copy_from_slice(&self.buffer[..bytes_read])))
     }
+}
 
-    pub fn position(&self) -> usize {
-        self.position
+#[derive(Debug, Clone)]
+pub enum OnFlyCursorEvent {
+    Modified,
+    Removed,
+    // Writer confirm that file is fully write
+    WriteCompleted,
+    // Writer confirm that the file is now invalid due to an error
+    WriteFailed(String)
+}
+
+#[derive(Debug)]
+pub struct OnFlyCursor {
+    file: tokio::fs::File,
+    position: u64,
+    buffer: Vec<u8>,
+    is_completd: bool,
+    rx: broadcast::Receiver<OnFlyCursorEvent>
+}
+
+impl OnFlyCursor {
+    pub async fn new(path: PathBuf, buffer_size: usize, rx: broadcast::Receiver<OnFlyCursorEvent>) -> Result<Self> {
+        let file = fs::File::open(path.clone()).await?;
+        Ok(Self {
+            file,
+            position: 0,
+            buffer: vec![0; buffer_size],
+            rx,
+            is_completd: false
+        })
     }
+}
 
-    pub fn is_eof(&self) -> bool {
-        self.is_eof
+#[async_trait::async_trait]
+impl IOCursor for OnFlyCursor {
+    async fn next(&mut self) -> Result<Option<Bytes>> {
+        loop {
+            self.file.seek(std::io::SeekFrom::Start(self.position)).await?;
+            let bytes_read = self.file.read(&mut self.buffer).await?;
+
+            if bytes_read > 0 {
+                self.position += bytes_read as u64;
+                return Ok(Some(Bytes::copy_from_slice(&self.buffer[..bytes_read])));
+            }
+
+            if self.is_completd {
+                return Ok(None)
+            }
+
+            match self.rx.recv().await {
+                Ok(OnFlyCursorEvent::Modified) => continue,
+                Ok(OnFlyCursorEvent::Removed) => return Err(anyhow::anyhow!("File removed")),
+                Ok(OnFlyCursorEvent::WriteCompleted) => {
+                    self.is_completd = true;
+                    continue;
+                }
+                Ok(OnFlyCursorEvent::WriteFailed(e)) => return Err(anyhow::anyhow!(e)),
+                Err(broadcast::error::RecvError::Closed) => return Ok(None),
+                Err(broadcast::error::RecvError::Lagged(_)) => continue
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+pub mod test {
+    use anyhow::Result;
+    use flate2::read::GzDecoder;
+    use tokio_scoped::scoped;
+    use std::fs;
+    use std::io::Read;
+    use std::path::Path;
+    use tar::Archive;
+    use tokio::fs::File;
+    use tokio::io::AsyncWriteExt;
+
+    use crate::local_storage::file_system::Folder;
+    use crate::logger;
+
+    #[tokio::test(flavor = "multi_thread")]
+    pub async fn test_tar() -> Result<()> {
+        logger::setup();
+        let source_folder = "/Users/tiendang/Projects/affinitypool";
+        let output_file1 = "/Users/tiendang/Projects/affinitypool1.tar";
+        let output_file2 = "/Users/tiendang/Projects/affinitypool2.tar";
+        let output_file3 = "/Users/tiendang/Projects/affinitypool3.tar";
+
+        let folder = Folder::new(source_folder).await?;
+        
+        // Create three concurrent tar cursors
+        let mut cursor1 = folder.cursor_tar("/Users/tiendang/Projects/affinitypool_temp1.tar".into(), 1024 * 12).await?;
+        let mut cursor2 = folder.cursor_tar("/Users/tiendang/Projects/affinitypool_temp2.tar".into(), 1024 * 12).await?;
+        let mut cursor3 = folder.cursor_tar("/Users/tiendang/Projects/affinitypool_temp3.tar".into(), 1024 * 12).await?;
+
+        tokio_scoped::scope(|s| {
+            s.spawn(async {
+                let mut out_file1 = File::create(output_file1).await.unwrap();
+                loop {
+                    let chunk = cursor1.next().await.unwrap();
+                    match chunk {
+                        Some(chunk) => {
+                            let _ = out_file1.write_all(&chunk).await;
+                        }
+                        None => {
+                            break;
+                        }
+                    }
+                }
+                let _ = out_file1.sync_all().await;
+                println!("Compression 1 completed: {output_file1}");
+            });
+
+            s.spawn(async {
+                let mut out_file2 = File::create(output_file2).await.unwrap();
+                loop {
+                    let chunk = cursor2.next().await.unwrap();
+                    match chunk {
+                        Some(chunk) => {
+                            let _ = out_file2.write_all(&chunk).await;
+                            out_file2.sync_all().await;
+                        }
+                        None => {
+                            break;
+                        }
+                    }
+                }
+                let _ = out_file2.sync_all().await;
+                println!("Compression 2 completed: {output_file2}");
+            });
+
+            s.spawn(async {
+                let mut out_file3 = File::create(output_file3).await.unwrap();
+                loop {
+                    let chunk = cursor3.next().await.unwrap();
+                    match chunk {
+                        Some(chunk) => {
+                            let _ = out_file3.write_all(&chunk).await;
+                            out_file3.sync_all().await;
+                        }
+                        None => {
+                            break;
+                        }
+                    }
+                }
+                let _ = out_file3.sync_all().await;
+                println!("Compression 3 completed: {output_file3}");
+            });
+        });
+
+        // Verify one of the archives by extracting
+        let extract_path = "/tmp/affinitypool_extracted";
+        if Path::new(extract_path).exists() {
+            fs::remove_dir_all(extract_path)?;
+        }
+        fs::create_dir_all(extract_path)?;
+
+        // Read tar file into memory
+        let mut tar_file = fs::File::open(output_file1)?;
+        let mut tar_data = Vec::new();
+        tar_file.read_to_end(&mut tar_data)?;
+
+        // Extract tar archive
+        let mut archive = Archive::new(&tar_data[..]);
+        archive.unpack(extract_path)?;
+
+        println!("Extraction completed successfully");
+
+        Ok(())
     }
 }

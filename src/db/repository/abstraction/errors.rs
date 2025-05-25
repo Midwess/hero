@@ -5,8 +5,10 @@ pub enum RepositoryError {
     NotFound(String, String),
     #[error("Conflict {0} {1}")]
     Conflict(String, String),
+    #[cfg(any(feature = "db-local", feature = "db-remote"))]
     #[error("Error on db side {0}")]
     SurrealDbError(#[from] surrealdb::Error),
+    #[cfg(any(feature = "db-local", feature = "db-remote"))]
     #[error("Error on db side {0}")]
     DbError(String)
 }

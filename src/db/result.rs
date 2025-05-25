@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use surreal_devl::proxy::default::{SurrealDeserializer, SurrealSerializer};
+#[cfg(any(feature = "db-local", feature = "db-remote"))]
 use surreal_devl::surreal_qr::SurrealResponseError;
 use surrealdb::sql::Value;
 

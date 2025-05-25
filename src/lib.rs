@@ -29,6 +29,7 @@ pub type Db = surrealdb::Surreal<Client>;
 pub mod local_storage;
 
 pub mod config;
+#[cfg(any(feature = "db-local", feature = "db-remote"))]
 pub mod db;
 pub mod logger;
 pub mod services;

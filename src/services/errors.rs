@@ -2,7 +2,6 @@
 use aws_sdk_s3::error::SdkError;
 #[cfg(feature = "s3")]
 use aws_sdk_s3::presigning::PresigningConfigError;
-use surreal_devl::surreal_qr::SurrealResponseError;
 use thiserror::Error;
 #[cfg(feature = "grpc-server")]
 use tonic::Status;
@@ -43,9 +42,14 @@ pub enum Errors {
     #[error("Tcp failure {}", .0)]
     TcpFailure(String),
     #[error("Failed to download file {}", .0)]
-    FailedToDownloadFile(String)
+    FailedToDownloadFile(String),
+    #[cfg(feature = "local-storage")]
+    #[error("File watcher error: {0}")]
+    NotifyWatcher(#[from] notify::Error)
 }
 
+#[cfg(feature = "db-local")]
+#[cfg(feature = "db-remote")]
 impl From<surrealdb::Error> for Errors {
     fn from(value: surrealdb::Error) -> Self {
         Self::DatabaseError {
@@ -55,6 +59,8 @@ impl From<surrealdb::Error> for Errors {
     }
 }
 
+#[cfg(feature = "db-local")]
+#[cfg(feature = "db-remote")]
 impl From<SurrealResponseError> for Errors {
     fn from(value: SurrealResponseError) -> Self {
         Self::UnexpectedDataFormat(format!("{:?}", &value))
