@@ -22,7 +22,7 @@ grpc-client = ["tonic/transport"]
 grpc-server = ["tonic", "tonic-middleware", "jsonwebtoken"]
 host_machine = ["tokio-stream", "tokio/process"]
 retry = []
-s3 = ["aws-config", "aws-sdk-s3"]
+s3 = ["aws-config", "aws-sdk-s3", "aws-smithy-async"]
 services = []
 smtp = ["lettre", "reqwest", "prost", "lettre/smtp-transport", "lettre/builder", "lettre/default"]
 db-remote = ["surrealdb/default", "surreal_devl", "surreal_derive_plus", "surrealdb/protocol-ws"]
@@ -63,6 +63,7 @@ surreal_derive_plus = { workspace = true, optional = true, default-features = fa
 jsonwebtoken = { version = "9.3.0", optional = true, default-features = false }
 reqwest = { workspace = true, optional = true, default-features = false }
 bytes = { workspace = true, optional = true }
+aws-smithy-async = {workspace = true, optional = true}
 
 [build-dependencies]
 
