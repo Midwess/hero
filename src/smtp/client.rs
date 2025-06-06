@@ -56,7 +56,7 @@ impl SmtpClient {
         let transport = self.transport.retrieve().await.unwrap();
         transport
             .send(&message)
-            .map_err(|e| Errors::FailedToSendEmail(format!("Failed to send email, error={:?}", e)))?;
+            .map_err(|e| Errors::FailedToSendEmail(format!("Failed to send email, error={e:?}")))?;
 
         Ok(())
     }
@@ -79,7 +79,7 @@ impl SmtpClient {
             .send()
             .await
             .map_err(|e| {
-                Errors::FailedToSendEmail(format!("Failed to generate email template from crafter service {:?}", e))
+                Errors::FailedToSendEmail(format!("Failed to generate email template from crafter service {e:?}"))
             })?;
 
         if res.status() != StatusCode::OK {

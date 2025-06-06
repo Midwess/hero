@@ -2,11 +2,11 @@
 use aws_sdk_s3::error::SdkError;
 #[cfg(feature = "s3")]
 use aws_sdk_s3::presigning::PresigningConfigError;
+#[cfg(any(feature = "db-local", feature = "db-remote"))]
+use surreal_devl::surreal_qr::SurrealResponseError;
 use thiserror::Error;
 #[cfg(feature = "grpc-server")]
 use tonic::Status;
-#[cfg(any(feature = "db-local", feature = "db-remote"))]
-use surreal_devl::surreal_qr::SurrealResponseError;
 
 #[derive(Error, Debug)]
 pub enum Errors {
@@ -92,7 +92,7 @@ impl From<Errors> for Status {
             Errors::AwsS3Error(message) => Self::aborted(format!("Resource busy, please contact support {message}")),
             Errors::BadRequest(message) => Self::invalid_argument(message),
             Errors::UnexpectedDataFormat(_) => Self::aborted("Internal error, contact support"),
-            Errors::AlreadyExist(message) => Self::already_exists(format!("Already exist {}", message)),
+            Errors::AlreadyExist(message) => Self::already_exists(format!("Already exist {message}")),
             Errors::ResourceNotFound(message) => Self::not_found(message.to_owned()),
             Errors::FailedToSendEmail(_) => Self::internal("Failed to send email"),
             Errors::IoError(_) => Self::internal("Internal error"),

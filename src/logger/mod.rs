@@ -20,8 +20,6 @@ pub fn setup() {
 }
 
 pub struct ThrottleLogger {
-    namespace: String,
-    delay: Duration,
     messages: Arc<Mutex<HashMap<String, usize>>>,
     join_handle: JoinHandle<()>
 }
@@ -50,12 +48,7 @@ impl ThrottleLogger {
             }
         });
 
-        Self {
-            namespace,
-            delay,
-            messages,
-            join_handle
-        }
+        Self { messages, join_handle }
     }
 
     pub async fn log(&self, content: String) {

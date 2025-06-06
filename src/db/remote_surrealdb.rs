@@ -1,6 +1,5 @@
 use std::ops::Deref;
 
-use surrealdb::engine::remote::ws::Ws;
 use surrealdb::opt::auth::Database;
 
 use crate::utils::pool::allocator::PoolResourceProvider;
@@ -38,7 +37,7 @@ impl PoolResourceProvider<SurrealDbConnection> for SurrealDbPoolResourceProvider
     async fn new(&self) -> SurrealDbConnection {
         let param = &self.info;
         let db = Db::init();
-        db.connect::<Ws>(param.socket_address.clone()).await.expect("Failed while connecting to surreal db");
+        db.connect(param.socket_address.clone()).await.expect("Failed while connecting to surreal db");
         db.signin(Database {
             database: param.db_name.as_str(),
             namespace: param.namespace.as_str(),

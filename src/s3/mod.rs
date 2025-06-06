@@ -17,12 +17,7 @@ pub struct S3Client {
 
 impl S3Client {
     pub async fn get_objects(&self, bucket_name: String, prefix: String) -> Resolve<Vec<StaticResource>> {
-        let list_objects_resp = self.client
-            .list_objects_v2()
-            .bucket(bucket_name)
-            .prefix(prefix.clone())
-            .send()
-            .await?;
+        let list_objects_resp = self.client.list_objects_v2().bucket(bucket_name).prefix(prefix.clone()).send().await?;
 
         let mut result: Vec<StaticResource> = vec![];
         for object in list_objects_resp.contents() {
@@ -73,26 +68,26 @@ impl S3Client {
             _ => return Err(Errors::BadRequest("Bad request, s3_object must have path".to_owned()))
         };
 
-        let cdn_url = format!("{}/{}", cdn_host_url, path);
+        let cdn_url = format!("{cdn_host_url}/{path}");
 
         s3_object.source = Some(Source::Url(cdn_url.to_owned()));
 
         Ok(())
     }
 
-    pub async fn sign_object(&self, bucket_name: String, s3_object: &mut StaticResource, duration: Duration) -> Resolve<()> {
+    pub async fn sign_object(
+        &self,
+        bucket_name: String,
+        s3_object: &mut StaticResource,
+        duration: Duration
+    ) -> Resolve<()> {
         let path = match &s3_object.source {
             Some(Source::Path(path)) => path.clone(),
             _ => return Err(Errors::BadRequest("Bad request, s3_object must have path".to_owned()))
         };
 
         let presigning_config = PresigningConfig::expires_in(duration)?;
-        let presigned_req = self.client
-            .get_object()
-            .bucket(bucket_name)
-            .key(path)
-            .presigned(presigning_config)
-            .await?;
+        let presigned_req = self.client.get_object().bucket(bucket_name).key(path).presigned(presigning_config).await?;
 
         s3_object.source = Some(Source::Url(presigned_req.uri().to_owned()));
 

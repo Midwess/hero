@@ -1,5 +1,5 @@
-#[cfg(feature = "db-remote")]
-use surrealdb::engine::remote::ws::Client;
+#[cfg(any(feature = "db-local", feature = "db-remote"))]
+use surrealdb::engine::any::Any;
 
 #[cfg(feature = "s3")]
 pub type S3Connection = aws_sdk_s3::client::Client;
@@ -22,8 +22,8 @@ pub mod s3;
 #[cfg(feature = "smtp")]
 pub mod smtp;
 
-#[cfg(feature = "db-remote")]
-pub type Db = surrealdb::Surreal<Client>;
+#[cfg(any(feature = "db-local", feature = "db-remote"))]
+pub type Db = surrealdb::Surreal<Any>;
 
 #[cfg(feature = "local-storage")]
 pub mod local_storage;
