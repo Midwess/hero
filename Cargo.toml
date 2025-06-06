@@ -23,7 +23,7 @@ grpc-server = ["tonic", "tonic-middleware", "core-services/grpc-server"]
 db-local = ["surrealdb/kv-surrealkv", "surreal_devl", "surreal_derive_plus", "core-services/retry", "core-services/db-local"]
 db-remote = ["surrealdb/protocol-ws", "surreal_devl", "surreal_derive_plus", "core-services/retry", "core-services/db-remote"]
 gateway = ["reqwest", "reqwest/json"]
-s3 = ["core-services/s3", "aws-sdk-s3"]
+s3 = ["core-services/s3", "aws-sdk-s3", "aws-smithy-async"]
 
 [dependencies]
 core-services = { path="../core-services", default-features = false }
@@ -45,3 +45,4 @@ tonic-middleware = { version = "0.1.4", optional = true, default-features = fals
 tonic = { workspace = true, optional = true, default-features = false }
 reqwest = { workspace = true, optional = true, default-features = false }
 aws-sdk-s3 = { version = "1.76.0", optional = true, default-features = false }
+aws-smithy-async = {workspace = true, optional = true}

@@ -19,9 +19,9 @@ use core_services::utils::pool::allocator::PoolResourceProvider;
 #[async_trait::async_trait]
 pub trait DependenciesInjection {
     #[cfg(feature = "s3")]
-    fn s3_client(&self) -> &S3Client;
+    fn s3_client(&self, bucket_name: String) -> S3Client;
     #[cfg(feature = "s3")]
-    fn cloud_flare_s3_client(&self) -> &S3Client;
+    fn cloud_flare_s3_client(&self, bucket_name: String) -> S3Client;
     #[cfg(feature = "db-remote")]
     fn system_db(&self) -> PoolRequest<SurrealDbConnection>;
     #[cfg(feature = "db-remote")]
@@ -36,11 +36,7 @@ pub struct DevlogSdk {
     #[cfg(feature = "db-remote")]
     system_db_allocator: OnceCell<Arc<PoolAllocator<SurrealDbConnection>>>,
     #[cfg(feature = "db-remote")]
-    app_db_allocator: OnceCell<Arc<PoolAllocator<SurrealDbConnection>>>,
-    #[cfg(feature = "s3")]
-    s3_client: OnceCell<S3Client>,
-    #[cfg(feature = "s3")]
-    cloud_flare_s3_client: OnceCell<S3Client>
+    app_db_allocator: OnceCell<Arc<PoolAllocator<SurrealDbConnection>>>
 }
 
 impl Default for DevlogSdk {
@@ -55,11 +51,7 @@ impl DevlogSdk {
             #[cfg(feature = "db-remote")]
             system_db_allocator: OnceCell::const_new(),
             #[cfg(feature = "db-remote")]
-            app_db_allocator: OnceCell::const_new(),
-            #[cfg(feature = "s3")]
-            s3_client: OnceCell::const_new(),
-            #[cfg(feature = "s3")]
-            cloud_flare_s3_client: OnceCell::const_new()
+            app_db_allocator: OnceCell::const_new()
         }
     }
 }
@@ -137,15 +129,11 @@ impl DependenciesInjection for DevlogSdk {
     }
 
     #[cfg(feature = "s3")]
-    fn s3_client(&self) -> &S3Client {
-        if let Some(client) = self.s3_client.get() {
-            return client;
-        }
-
-        use std::env;
-
+    fn s3_client(&self, bucket_name: String) -> S3Client {
         use aws_sdk_s3::config::{BehaviorVersion, Credentials, Region};
         use aws_sdk_s3::Client;
+        use core_services::s3::S3SleepAsync;
+        use std::env;
 
         let region = env::var("AWS_S3_REGION").unwrap_or("us-east-1".to_string());
         let access_key = env::var("AWS_ACCESS_KEY_ID").expect("AWS_ACCESS_KEY_ID must be defined");
@@ -157,49 +145,44 @@ impl DependenciesInjection for DevlogSdk {
         let mut s3_config_builder = aws_sdk_s3::Config::builder()
             .behavior_version(BehaviorVersion::latest())
             .region(Region::new(region))
-            .credentials_provider(credentials);
+            .credentials_provider(credentials)
+            .sleep_impl(S3SleepAsync::new());
 
         s3_config_builder = s3_config_builder.endpoint_url(endpoint_url).force_path_style(true);
 
         let client = Client::from_conf(s3_config_builder.build());
-        let s3_client = S3Client { client };
 
-        let _ = self.s3_client.set(s3_client);
-
-        self.s3_client.get().expect("S3 client must be enabled")
+        S3Client { client, bucket_name }
     }
 
     #[cfg(feature = "s3")]
-    fn cloud_flare_s3_client(&self) -> &S3Client {
-        if let Some(client) = self.cloud_flare_s3_client.get() {
-            return client;
-        }
-
+    fn cloud_flare_s3_client(&self, bucket_name: String) -> S3Client {
         use std::env;
 
         use aws_sdk_s3::config::{BehaviorVersion, Credentials, Region};
         use aws_sdk_s3::Client;
+        use core_services::s3::S3SleepAsync;
 
-        let region = env::var("CLOUD_FLARE_S3_REGION").unwrap_or("us-east-1".to_string());
-        let access_key = env::var("CLOUD_FLARE_ACCESS_KEY_ID").expect("CLOUD_FLARE_ACCESS_KEY_ID must be defined");
+        let region = env::var("CLOUD_FLARE_R2_REGION").unwrap_or("us-east-1".to_string());
+        let access_key =
+            env::var("CLOUD_FLARE_R2_ACCESS_KEY_ID").expect("CLOUD_FLARE_R2_ACCESS_KEY_ID must be defined");
         let secret_key =
-            env::var("CLOUD_FLARE_SECRET_ACCESS_KEY").expect("CLOUD_FLARE_SECRET_ACCESS_KEY must be defined");
-        let endpoint_url = env::var("CLOUD_FLARE_ENDPOINT_URL").expect("CLOUD_FLARE_ENDPOINT_URL must be defined");
+            env::var("CLOUD_FLARE_R2_SECRET_ACCESS_KEY").expect("CLOUD_FLARE_R2_SECRET_ACCESS_KEY must be defined");
+        let endpoint_url =
+            env::var("CLOUD_FLARE_R2_ENDPOINT_URL").expect("CLOUD_FLARE_R2_ENDPOINT_URL must be defined");
 
         let credentials = Credentials::new(access_key, secret_key, None, None, "devlog-cloudflare");
 
         let mut s3_config_builder = aws_sdk_s3::Config::builder()
             .behavior_version(BehaviorVersion::latest())
             .region(Region::new(region))
-            .credentials_provider(credentials);
+            .credentials_provider(credentials)
+            .sleep_impl(S3SleepAsync::new());
 
         s3_config_builder = s3_config_builder.endpoint_url(endpoint_url).force_path_style(true);
 
         let client = Client::from_conf(s3_config_builder.build());
-        let s3_client = S3Client { client };
 
-        let _ = self.cloud_flare_s3_client.set(s3_client);
-
-        self.cloud_flare_s3_client.get().expect("Cloudflare s3 client must be enabled")
+        S3Client { client, bucket_name }
     }
 }

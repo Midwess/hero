@@ -35,6 +35,7 @@ impl Default for Config {
         }
     }
 }
+
 lazy_static! {
     pub static ref CONFIGS: Config = Default::default();
 }
