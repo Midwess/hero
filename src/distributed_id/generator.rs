@@ -1,14 +1,19 @@
 use chrono::{DateTime, Utc};
 #[cfg(feature = "db-remote")]
 use core_services::db::remote_surrealdb::SurrealDbConnection;
+#[cfg(feature = "db-remote")]
+use core_services::utils::pool::request::PoolRequest;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+#[cfg(any(feature = "db-remote", feature = "db-local"))]
+use surreal_derive_plus::surreal_quote;
 use surreal_derive_plus::SurrealDerive;
 use surreal_devl::surreal_id::SurrealId;
+#[cfg(any(feature = "db-remote", feature = "db-local"))]
+use surreal_devl::surreal_qr::RPath;
 use surrealdb::sql::{Id, Thing};
 use surrealdb::Error;
 use thiserror::Error;
-
 pub static EPOCH_SINCE: u64 = 1735405200000; // 2024-12-29T00:00:00Z
 
 pub static CONCURRENT_COLLISION_THRESHOLD: u64 = 4096;
@@ -70,6 +75,8 @@ impl Worker {
         name: String,
         db_req: PoolRequest<SurrealDbConnection>
     ) -> Result<Self, DistributedIdError> {
+        use surreal_devl::surreal_qr::RPath;
+
         let db = db_req.retrieve().await;
         if db.is_none() {
             return Err(DistributedIdError::UnnableToConnectToDatabase)
@@ -136,6 +143,8 @@ pub struct DistributedIdGenerator {
 impl DistributedIdGenerator {
     #[cfg(feature = "db-remote")]
     pub async fn init(name: String, db: PoolRequest<SurrealDbConnection>) -> Result<Self, DistributedIdError> {
+        use core_services::retry;
+
         let created_worker = retry!(
             retries = 10,
             delay = std::time::Duration::from_millis(500),

@@ -184,12 +184,12 @@ impl GatewayServiceBuilder {
 
     // Add gRPC support by setting a default gRPC service URL
     pub fn grpc(mut self, grpc_host: String, grpc_port: u16) -> Self {
-        self.url = Some(format!("grpc://{}:{}", grpc_host, grpc_port));
+        self.url = Some(format!("grpc://{grpc_host}:{grpc_port}"));
         self
     }
 
     pub fn http(mut self, http_host: String, http_port: u16) -> Self {
-        self.url = Some(format!("http://{}:{}", http_host, http_port));
+        self.url = Some(format!("http://{http_host}:{http_port}"));
         self
     }
 
