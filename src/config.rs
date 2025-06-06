@@ -11,17 +11,6 @@ pub struct TokenConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct AwsS3 {
-    pub bucket_name: String,
-    pub access_key: String,
-    pub secret_key: String,
-    pub region: String,
-    pub host_url: String,
-    pub cdn_host_url: String,
-    pub default_avatars_folder_path: String
-}
-
-#[derive(Debug, Clone)]
 pub struct Crafter {
     pub url: String
 }
@@ -55,22 +44,6 @@ impl Default for Smtp {
     }
 }
 
-impl Default for AwsS3 {
-    fn default() -> Self {
-        Self {
-            host_url: env::var("AWS_ENDPOINT_URL").expect("AWS_ENDPOINT_URL must be defined"),
-            cdn_host_url: env::var("AWS_CDN_ENDPOINT_URL")
-                .unwrap_or(env::var("AWS_ENDPOINT_URL").expect("AWS_ENDPOINT_URL must be defined")),
-            bucket_name: env::var("AWS_S3_BUCKET_NAME").expect("AWS_S3_BUCKET_NAME must be defined"),
-            access_key: env::var("AWS_ACCESS_KEY_ID").expect("AWS_ACCESS_KEY_ID must be defined"),
-            secret_key: env::var("AWS_SECRET_ACCESS_KEY").expect("AWS_SECRET_ACCESS_KEY must be defined"),
-            region: env::var("AWS_S3_REGION").expect("AWS_S3_REGION must be defined"),
-            default_avatars_folder_path: env::var("DEVLOG_DEFAULT_AVATARS_S3_FOLDER_PATH")
-                .unwrap_or(String::from("users/avatars/defaults/"))
-        }
-    }
-}
-
 impl Default for TokenConfig {
     fn default() -> Self {
         let refresh_token_duration = Duration::from_millis(
@@ -96,7 +69,6 @@ impl Default for TokenConfig {
 #[derive(Debug, Default)]
 pub struct Config {
     pub token: TokenConfig,
-    pub aws_s3: AwsS3,
     pub smtp: Smtp,
     pub crafter: Crafter
 }

@@ -9,11 +9,12 @@ use crate::Db;
 #[derive(Debug, Clone)]
 pub struct SurrealDbConnectionInfo {
     pub socket_address: String,
-    /// https://surrealdb.com/docs/surrealql/statements/define/namespace
     pub namespace: String,
     pub db_name: String,
     pub db_password: String,
-    pub db_username: String
+    pub db_username: String,
+    pub max_pool_size: usize,
+    pub min_pool_size: usize
 }
 
 pub struct SurrealDbConnection {

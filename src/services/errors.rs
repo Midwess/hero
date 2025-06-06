@@ -5,6 +5,8 @@ use aws_sdk_s3::presigning::PresigningConfigError;
 use thiserror::Error;
 #[cfg(feature = "grpc-server")]
 use tonic::Status;
+#[cfg(any(feature = "db-local", feature = "db-remote"))]
+use surreal_devl::surreal_qr::SurrealResponseError;
 
 #[derive(Error, Debug)]
 pub enum Errors {
