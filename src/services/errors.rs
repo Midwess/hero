@@ -2,8 +2,6 @@
 use aws_sdk_s3::error::SdkError;
 #[cfg(feature = "s3")]
 use aws_sdk_s3::presigning::PresigningConfigError;
-#[cfg(any(feature = "db-local", feature = "db-remote"))]
-use surreal_devl::surreal_qr::SurrealResponseError;
 use thiserror::Error;
 #[cfg(feature = "grpc-server")]
 use tonic::Status;

@@ -17,7 +17,7 @@ pub struct SurrealDbConnectionInfo {
 }
 
 pub struct SurrealDbConnection {
-    connection: Db
+    pub connection: Db
 }
 
 impl Deref for SurrealDbConnection {
