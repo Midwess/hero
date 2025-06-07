@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use core_services::db::remote_surrealdb::SurrealDbConnection;
 use core_services::utils::pool::request::PoolRequest;
 use generator::{DistributedIdGenerator, EPOCH_SINCE};
@@ -28,4 +29,10 @@ pub async fn init_id_generator(app_name: String, db: PoolRequest<SurrealDbConnec
 pub fn init_scoped_id_generator(app_name: String) {
     let distributed_id_generator = DistributedIdGenerator::init_scoped(app_name.clone());
     let _ = DISTRIBUTED_ID_GENERATOR.set(Arc::new(Mutex::new(distributed_id_generator)));
+}
+
+pub fn id_to_datetime(id: u64) -> DateTime<Utc> {
+    let timestamp = id >> 23;
+    let epoch_since_ms = EPOCH_SINCE;
+    DateTime::from_timestamp_millis(epoch_since_ms as i64 + timestamp as i64).unwrap()
 }

@@ -1,15 +1,10 @@
 use chrono::{DateTime, Utc};
-#[cfg(feature = "db-remote")]
 use core_services::db::remote_surrealdb::SurrealDbConnection;
-#[cfg(feature = "db-remote")]
 use core_services::utils::pool::request::PoolRequest;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-#[cfg(any(feature = "db-remote", feature = "db-local"))]
-use surreal_derive_plus::surreal_quote;
-use surreal_derive_plus::SurrealDerive;
+use surreal_derive_plus::{surreal_quote, SurrealDerive};
 use surreal_devl::surreal_id::SurrealId;
-#[cfg(any(feature = "db-remote", feature = "db-local"))]
 use surreal_devl::surreal_qr::RPath;
 use surrealdb::sql::{Id, Thing};
 use surrealdb::Error;
@@ -46,7 +41,6 @@ impl SurrealId for Worker {
 }
 
 impl Worker {
-    #[cfg(feature = "db-remote")]
     async fn create_worker(
         distributed_id: u64,
         name: String,
@@ -70,7 +64,6 @@ impl Worker {
         Ok(created_worker.unwrap())
     }
 
-    #[cfg(feature = "db-remote")]
     async fn get_or_create_worker(
         name: String,
         db_req: PoolRequest<SurrealDbConnection>
@@ -141,7 +134,6 @@ pub struct DistributedIdGenerator {
 }
 
 impl DistributedIdGenerator {
-    #[cfg(feature = "db-remote")]
     pub async fn init(name: String, db: PoolRequest<SurrealDbConnection>) -> Result<Self, DistributedIdError> {
         use core_services::retry;
 
