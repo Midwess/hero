@@ -18,7 +18,7 @@ pub async fn find_grpc_listener() -> Resolve<GrpcConnection> {
     let mut port = base_port;
 
     let listener = loop {
-        let addr: SocketAddr = format!("0.0.0.0:{port}").parse().expect("Invalid address");
+        let addr: SocketAddr = format!("[::]:{}", port).parse().expect("Invalid address");
 
         match TcpIncoming::new(addr, true, None) {
             Ok(listener) => {
@@ -57,7 +57,7 @@ pub async fn find_tcp_listener() -> Resolve<TcpConnection> {
     let mut port = base_port;
 
     let listener = loop {
-        let addr: SocketAddr = format!("0.0.0.0:{port}").parse().expect("Invalid address");
+        let addr: SocketAddr = format!("[::]:{port}").parse().expect("Invalid address");
 
         match TcpListener::bind(addr) {
             Ok(listener) => {
