@@ -18,7 +18,7 @@ pub async fn find_grpc_listener() -> Resolve<GrpcConnection> {
     let mut port = base_port;
 
     let listener = loop {
-        let addr: SocketAddr = format!("[::]:{}", port).parse().expect("Invalid address");
+        let addr: SocketAddr = format!("[::]:{port}").parse().expect("Invalid address");
 
         match TcpIncoming::new(addr, true, None) {
             Ok(listener) => {
@@ -29,7 +29,7 @@ pub async fn find_grpc_listener() -> Resolve<GrpcConnection> {
                 port += 1;
 
                 if port > max_port {
-                    error!(target: "tcp-listener", "No available ports in range {}-{}", base_port, max_port);
+                    error!(target: "tcp-listener", "No available ports in range {base_port}-{max_port}");
                     return Err(Errors::TcpFailure("No port available".to_owned()));
                 }
             }
@@ -69,7 +69,7 @@ pub async fn find_tcp_listener() -> Resolve<TcpConnection> {
                 if port > max_port {
                     error!(
                         target: "tcp-listener",
-                        "No available ports in range {}-{}", base_port, max_port
+                        "No available ports in range {base_port}-{max_port}"
                     );
                     return Err(Errors::TcpFailure("No port available".to_owned()));
                 }

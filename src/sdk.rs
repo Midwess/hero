@@ -1,5 +1,6 @@
+use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::OnceCell;
+use tokio::sync::{Mutex, OnceCell};
 
 #[cfg(feature = "s3")]
 use core_services::s3::S3Client;
@@ -19,24 +20,24 @@ use core_services::utils::pool::allocator::PoolResourceProvider;
 #[async_trait::async_trait]
 pub trait DependenciesInjection {
     #[cfg(feature = "s3")]
-    fn s3_client(&self, bucket_name: String) -> S3Client;
-    #[cfg(feature = "s3")]
-    fn cloud_flare_s3_client(&self, bucket_name: String) -> S3Client;
+    fn s3_client(&self) -> S3Client;
     #[cfg(feature = "db-remote")]
-    fn system_db(&self) -> PoolRequest<SurrealDbConnection>;
-    #[cfg(feature = "db-remote")]
-    fn app_db(&self) -> PoolRequest<SurrealDbConnection>;
+    async fn system_db(&self) -> PoolRequest<SurrealDbConnection>;
     #[cfg(feature = "db-remote")]
     async fn enable_system_db(&self);
     #[cfg(feature = "db-remote")]
-    async fn enable_app_db(&self, app_name: String);
+    async fn enable_db(&self, db_name: DbName, min_pool_size: usize, max_pool_size: usize);
+    #[cfg(feature = "db-remote")]
+    async fn db_allocator(&self, db_name: DbName) -> Arc<PoolAllocator<SurrealDbConnection>>;
+    #[cfg(feature = "db-remote")]
+    async fn db(&self, db_name: DbName) -> PoolRequest<SurrealDbConnection>;
 }
 
+type DbName = String;
 pub struct DevlogSdk {
     #[cfg(feature = "db-remote")]
-    system_db_allocator: OnceCell<Arc<PoolAllocator<SurrealDbConnection>>>,
-    #[cfg(feature = "db-remote")]
-    app_db_allocator: OnceCell<Arc<PoolAllocator<SurrealDbConnection>>>
+    db_allocators: Mutex<HashMap<DbName, Arc<PoolAllocator<SurrealDbConnection>>>>,
+    s3_client: OnceCell<S3Client>
 }
 
 impl Default for DevlogSdk {
@@ -49,9 +50,9 @@ impl DevlogSdk {
     pub fn new() -> Self {
         Self {
             #[cfg(feature = "db-remote")]
-            system_db_allocator: OnceCell::const_new(),
-            #[cfg(feature = "db-remote")]
-            app_db_allocator: OnceCell::const_new()
+            db_allocators: Mutex::new(HashMap::new()),
+            #[cfg(feature = "s3")]
+            s3_client: OnceCell::new()
         }
     }
 }
@@ -60,18 +61,19 @@ impl DevlogSdk {
 impl DependenciesInjection for DevlogSdk {
     #[cfg(feature = "db-remote")]
     async fn enable_system_db(&self) {
-        use crate::config::CONFIGS;
+        self.enable_db("system".to_string(), 0, 5).await;
+    }
 
-        let min_pool_size = 1;
-        let max_pool_size = 5;
+    async fn enable_db(&self, db_name: DbName, min_pool_size: usize, max_pool_size: usize) {
+        use crate::config::CONFIGS;
 
         let db_provider: Box<dyn PoolResourceProvider<SurrealDbConnection>> = Box::new(SurrealDbPoolResourceProvider {
             info: SurrealDbConnectionInfo {
                 socket_address: CONFIGS.surrealdb_ws_address.clone(),
-                namespace: CONFIGS.environment.clone(),
-                db_name: "system".to_string(),
+                namespace: CONFIGS.surrealdb_namespace.clone(),
+                db_name: db_name.clone(),
                 db_password: CONFIGS.surrealdb_password.clone(),
-                db_username: "devlog".to_string(),
+                db_username: CONFIGS.surrealdb_username.clone(),
                 max_pool_size,
                 min_pool_size
             }
@@ -83,57 +85,36 @@ impl DependenciesInjection for DevlogSdk {
             .build()
             .await;
 
-        let _ = self.system_db_allocator.set(db_allocator);
+        let _ = self.db_allocators.lock().await.entry(db_name).or_insert(db_allocator);
     }
 
     #[cfg(feature = "db-remote")]
-    async fn enable_app_db(&self, app_name: String) {
-        use crate::config::CONFIGS;
-
-        let min_pool_size = 1;
-        let max_pool_size = 5;
-
-        let db_provider: Box<dyn PoolResourceProvider<SurrealDbConnection>> = Box::new(SurrealDbPoolResourceProvider {
-            info: SurrealDbConnectionInfo {
-                socket_address: CONFIGS.surrealdb_ws_address.clone(),
-                namespace: CONFIGS.environment.clone(),
-                db_name: app_name,
-                db_password: CONFIGS.surrealdb_password.clone(),
-                db_username: "devlog".to_string(),
-                max_pool_size,
-                min_pool_size
-            }
-        });
-
-        let db_allocator: Arc<PoolAllocator<SurrealDbConnection>> = PoolBuilder::new(db_provider)
-            .min_pool_size(min_pool_size)
-            .max_pool_size(max_pool_size)
-            .build()
-            .await;
-
-        let _ = self.app_db_allocator.set(db_allocator);
+    async fn db_allocator(&self, db_name: DbName) -> Arc<PoolAllocator<SurrealDbConnection>> {
+        self.db_allocators.lock().await.get(&db_name).expect("Db allocator must be enabled").clone()
     }
 
     #[cfg(feature = "db-remote")]
-    fn system_db(&self) -> PoolRequest<SurrealDbConnection> {
-        PoolRequestBuilder::new()
-            .pool(self.system_db_allocator.get().expect("System db allocator must be enabled").clone())
-            .build()
+    async fn db(&self, db_name: DbName) -> PoolRequest<SurrealDbConnection> {
+        let db_allocator = self.db_allocator(db_name).await;
+        PoolRequestBuilder::new().pool(db_allocator).build()
     }
 
     #[cfg(feature = "db-remote")]
-    fn app_db(&self) -> PoolRequest<SurrealDbConnection> {
-        PoolRequestBuilder::new()
-            .pool(self.app_db_allocator.get().expect("App db allocator must be enabled").clone())
-            .build()
+    async fn system_db(&self) -> PoolRequest<SurrealDbConnection> {
+        let db_allocator = self.db_allocator("system".to_string()).await;
+        PoolRequestBuilder::new().pool(db_allocator).build()
     }
 
     #[cfg(feature = "s3")]
-    fn s3_client(&self, bucket_name: String) -> S3Client {
+    fn s3_client(&self) -> S3Client {
         use aws_sdk_s3::config::{BehaviorVersion, Credentials, Region};
         use aws_sdk_s3::Client;
         use core_services::s3::S3SleepAsync;
         use std::env;
+
+        if let Some(s3_client) = self.s3_client.get() {
+            return s3_client.clone();
+        }
 
         let region = env::var("AWS_S3_REGION").unwrap_or("us-east-1".to_string());
         let access_key = env::var("AWS_ACCESS_KEY_ID").expect("AWS_ACCESS_KEY_ID must be defined");
@@ -152,37 +133,12 @@ impl DependenciesInjection for DevlogSdk {
 
         let client = Client::from_conf(s3_config_builder.build());
 
-        S3Client { client, bucket_name }
-    }
+        let s3_client = S3Client {
+            client: Arc::new(client)
+        };
 
-    #[cfg(feature = "s3")]
-    fn cloud_flare_s3_client(&self, bucket_name: String) -> S3Client {
-        use std::env;
+        let _ = self.s3_client.set(s3_client.clone());
 
-        use aws_sdk_s3::config::{BehaviorVersion, Credentials, Region};
-        use aws_sdk_s3::Client;
-        use core_services::s3::S3SleepAsync;
-
-        let region = env::var("CLOUD_FLARE_R2_REGION").unwrap_or("us-east-1".to_string());
-        let access_key =
-            env::var("CLOUD_FLARE_R2_ACCESS_KEY_ID").expect("CLOUD_FLARE_R2_ACCESS_KEY_ID must be defined");
-        let secret_key =
-            env::var("CLOUD_FLARE_R2_SECRET_ACCESS_KEY").expect("CLOUD_FLARE_R2_SECRET_ACCESS_KEY must be defined");
-        let endpoint_url =
-            env::var("CLOUD_FLARE_R2_ENDPOINT_URL").expect("CLOUD_FLARE_R2_ENDPOINT_URL must be defined");
-
-        let credentials = Credentials::new(access_key, secret_key, None, None, "devlog-cloudflare");
-
-        let mut s3_config_builder = aws_sdk_s3::Config::builder()
-            .behavior_version(BehaviorVersion::latest())
-            .region(Region::new(region))
-            .credentials_provider(credentials)
-            .sleep_impl(S3SleepAsync::new());
-
-        s3_config_builder = s3_config_builder.endpoint_url(endpoint_url).force_path_style(true);
-
-        let client = Client::from_conf(s3_config_builder.build());
-
-        S3Client { client, bucket_name }
+        s3_client
     }
 }
