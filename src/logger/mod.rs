@@ -41,8 +41,7 @@ impl ThrottleLogger {
                 for (content, count) in msgs.drain() {
                     info!(
                         target: ns.as_str(),
-                        "{} happens {} times in the last {:?}",
-                        content, count, delay
+                        "{content} happens {count} times in the last {delay:?}"
                     );
                 }
             }

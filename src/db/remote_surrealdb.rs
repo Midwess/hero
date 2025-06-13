@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use surrealdb::opt::auth::Database;
+use surrealdb::opt::auth::Namespace;
 
 use crate::utils::pool::allocator::PoolResourceProvider;
 use crate::Db;
@@ -38,14 +38,15 @@ impl PoolResourceProvider<SurrealDbConnection> for SurrealDbPoolResourceProvider
         let param = &self.info;
         let db = Db::init();
         db.connect(param.socket_address.clone()).await.expect("Failed while connecting to surreal db");
-        db.signin(Database {
-            database: param.db_name.as_str(),
+        db.signin(Namespace {
             namespace: param.namespace.as_str(),
             username: param.db_username.as_str(),
             password: param.db_password.as_str()
         })
         .await
         .unwrap();
+
+        db.use_db(param.db_name.as_str()).await.unwrap();
 
         log::info!(target: "db", "Connected to surreal db using {:?}", param);
         SurrealDbConnection { connection: db }
