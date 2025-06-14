@@ -37,6 +37,7 @@ type DbName = String;
 pub struct DevlogSdk {
     #[cfg(feature = "db-remote")]
     db_allocators: Mutex<HashMap<DbName, Arc<PoolAllocator<SurrealDbConnection>>>>,
+    #[cfg(feature = "s3")]
     s3_client: OnceCell<S3Client>
 }
 
@@ -64,6 +65,7 @@ impl DependenciesInjection for DevlogSdk {
         self.enable_db("system".to_string(), 0, 5).await;
     }
 
+    #[cfg(feature = "db-remote")]
     async fn enable_db(&self, db_name: DbName, min_pool_size: usize, max_pool_size: usize) {
         use crate::config::CONFIGS;
 
