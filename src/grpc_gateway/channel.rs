@@ -1,4 +1,5 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
+use std::time::Duration;
 
 use tokio::sync::Mutex;
 use tonic::transport::{Channel, Endpoint};
@@ -10,14 +11,20 @@ use crate::config::CONFIGS;
 #[derive(Clone)]
 pub struct GrpcGatewayChannel {
     channel: Arc<Mutex<Option<Channel>>>,
-    endpoint: Endpoint,
+    endpoint: Endpoint
+}
+
+impl Default for GrpcGatewayChannel {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl GrpcGatewayChannel {
     pub fn new() -> Self {
         Self {
             channel: Arc::new(Mutex::new(None)),
-            endpoint: format!("grpc://{}:{}", CONFIGS.kong.host, CONFIGS.kong.port).parse().unwrap(),
+            endpoint: format!("grpc://{}:{}", CONFIGS.kong.host, CONFIGS.kong.port).parse().unwrap()
         }
     }
 
