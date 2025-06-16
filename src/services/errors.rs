@@ -8,6 +8,7 @@ use thiserror::Error;
 #[cfg(feature = "grpc-server")]
 use tonic::Status;
 
+#[cfg(any(feature = "db-local", feature = "db-remote"))]
 use crate::db::repository::abstraction::errors::RepositoryError;
 
 #[derive(Error, Debug)]
@@ -49,6 +50,7 @@ pub enum Errors {
     FailedToDownloadFile(String),
     #[error("Invalid s3 path format {}", .0)]
     InvalidS3Path(String),
+    #[cfg(any(feature = "db-local", feature = "db-remote"))]
     #[error("Repository error {}", .0)]
     RepositoryError(#[from] RepositoryError)
 }
@@ -107,6 +109,7 @@ impl From<Errors> for Status {
             Errors::TcpFailure(_) => Self::internal("Service failed to start"),
             Errors::FailedToDownloadFile(_) => Self::internal("Failed to download file"),
             Errors::InvalidS3Path(_) => Self::invalid_argument("Invalid s3 path"),
+            #[cfg(any(feature = "db-local", feature = "db-remote"))]
             Errors::RepositoryError(_) => Self::internal("Internal error, contact support")
         }
     }
