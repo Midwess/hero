@@ -51,17 +51,17 @@ md5 = { workspace = true, optional = true }
 flate2 = { workspace = true, optional = true }
 tar = { workspace = true, optional = true }
 tokio-stream = { version = "0.1.17", optional = true }
-tonic = { workspace = true, optional = true, default-features = false }
-prost = { workspace = true, optional = true, default-features = false }
-tonic-middleware = { version = "0.1.4", optional = true, default-features = false }
-aws-config = { version = "1.1.7", features = ["behavior-version-latest"], optional = true, default-features = false }
-aws-sdk-s3 = { version = "1.41.0", optional = true, default-features = false }
-lettre = { version = "0.11.7", optional = true, default-features = false }
-surrealdb = { workspace = true, optional = true, default-features = false }
-surreal_devl = { workspace = true, optional = true, default-features = false }
-surreal_derive_plus = { workspace = true, optional = true, default-features = false }
-jsonwebtoken = { version = "9.3.0", optional = true, default-features = false }
-reqwest = { workspace = true, optional = true, default-features = false }
+tonic = { workspace = true, optional = true }
+prost = { workspace = true, optional = true }
+tonic-middleware = { version = "0.1.4", optional = true }
+aws-config = { version = "1.1.7", features = ["behavior-version-latest"], optional = true }
+aws-sdk-s3 = { version = "1.41.0", optional = true }
+lettre = { version = "0.11.7", optional = true }
+surrealdb = { workspace = true, optional = true }
+surreal_devl = { workspace = true, optional = true }
+surreal_derive_plus = { workspace = true, optional = true }
+jsonwebtoken = { version = "9.3.0", optional = true }
+reqwest = { workspace = true, optional = true }
 bytes = { workspace = true, optional = true }
 aws-smithy-async = {workspace = true, optional = true}
 
