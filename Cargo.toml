@@ -26,7 +26,7 @@ gateway = ["reqwest", "reqwest/json"]
 s3 = ["core-services/s3", "aws-sdk-s3", "aws-smithy-async"]
 
 [dependencies]
-core-services = { path="../core-services", default-features = false }
+core-services = { path="../core-services" }
 schema = { path="../schema/rust" }
 log.workspace = true
 chrono.workspace = true
@@ -37,12 +37,13 @@ lazy_static.workspace = true
 tokio.workspace = true
 async-trait.workspace = true
 thiserror.workspace = true
+futures-util.workspace = true
 
 surreal_derive_plus = { workspace = true, optional = true }
 surreal_devl = { workspace = true, optional = true }
 surrealdb = { workspace = true, optional = true }
-tonic-middleware = { version = "0.1.4", optional = true, default-features = false }
-tonic = { workspace = true, optional = true, default-features = false }
-reqwest = { workspace = true, optional = true, default-features = false }
-aws-sdk-s3 = { version = "1.76.0", optional = true, default-features = false }
+tonic-middleware = { version = "0.1.4", optional = true }
+tonic = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
+aws-sdk-s3 = { version = "1.76.0", optional = true }
 aws-smithy-async = {workspace = true, optional = true}

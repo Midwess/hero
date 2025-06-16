@@ -3,8 +3,7 @@ use core_services::db::remote_surrealdb::SurrealDbConnection;
 use core_services::utils::pool::request::PoolRequest;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use surreal_derive_plus::surreal_quote;
-use surreal_derive_plus::SurrealDerive;
+use surreal_derive_plus::{surreal_quote, SurrealDerive};
 use surreal_devl::surreal_id::SurrealId;
 use surreal_devl::surreal_qr::RPath;
 use surrealdb::sql::{Id, Thing};
@@ -42,7 +41,6 @@ impl SurrealId for Worker {
 }
 
 impl Worker {
-    #[cfg(feature = "db-remote")]
     async fn create_worker(
         distributed_id: u64,
         name: String,
@@ -66,7 +64,6 @@ impl Worker {
         Ok(created_worker.unwrap())
     }
 
-    #[cfg(feature = "db-remote")]
     async fn get_or_create_worker(
         name: String,
         db_req: PoolRequest<SurrealDbConnection>
