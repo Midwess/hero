@@ -101,9 +101,10 @@ impl S3Client {
         Ok(())
     }
 
-    pub async fn sign_object(&self, s3_object: &mut StaticResource, duration: Duration) -> Resolve<()> {
+    pub async fn sign_object(&self, s3_object: &mut StaticResource, duration: Duration) -> Resolve<String> {
         let path = match &s3_object.source {
             Some(Source::S3Path(path)) => path.clone(),
+            Some(Source::Url(url)) => return Ok(url.clone()),
             _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned()))
         };
 
@@ -116,8 +117,9 @@ impl S3Client {
             .presigned(presigning_config)
             .await?;
 
-        s3_object.source = Some(Source::Url(presigned_req.uri().to_owned()));
+        let url = presigned_req.uri().to_owned();
+        s3_object.source = Some(Source::Url(url.clone()));
 
-        Ok(())
+        Ok(url)
     }
 }
