@@ -88,7 +88,7 @@ impl ApiGatewayClient for KongGatewayAdminClient {
 
             let resp = match resp.status() {
                 StatusCode::CONFLICT => {
-                    info!(target: "kong-admin", "Service already exist, change to update");
+                    info!(target: "kong-admin", "Route already exist, change to update");
 
                     client
                         .patch(format!("{kong_url}/services/{service_name}/routes/{}", &route.name))
