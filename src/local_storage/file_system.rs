@@ -486,6 +486,33 @@ impl Folder {
         let cursor = TarCursor::new(self.clone(), chunk_size).await?;
         Ok(Box::new(cursor))
     }
+
+    pub async fn calculate_tar_size(&self) -> Result<u64> {
+        let mut total_size = 0u64;
+        let mut pending_entries = vec![TarEntry::from_metadata(self.path.clone(), self.path.clone())?];
+
+        while let Some(entry) = pending_entries.pop() {
+            total_size += 512;
+
+            if entry.is_dir {
+                let mut dir_entries = fs::read_dir(entry.absolute_path.as_ref().unwrap()).await?;
+                while let Some(dir_entry) = dir_entries.next_entry().await? {
+                    let entry_path = dir_entry.path();
+                    let tar_entry = TarEntry::from_metadata(self.path.clone(), entry_path)?;
+                    pending_entries.push(tar_entry);
+                }
+            } else if entry.is_file {
+                let file_size = entry.size;
+                total_size += ((file_size + 511) / 512) * 512;
+            }
+        }
+
+        total_size += 1024;
+        // We substract the size of the root folder since we are not calculate it
+        total_size -= 512;
+
+        Ok(total_size)
+    }
 }
 
 #[derive(Debug)]

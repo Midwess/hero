@@ -77,7 +77,6 @@ impl S3Client {
 
         match download_result {
             Ok(download_url) => {
-                info!(target: "s3", "Downloading file from S3 {download_url:?}");
                 let body = match download_url.body.collect().await {
                     Ok(body) => body,
                     Err(_) => return Ok(None)
@@ -101,7 +100,7 @@ impl S3Client {
         Ok(())
     }
 
-    pub async fn sign_object(&self, s3_object: &mut StaticResource, duration: Duration) -> Resolve<String> {
+    pub async fn sign_download(&self, s3_object: &mut StaticResource, duration: Duration) -> Resolve<String> {
         let path = match &s3_object.source {
             Some(Source::S3Path(path)) => path.clone(),
             Some(Source::Url(url)) => return Ok(url.clone()),
@@ -112,6 +111,28 @@ impl S3Client {
         let presigned_req = self
             .client
             .get_object()
+            .bucket(path.bucket())
+            .key(path.prefix())
+            .presigned(presigning_config)
+            .await?;
+
+        let url = presigned_req.uri().to_owned();
+        s3_object.source = Some(Source::Url(url.clone()));
+
+        Ok(url)
+    }
+
+    pub async fn sign_upload(&self, s3_object: &mut StaticResource, duration: Duration) -> Resolve<String> {
+        let path = match &s3_object.source {
+            Some(Source::S3Path(path)) => path.clone(),
+            Some(Source::Url(url)) => return Ok(url.clone()),
+            _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned()))
+        };
+
+        let presigning_config = PresigningConfig::expires_in(duration)?;
+        let presigned_req = self
+            .client
+            .put_object()
             .bucket(path.bucket())
             .key(path.prefix())
             .presigned(presigning_config)

@@ -254,7 +254,7 @@ where
         Self {
             min_pool_size: 10,
             max_pool_size: 20,
-            resource_idle_timeout: Duration::new(10, 0),
+            resource_idle_timeout: Duration::new(60 * 10, 0),
             pool_resource_provider: Some(resource_provider)
         }
     }
