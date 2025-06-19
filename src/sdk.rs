@@ -128,7 +128,7 @@ impl DependenciesInjection for DevlogSdk {
         let secret_key = env::var("AWS_SECRET_ACCESS_KEY").expect("AWS_SECRET_ACCESS_KEY must be defined");
         let endpoint_url = env::var("AWS_ENDPOINT_URL").expect("AWS_ENDPOINT_URL must be defined");
 
-        let credentials = Credentials::new(access_key, secret_key, None, None, "devlog");
+        let credentials = Credentials::new(access_key, secret_key, None, None, "cloudflare");
 
         let mut s3_config_builder = aws_sdk_s3::Config::builder()
             .behavior_version(BehaviorVersion::latest())
