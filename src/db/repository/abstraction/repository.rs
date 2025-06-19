@@ -79,15 +79,18 @@ where
         let mut id_statement = "".to_owned();
         match value {
             surrealdb::sql::Value::Array(array) => {
+                let mut is_first = true;
                 for (index, item) in array.0.iter().enumerate() {
                     let value = SurrealQR(item.clone());
                     if value.is_none() {
                         continue;
                     }
 
-                    if index == 0 {
+                    if is_first {
+                        is_first = false;
                         id_statement = format!("id[{index}]={}", surreal_statement::val(&value.0));
-                    } else {
+                    }
+                    else {
                         id_statement.push_str(&format!(" AND id[{index}]={}", surreal_statement::val(&value.0)));
                     }
                 }
