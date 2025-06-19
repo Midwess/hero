@@ -3,7 +3,6 @@ use crate::services::errors::Errors;
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::Client;
-use log::info;
 use schema::value::static_resource::static_resource::Source;
 use schema::value::static_resource::{S3Path, StaticResource};
 use std::sync::Arc;

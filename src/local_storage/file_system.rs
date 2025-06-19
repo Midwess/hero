@@ -503,7 +503,7 @@ impl Folder {
                 }
             } else if entry.is_file {
                 let file_size = entry.size;
-                total_size += ((file_size + 511) / 512) * 512;
+                total_size += file_size.div_ceil(512) * 512;
             }
         }
 
