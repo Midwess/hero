@@ -3,7 +3,9 @@ use core_services::db::remote_surrealdb::SurrealDbConnection;
 use core_services::utils::pool::request::PoolRequest;
 use generator::{DistributedIdGenerator, EPOCH_SINCE};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::{Mutex, OnceCell};
+use tokio::time::sleep;
 
 pub mod db;
 pub mod generator;
@@ -22,8 +24,20 @@ pub fn id_to_unix_timestamp(id: u64) -> u64 {
 }
 
 pub async fn init_id_generator(app_name: String, db: PoolRequest<SurrealDbConnection>) {
-    let distributed_id_generator = DistributedIdGenerator::init(app_name.clone(), db).await.unwrap();
+    let distributed_id_generator = DistributedIdGenerator::init(app_name.clone(), db.clone()).await.unwrap();
     let _ = DISTRIBUTED_ID_GENERATOR.set(Arc::new(Mutex::new(distributed_id_generator)));
+    // Reset the worker every 10 minutes
+    // Make sure there will be no duplicate ids due to one worker being restarted
+    // and another is running for too long.
+    tokio::spawn(async move {
+        loop {
+            sleep(Duration::from_secs(10 * 60)).await;
+            let new_worker = DistributedIdGenerator::init(app_name.clone(), db.clone()).await.unwrap();
+            let mut worker = DISTRIBUTED_ID_GENERATOR.get().unwrap().lock().await;
+            *worker = new_worker;
+            log::info!("Reset distributed id generator worker {:?}", worker);
+        }
+    });
 }
 
 pub fn init_scoped_id_generator(app_name: String) {

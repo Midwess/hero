@@ -126,6 +126,7 @@ impl Worker {
     }
 }
 
+#[derive(Debug)]
 pub struct DistributedIdGenerator {
     pub worker: Worker,
     pub last_timestamp: u64,
