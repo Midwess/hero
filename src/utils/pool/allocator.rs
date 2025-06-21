@@ -100,7 +100,7 @@ where
 
         if let Some(removed_item) = items.swap_remove_back(index) {
             drop(items);
-            if let Err(_) = self.decrease_counter().await {
+            if self.decrease_counter().await.is_err() {
                 self.items.lock().await.push_back(removed_item);
             }
         }

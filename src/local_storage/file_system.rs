@@ -1,13 +1,13 @@
 use anyhow::Result;
 use md5::Context;
 use std::future::Future;
-use std::io::{Read, Seek, Write};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::fs::{self, OpenOptions};
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::{Mutex, OnceCell};
 use tokio::task::spawn_blocking;
 
@@ -15,7 +15,7 @@ use tokio::task::spawn_blocking;
 struct TarEntry {
     is_dir: bool,
     is_file: bool,
-    modified_at: std::time::SystemTime,
+    modified_at: SystemTime,
     size: u64,
     relative_path: PathBuf,
     absolute_path: Option<PathBuf>
@@ -230,13 +230,13 @@ impl File {
         Ok(())
     }
 
-    pub async fn open(&self) -> Result<tokio::fs::File> {
+    pub async fn open(&self) -> Result<fs::File> {
         let file = OpenOptions::new().create(true).write(true).read(true).open(&self.path).await?;
 
         Ok(file)
     }
 
-    pub async fn open_append(&self) -> Result<tokio::fs::File> {
+    pub async fn open_append(&self) -> Result<fs::File> {
         let file = OpenOptions::new().create(true).append(true).write(true).read(true).open(&self.path).await?;
 
         Ok(file)

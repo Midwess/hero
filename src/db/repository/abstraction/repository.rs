@@ -1,5 +1,3 @@
-use std::usize;
-
 use serde::de::DeserializeOwned;
 use surreal_derive_plus::surreal_quote;
 use surreal_devl::proxy::default::{SurrealDeserializer, SurrealSerializer};
