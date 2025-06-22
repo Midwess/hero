@@ -138,10 +138,8 @@ impl GatewayRouteBuilder {
             "https".to_string(),
         ]);
 
-        self.methods = Some(
-            vec!["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD", "CONNECT", "TRACE"]
-            .iter().map(|s| s.to_string()).collect()
-        );
+        // Accepts all
+        self.methods = Some(vec![]);
 
         self
     }
