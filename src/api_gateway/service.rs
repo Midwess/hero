@@ -137,6 +137,12 @@ impl GatewayRouteBuilder {
             "http".to_string(),
             "https".to_string(),
         ]);
+
+        self.methods = Some(
+            vec!["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD", "CONNECT", "TRACE"]
+            .iter().map(|s| s.to_string()).collect()
+        );
+
         self
     }
 
@@ -151,7 +157,7 @@ impl GatewayRouteBuilder {
         GatewayRoute {
             name: self.name.expect("Route name is required"),
             paths: self.paths,
-            methods: Some(self.methods.unwrap_or_default()),
+            methods: self.methods,
             hosts: self.hosts.clone(),
             regex_priority: self.regex_priority.unwrap_or(1),
             protocols: Some(self.protocols.expect("Protocols is required")),
