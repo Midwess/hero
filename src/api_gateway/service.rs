@@ -33,6 +33,8 @@ pub struct GatewayServiceBuilder {
 pub struct GatewayRoute {
     pub name: String,
     pub paths: Vec<String>,
+    pub host: Option<String>,
+    pub regex_priority: i32,
     pub methods: Option<Vec<String>>,
     pub protocols: Option<Vec<String>>,
     pub strip_path: bool,
@@ -46,6 +48,8 @@ pub struct GatewayRoute {
 pub struct GatewayRouteBuilder {
     pub name: Option<String>,
     pub paths: Vec<String>,
+    pub host: Option<String>,
+    pub regex_priority: Option<i32>,
     pub methods: Option<Vec<String>>,
     pub protocols: Option<Vec<String>>,
     pub strip_path: Option<bool>,
@@ -75,6 +79,16 @@ impl GatewayRouteBuilder {
 
     pub fn methods(mut self, methods: Vec<String>) -> Self {
         self.methods = Some(methods);
+        self
+    }
+
+    pub fn host(mut self, host: impl Into<String>) -> Self {
+        self.host = Some(host.into());
+        self
+    }
+
+    pub fn regex_priority(mut self, regex_priority: i32) -> Self {
+        self.regex_priority = Some(regex_priority);
         self
     }
 
@@ -138,6 +152,8 @@ impl GatewayRouteBuilder {
             name: self.name.expect("Route name is required"),
             paths: self.paths,
             methods: self.methods,
+            host: self.host.clone(),
+            regex_priority: self.regex_priority.unwrap_or(1),
             protocols: Some(self.protocols.expect("Protocols is required")),
             strip_path: self.strip_path.unwrap_or(false),
             preserve_host: self.preserve_host.unwrap_or(true),
