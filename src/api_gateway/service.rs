@@ -151,7 +151,7 @@ impl GatewayRouteBuilder {
         GatewayRoute {
             name: self.name.expect("Route name is required"),
             paths: self.paths,
-            methods: self.methods,
+            methods: Some(self.methods.unwrap_or_default()),
             hosts: self.hosts.clone(),
             regex_priority: self.regex_priority.unwrap_or(1),
             protocols: Some(self.protocols.expect("Protocols is required")),
