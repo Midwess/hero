@@ -20,7 +20,7 @@ pub async fn find_grpc_listener() -> Resolve<GrpcConnection> {
     let listener = loop {
         let addr: SocketAddr = format!("[::]:{port}").parse().expect("Invalid address");
 
-        match TcpIncoming::new(addr, true, None) {
+        match TcpIncoming::bind(addr) {
             Ok(listener) => {
                 println!("Server successfully bound to {addr}");
                 break listener;
