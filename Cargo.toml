@@ -3,19 +3,6 @@ name = "core-services"
 version = "0.1.0"
 edition = "2021"
 
-[profile.dev]
-opt-level = 0
-debug = 1
-strip = false
-split-debuginfo = "unpacked"
-incremental = true
-codegen-units = 256
-lto = false
-panic = "unwind"
-debug-assertions = true
-overflow-checks = true
-rpath = false
-
 [features]
 full = ["db-local", "db-remote", "grpc-client", "grpc-server", "host_machine", "retry", "s3", "services", "smtp", "local-storage"]
 grpc-client = ["tonic/transport"]
