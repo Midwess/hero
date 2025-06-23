@@ -7,9 +7,6 @@ pub type S3Connection = aws_sdk_s3::client::Client;
 #[cfg(feature = "smtp")]
 pub type SmtpTransport = lettre::SmtpTransport;
 
-#[cfg(feature = "grpc-server")]
-pub mod grpc;
-
 #[cfg(feature = "host_machine")]
 pub mod host_machine;
 
