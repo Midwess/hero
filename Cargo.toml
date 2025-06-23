@@ -3,19 +3,6 @@ name = "devlog-sdk"
 version = "0.1.0"
 edition = "2021"
 
-[profile.dev]
-opt-level = 0
-debug = 1
-strip = false
-split-debuginfo = "unpacked"
-incremental = true
-codegen-units = 256
-lto = false
-panic = "unwind"
-debug-assertions = true
-overflow-checks = true
-rpath = false
-
 [features]
 full = ["grpc-client", "grpc-server", "db-local", "db-remote", "gateway", "s3"]
 grpc-client = ["tonic/transport"]
