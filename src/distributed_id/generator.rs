@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use core_services::db::remote_surrealdb::SurrealDbConnection;
+use core_services::db::surrealdb::connection::SurrealDbConnection;
 use core_services::utils::pool::request::PoolRequest;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;

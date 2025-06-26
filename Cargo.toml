@@ -6,8 +6,8 @@ edition = "2021"
 [features]
 full = ["grpc-client", "grpc-server", "db-local", "db-remote", "gateway", "s3"]
 grpc-client = ["tonic/transport"]
-grpc-server = ["tonic", "tonic-middleware", "core-services/grpc-server"]
-db-local = ["surrealdb/kv-surrealkv", "surreal_devl", "surreal_derive_plus", "core-services/retry", "core-services/db-local"]
+grpc-server = ["tonic", "tonic-middleware", "core-services/grpc-server", "gateway"]
+db-local = ["surrealdb", "surreal_devl", "surreal_derive_plus", "core-services/retry", "core-services/db-local"]
 db-remote = ["surrealdb/protocol-ws", "surreal_devl", "surreal_derive_plus", "core-services/retry", "core-services/db-remote"]
 gateway = ["reqwest", "reqwest/json"]
 s3 = ["core-services/s3", "aws-sdk-s3", "aws-smithy-async"]
@@ -34,3 +34,4 @@ tonic = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
 aws-sdk-s3 = { version = "1.76.0", optional = true }
 aws-smithy-async = {workspace = true, optional = true}
+once_cell = "1.21.3"

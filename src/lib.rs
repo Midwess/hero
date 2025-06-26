@@ -10,4 +10,5 @@ pub mod live_query;
 pub mod tcp;
 
 pub mod config;
+pub mod local_id_generator;
 pub mod sdk;

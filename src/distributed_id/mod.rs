@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use core_services::db::remote_surrealdb::SurrealDbConnection;
+use core_services::db::surrealdb::connection::SurrealDbConnection;
 use core_services::utils::pool::request::PoolRequest;
 use generator::{DistributedIdGenerator, EPOCH_SINCE};
 use std::sync::Arc;
@@ -35,7 +35,7 @@ pub async fn init_id_generator(app_name: String, db: PoolRequest<SurrealDbConnec
             let new_worker = DistributedIdGenerator::init(app_name.clone(), db.clone()).await.unwrap();
             let mut worker = DISTRIBUTED_ID_GENERATOR.get().unwrap().lock().await;
             *worker = new_worker;
-            log::info!("Reset distributed id generator worker {:?}", worker);
+            log::info!("Reset distributed id generator worker {worker:?}");
         }
     });
 }

@@ -11,7 +11,7 @@ use core_services::utils::pool::allocator::{PoolAllocator, PoolBuilder};
 use core_services::utils::pool::request::PoolRequestBuilder;
 #[cfg(feature = "db-remote")]
 use core_services::{
-    db::remote_surrealdb::{SurrealDbConnection, SurrealDbConnectionInfo, SurrealDbPoolResourceProvider},
+    db::surrealdb::connection::{SurrealDbConnection, SurrealDbConnectionInfo, SurrealDbPoolResourceProvider},
     utils::pool::request::PoolRequest
 };
 
