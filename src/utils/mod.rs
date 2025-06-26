@@ -1,7 +1,6 @@
 pub mod finally;
 pub mod number;
 pub mod pool;
-pub mod pool_allocator;
 pub mod throttle_future;
 
 use rand::Rng;

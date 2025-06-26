@@ -5,5 +5,6 @@ where
     T: DbId
 {
     fn get_table() -> &'static str;
+
     fn id(&self) -> T;
 }

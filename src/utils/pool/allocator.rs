@@ -1,3 +1,4 @@
+use futures_util::future::join_all;
 use log::*;
 use std::borrow::BorrowMut;
 use std::cmp::min;
@@ -363,19 +364,21 @@ where
             return;
         }
 
-        tokio_scoped::scope(|scope| {
-            for _i in 0..self.pool.min_size {
-                let pool = self.pool.clone();
-                let resource_provider = &self.resource_provider;
-                let idle_timeout = self.resource_idle_timeout;
-                scope.spawn(async move {
-                    let resource = resource_provider.new().await;
-                    let pool_item: PoolItem<T> = PoolItem::new(Box::new(resource), idle_timeout);
+        let mut futures = vec![];
 
-                    pool.add_new_item(pool_item).await;
-                });
-            }
-        });
+        for _i in 0..self.pool.min_size {
+            let pool = self.pool.clone();
+            let resource_provider = &self.resource_provider;
+            let idle_timeout = self.resource_idle_timeout;
+            futures.push(async move {
+                let resource = resource_provider.new().await;
+                let pool_item: PoolItem<T> = PoolItem::new(Box::new(resource), idle_timeout);
+
+                pool.add_new_item(pool_item).await;
+            });
+        }
+
+        join_all(futures).await;
 
         info!(
             target: "pool-allocator",

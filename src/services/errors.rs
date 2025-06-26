@@ -52,7 +52,9 @@ pub enum Errors {
     InvalidS3Path(String),
     #[cfg(any(feature = "db-local", feature = "db-remote"))]
     #[error("Repository error {}", .0)]
-    RepositoryError(#[from] RepositoryError)
+    RepositoryError(#[from] RepositoryError),
+    #[error("Json error {}", .0)]
+    JsonError(#[from] serde_json::Error)
 }
 
 #[cfg(any(feature = "db-local", feature = "db-remote"))]
@@ -110,7 +112,8 @@ impl From<Errors> for Status {
             Errors::FailedToDownloadFile(_) => Self::internal("Failed to download file"),
             Errors::InvalidS3Path(_) => Self::invalid_argument("Invalid s3 path"),
             #[cfg(any(feature = "db-local", feature = "db-remote"))]
-            Errors::RepositoryError(_) => Self::internal("Internal error, contact support")
+            Errors::RepositoryError(_) => Self::internal("Internal error, contact support"),
+            Errors::JsonError(_) => Self::internal("Internal error, contact support")
         }
     }
 }

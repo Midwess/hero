@@ -1,10 +1,8 @@
+use crate::db::repository::abstraction::id::DbId;
 use serde::{Deserialize, Serialize};
 use surreal_devl::proxy::default::{SurrealDeserializer, SurrealSerializer};
-#[cfg(any(feature = "db-local", feature = "db-remote"))]
 use surreal_devl::surreal_qr::SurrealResponseError;
 use surrealdb::sql::Value;
-
-use super::repository::abstraction::id::DbId;
 
 /// === Index ===
 /// Standard id will indexing via soft deleted then the order id (snowflake id) then your unique custom key

@@ -4,31 +4,31 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-full = ["db-local", "db-remote", "grpc-client", "grpc-server", "host_machine", "retry", "s3", "services", "smtp", "local-storage"]
+full = ["db-local", "db-remote", "grpc-client", "grpc-server", "host_machine", "retry", "s3", "services", "smtp", "local-storage", "db-red"]
 grpc-client = ["tonic/transport"]
 grpc-server = ["tonic", "tonic-middleware", "jsonwebtoken"]
-host_machine = ["tokio-stream", "tokio/process"]
+host_machine = ["tokio/process", "tokio/fs", "tokio/io-std", "tokio-stream"]
+local-storage = ["tokio/fs", "tokio/io-std", "md5", "zip", "bytes", "flate2", "tar"]
 retry = []
 s3 = ["aws-config", "aws-sdk-s3", "aws-smithy-async"]
 services = []
 smtp = ["lettre", "reqwest", "prost", "lettre/smtp-transport", "lettre/builder", "lettre/default"]
-db-remote = ["surrealdb/default", "surreal_devl", "surreal_derive_plus", "surrealdb/protocol-ws"]
-db-local = ["surrealdb", "surrealdb/kv-surrealkv", "surreal_devl", "surreal_derive_plus"]
-local-storage = ["md5", "zip", "bytes", "flate2", "tar"]
+db-remote = ["surrealdb", "surreal_devl", "surreal_derive_plus", "surrealdb/protocol-ws"]
+db-local = ["surrealdb", "surreal_devl", "surreal_derive_plus"]
+db-red = ["redb", "redb_model", "bincode", "bytes"]
 
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
-serde_derive.workspace = true
-serde_json.workspace = true
+serde_json = { workspace = true }
+bincode = { workspace = true, optional = true }
 thiserror.workspace = true
 async-trait.workspace = true
-tokio.workspace = true
-tokio-scoped.workspace = true
+tokio = { workspace = true, features = ["rt", "time"] }
+futures-util = { workspace = true }
 pretty_env_logger = { version = "0.5.0" }
 log.workspace = true
 schema = { path = "../schema/rust" }
 lazy_static.workspace = true
-chrono.workspace = true
 anyhow.workspace = true
 rand.workspace = true
 
@@ -44,13 +44,15 @@ tonic-middleware = { version = "0.1.4", optional = true }
 aws-config = { version = "1.1.7", features = ["behavior-version-latest"], optional = true }
 aws-sdk-s3 = { version = "1.41.0", optional = true }
 lettre = { version = "0.11.7", optional = true }
-surrealdb = { workspace = true, optional = true }
+surrealdb = { workspace = true, default-features = false, optional = true }
 surreal_devl = { workspace = true, optional = true }
 surreal_derive_plus = { workspace = true, optional = true }
 jsonwebtoken = { version = "9.3.0", optional = true }
 reqwest = { workspace = true, optional = true }
 bytes = { workspace = true, optional = true }
 aws-smithy-async = {workspace = true, optional = true}
+redb = { workspace = true, optional = true }
+redb_model = { workspace = true, optional = true }
 
 [build-dependencies]
 
