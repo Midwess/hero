@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use redb::{Database, ReadableTable, TableDefinition};
 
 use crate::db::redb::id::RedbId;
@@ -15,6 +14,20 @@ where
 {
     async fn get_db(&self) -> PoolResponse<Database>;
 
+    fn ensure_table_exists(
+        db: &Database,
+        def: TableDefinition<&[u8], &[u8]>,
+    ) -> Resolve<()> {
+        let txn = db.begin_write()?;
+        {
+            txn.open_table(def)?;
+        }
+
+        txn.commit()?;
+
+        Ok(())
+    }
+
     async fn create(&self, item: T) -> Resolve<T>
     where
         T: 'async_trait
@@ -26,8 +39,8 @@ where
         {
             let table_def: TableDefinition<&[u8], &[u8]> = TableDefinition::new(table_name);
             let mut table = tx.open_table(table_def)?;
-            let id = RedbTable::id(&item);
-            let key = Self::flatten_bytes_vec(id.id());
+            let id = RedbTable::id(&item).lower_id();
+            let key = Self::flatten_bytes_vec(id);
             let value = RedbTable::serialize(&item)?;
 
             table.insert(key.as_slice(), value.as_slice())?;
@@ -55,27 +68,56 @@ where
     async fn find_one(&self, id: &I) -> Resolve<Option<T>> {
         let table_name = T::get_table();
         let db = self.get_db().await;
+        Self::ensure_table_exists(&db, TableDefinition::new(table_name))?;
 
         let tx = db.begin_read()?;
         let table_def: TableDefinition<&[u8], &[u8]> = TableDefinition::new(table_name);
         let table = tx.open_table(table_def)?;
-        let key = Self::flatten_bytes_vec(id.id());
-        let value = table.get(key.as_slice())?;
-        Ok(value.map(|v| RedbTable::deserialize(v.value().to_vec()).unwrap()))
+        let raw_from_key = id.lower_id();
+        let from_key = Self::flatten_bytes_vec(id.lower_id());
+        let to_key = Self::flatten_bytes_vec(id.upper_id());
+        let value = match table.range(from_key.as_slice()..to_key.as_slice())?.next() {
+            Some(value) => {
+                let value = value?;
+                Some(RedbTable::deserialize(value.1.value().to_vec()).unwrap())
+            },
+            None => {
+                // Full table scan
+                let none_bytes = bincode::serialize(&None::<T>).unwrap();
+                let Some(item) = table.iter()?.find(|entry| {
+                    let Ok(entry) = entry else {
+                        return false;
+                    };
+
+                    let Ok(key) = bincode::deserialize::<Vec<Vec<u8>>>(entry.0.value().to_vec().as_slice()) else {
+                        return false;
+                    };
+
+                    return key.iter().zip(&raw_from_key).all(|(record_key, expected_key)| {
+                        if expected_key.eq(&none_bytes) {
+                            return true;
+                        }
+
+                        record_key.eq(expected_key)
+                    });
+                }) else {
+                    return Ok(None);
+                };
+
+                let value = item?;
+                Some(RedbTable::deserialize(value.1.value().to_vec()).unwrap())
+            }
+        };
+
+        Ok(value)
     }
 
-    fn flatten_bytes_vec(parts: Vec<Bytes>) -> Vec<u8> {
-        let total_len: usize = parts.iter().map(|b| b.len()).sum();
-        let mut buf = Vec::with_capacity(total_len);
-        for part in parts {
-            buf.extend_from_slice(&part);
-        }
-        buf
+    fn flatten_bytes_vec(parts: Vec<Vec<u8>>) -> Vec<u8> {
+        let bytes = bincode::serialize(&parts).unwrap();
+        return bytes;
     }
 
     async fn delete_one(&self, id: &I) -> Resolve<T> {
-        let table_name = T::get_table();
-        let db = self.get_db().await;
         let Some(item) = RedbRepository::find_one(self, id).await? else {
             return Err(RepositoryError::NotFound(
                 format!("{:?}: {:?}", T::get_table(), id),
@@ -83,11 +125,15 @@ where
             ));
         };
 
+        let table_name = T::get_table();
+        let db = self.get_db().await;
+
+        let id = RedbTable::<I>::id(&item).lower_id();
         let tx = db.begin_write()?;
         {
             let table_def: TableDefinition<&[u8], &[u8]> = TableDefinition::new(table_name);
             let mut table = tx.open_table(table_def)?;
-            let key = Self::flatten_bytes_vec(id.id());
+            let key = Self::flatten_bytes_vec(id);
             table.remove(key.as_slice())?;
         }
         tx.commit()?;
@@ -98,12 +144,12 @@ where
     async fn find_all(&self, from_id: Option<&I>, to_id: Option<&I>, count: Option<usize>) -> Resolve<Vec<T>> {
         let table_name = T::get_table();
         let db = self.get_db().await;
-
+        Self::ensure_table_exists(&db, TableDefinition::new(table_name))?;
         let tx = db.begin_read()?;
         let table_def: TableDefinition<&[u8], &[u8]> = TableDefinition::new(table_name);
         let table = tx.open_table(table_def)?;
-        let from_key = from_id.map(|id| Self::flatten_bytes_vec(id.id()));
-        let to_key = to_id.map(|id| Self::flatten_bytes_vec(id.id()));
+        let from_key = from_id.map(|id| Self::flatten_bytes_vec(id.lower_id()));
+        let to_key = to_id.map(|id| Self::flatten_bytes_vec(id.lower_id()));
 
         let result = match (from_key, to_key) {
             (Some(from_key), Some(to_key)) => table.range(from_key.as_slice()..=to_key.as_slice())?,
@@ -126,8 +172,6 @@ where
     }
 }
 
-#[cfg(not(feature = "db-remote"))]
-#[cfg(not(feature = "db-local"))]
 #[async_trait::async_trait]
 impl<X, T, I> Repository<T, I> for X
 where

@@ -1,3 +1,5 @@
+extern crate core;
+
 #[cfg(any(feature = "db-local", feature = "db-remote"))]
 use surrealdb::engine::any::Any;
 
