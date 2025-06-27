@@ -15,12 +15,13 @@ use core_services::{
     utils::pool::request::PoolRequest
 };
 
-#[warn(unused_imports)]
+#[cfg(any(feature = "db-remote", feature = "db-local", feature = "s3"))]
 use core_services::utils::pool::allocator::PoolResourceProvider;
 #[cfg(feature = "db-remote")]
 use tokio::sync::Mutex;
 #[cfg(feature = "s3")]
 use tokio::sync::OnceCell;
+type DbName = String;
 
 #[async_trait::async_trait]
 pub trait DependenciesInjection {
@@ -38,7 +39,6 @@ pub trait DependenciesInjection {
     async fn db(&self, db_name: DbName) -> PoolRequest<SurrealDbConnection>;
 }
 
-type DbName = String;
 pub struct DevlogSdk {
     #[cfg(feature = "db-remote")]
     db_allocators: Mutex<HashMap<DbName, Arc<PoolAllocator<SurrealDbConnection>>>>,

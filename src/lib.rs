@@ -1,6 +1,5 @@
 #[cfg(any(feature = "gateway", feature = "grpc-server"))]
 pub mod api_gateway;
-#[cfg(any(feature = "db-local", feature = "db-remote"))]
 pub mod distributed_id;
 #[cfg(feature = "grpc-client")]
 pub mod grpc_gateway;
@@ -10,5 +9,4 @@ pub mod live_query;
 pub mod tcp;
 
 pub mod config;
-pub mod local_id_generator;
 pub mod sdk;
