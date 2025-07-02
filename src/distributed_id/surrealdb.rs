@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use core_services::db::surrealdb::connection::SurrealDbConnection;
 use core_services::utils::pool::request::PoolRequest;
 use serde::{Deserialize, Serialize};
