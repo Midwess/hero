@@ -24,7 +24,6 @@ pub mod smtp;
 #[cfg(any(feature = "db-local", feature = "db-remote"))]
 pub type Db = surrealdb::Surreal<Any>;
 
-#[cfg(feature = "local-storage")]
 pub mod local_storage;
 
 pub mod config;

@@ -40,7 +40,7 @@ pub enum Errors {
     ResourceBusy(),
     #[error("Unsupported resource")]
     UnSupportedResource(),
-    #[error("Failed to register service to api gateway {}", .0)]
+    #[error("Failed to register service to core_api gateway {}", .0)]
     UnnableToRegisterApiGateway(String),
     #[error("Gateway operation failed {}", .0)]
     GatewayOperationFailed(String),

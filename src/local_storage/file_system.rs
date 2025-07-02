@@ -10,6 +10,7 @@ use tokio::fs::{self, OpenOptions};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::{Mutex, OnceCell};
 use tokio::task::spawn_blocking;
+use super::abstraction::IOCursor;
 
 #[derive(Debug, Clone, PartialEq)]
 struct TarEntry {
@@ -59,11 +60,6 @@ pub struct Metadata {
 pub struct File {
     pub name: String,
     pub path: PathBuf
-}
-
-#[async_trait::async_trait]
-pub trait IOCursor: Send + Sync {
-    async fn next(&mut self) -> Result<Option<bytes::Bytes>>;
 }
 
 impl Metadata {
@@ -330,13 +326,15 @@ impl Write for ChunkedWriter {
 }
 
 pub struct TarCursor {
-    cursor: Arc<Mutex<TarCursorBlocking>>
+    cursor: Arc<Mutex<TarCursorBlocking>>,
+    total_tar_size: Mutex<Option<u64>>
 }
 
 impl TarCursor {
     pub async fn new(folder: Folder, chunk_size: usize) -> Result<Self> {
         Ok(Self {
-            cursor: Arc::new(Mutex::new(TarCursorBlocking::new(folder, chunk_size)?))
+            cursor: Arc::new(Mutex::new(TarCursorBlocking::new(folder, chunk_size)?)),
+            total_tar_size: Mutex::new(None)
         })
     }
 }
@@ -350,6 +348,18 @@ impl IOCursor for TarCursor {
             cursor.next()
         })
         .await?
+    }
+
+    async fn total_size(&self) -> Result<u64> {
+        let mut total_tar_size = self.total_tar_size.lock().await;
+        if let Some(total_tar_size) = total_tar_size.as_ref() {
+            return Ok(*total_tar_size);
+        }
+
+        let size = self.cursor.lock().await.folder.calculate_total_size().await?;
+        total_tar_size.replace(size);
+
+        Ok(size)
     }
 }
 
@@ -557,5 +567,9 @@ impl IOCursor for FileCursor {
 
         self.position += bytes_read;
         Ok(Some(bytes::Bytes::copy_from_slice(&self.buffer[..bytes_read])))
+    }
+
+    async fn total_size(&self) -> Result<u64> {
+        Ok(self.file.metadata().await?.len())
     }
 }
