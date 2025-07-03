@@ -17,17 +17,17 @@ impl KongGatewayAdminClient {
         let client = reqwest::Client::new();
 
         if enable_web {
-            // Add the grpc-web plugin to the route
+            // Add the rpc-web plugin to the route
             let resp = client
                 .post(format!("{kong_url}/routes/{route_name}/plugins"))
-                .json(&serde_json::json!({ "name": "grpc-web" }))
+                .json(&serde_json::json!({ "name": "rpc-web" }))
                 .send()
                 .await
-                .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to enable grpc-web plugin: {it}")))?;
+                .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to enable rpc-web plugin: {it}")))?;
 
             if !resp.status().is_success() && StatusCode::CONFLICT != resp.status() {
                 return Err(Errors::UnnableToRegisterApiGateway(format!(
-                    "Failed to enable grpc-web plugin: {} {:?}",
+                    "Failed to enable rpc-web plugin: {} {:?}",
                     resp.status(),
                     resp.text().await.unwrap()
                 )));
@@ -51,10 +51,10 @@ impl KongGatewayAdminClient {
                 .await
                 .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Failed to parse plugins response: {it}")))?;
 
-            // Find and delete the grpc-web plugin
+            // Find and delete the rpc-web plugin
             if let Some(plugin_id) = plugins["data"].as_array().and_then(|plugins| {
                 plugins.iter().find_map(|plugin| {
-                    if plugin["name"] == "grpc-web" {
+                    if plugin["name"] == "rpc-web" {
                         plugin["id"].as_str().map(|id| id.to_string())
                     } else {
                         None
@@ -62,7 +62,7 @@ impl KongGatewayAdminClient {
                 })
             }) {
                 let _ = client.delete(format!("{kong_url}/plugins/{plugin_id}")).send().await.map_err(|it| {
-                    Errors::UnnableToRegisterApiGateway(format!("Failed to delete grpc-web plugin: {it}"))
+                    Errors::UnnableToRegisterApiGateway(format!("Failed to delete rpc-web plugin: {it}"))
                 })?;
             }
         }

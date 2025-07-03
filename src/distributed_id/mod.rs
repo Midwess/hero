@@ -1,7 +1,5 @@
 use chrono::{DateTime, Utc};
 #[cfg(any(feature = "db-local", feature = "db-remote"))]
-use core_services::db::surrealdb::connection::SurrealDbConnection;
-#[cfg(any(feature = "db-local", feature = "db-remote"))]
 use core_services::utils::pool::request::PoolRequest;
 use generator::{DistributedIdGenerator, EPOCH_SINCE};
 use std::sync::Arc;
@@ -27,7 +25,7 @@ pub fn id_to_unix_timestamp(id: u64) -> u64 {
 }
 
 #[cfg(any(feature = "db-local", feature = "db-remote"))]
-pub async fn init_id_generator(app_name: String, db: PoolRequest<SurrealDbConnection>) {
+pub async fn init_id_generator(app_name: String, db: PoolRequest<core_services::db::surrealdb::connection::SurrealDbConnection>) {
     let distributed_id_generator = DistributedIdGenerator::init(app_name.clone(), db.clone()).await.unwrap();
     let _ = DISTRIBUTED_ID_GENERATOR.set(Arc::new(Mutex::new(distributed_id_generator)));
     // Reset the worker every 10 minutes
