@@ -65,7 +65,7 @@ impl Worker {
 
         let db = db_req.retrieve().await;
         if db.is_none() {
-            return Err(DistributedIdError::WorkerError("Unnable to connect to database".to_owned()))
+            return Err(DistributedIdError::WorkerError("Unable to connect to database".to_owned()))
         }
 
         let db = db.unwrap();
@@ -100,7 +100,7 @@ impl Worker {
                 let created_worker =
                     Self::create_worker(latest_worker.distributed_id + 1, name, db_req.clone()).await?;
                 if created_worker.distributed_id == CONCURRENT_COLLISION_THRESHOLD {
-                    db.query(r#"DELETE worker WHERE distributed_id > #(CONCURRENT_COLLISION_THRESHOLD)"#).await?;
+                    db.query(surreal_quote!(r#"DELETE worker WHERE distributed_id > #(CONCURRENT_COLLISION_THRESHOLD)"#)).await?;
                 }
 
                 Ok(created_worker)
@@ -111,7 +111,7 @@ impl Worker {
             let created_worker =
                 Self::create_worker(latest_worker_node.distributed_id + 1, name, db_req.clone()).await?;
             if created_worker.distributed_id > CONCURRENT_COLLISION_THRESHOLD {
-                db.query(r#"DELETE worker WHERE distributed_id <= #(CONCURRENT_COLLISION_THRESHOLD)"#).await?;
+                db.query(surreal_quote!(r#"DELETE worker WHERE distributed_id <= #(CONCURRENT_COLLISION_THRESHOLD)"#)).await?;
             }
 
             Ok(created_worker)

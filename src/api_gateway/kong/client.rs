@@ -120,7 +120,7 @@ impl ApiGatewayClient for KongGatewayAdminClient {
 
         info!(target: "kong-admin", "Creating service {}", json!({"body": service}));
         let resp = client.post(format!("{kong_url}/services")).json(&service).send().await.map_err(|it| {
-            Errors::UnnableToRegisterApiGateway(format!("Unnable to register service, failed to create {it}"))
+            Errors::UnnableToRegisterApiGateway(format!("Unable to register service, failed to create {it}"))
         })?;
 
         let resp = match resp.status() {
@@ -130,13 +130,13 @@ impl ApiGatewayClient for KongGatewayAdminClient {
                 .send()
                 .await
                 .map_err(|it| {
-                    Errors::UnnableToRegisterApiGateway(format!("Unnable to register service, failed to update {it}"))
+                    Errors::UnnableToRegisterApiGateway(format!("Unable to register service, failed to update {it}"))
                 })?,
             _ => resp
         };
 
         if !resp.status().is_success() {
-            return Err(Errors::UnnableToRegisterApiGateway(resp.status().to_string()));
+            return Err(Errors::UnnableToRegisterApiGateway(format!("{:?}", resp.text().await)));
         } else if !resp.status().is_success() {
             return Err(Errors::UnnableToRegisterApiGateway(format!(
                 "Failed to update service {} {:?}",

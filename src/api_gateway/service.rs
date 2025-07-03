@@ -114,7 +114,7 @@ impl GatewayRouteBuilder {
 
     pub fn grpc(mut self) -> Self {
         self.protocols = Some(vec![
-            "rpc".to_string(),
+            "grpc".to_string(),
             "grpcs".to_string(),
         ]);
 
@@ -210,7 +210,7 @@ impl GatewayServiceBuilder {
 
     // Add gRPC support by setting a default gRPC service URL
     pub fn grpc(mut self, grpc_host: String, grpc_port: u16) -> Self {
-        self.url = Some(format!("rpc://{grpc_host}:{grpc_port}"));
+        self.url = Some(format!("grpc://{grpc_host}:{grpc_port}"));
         self
     }
 
