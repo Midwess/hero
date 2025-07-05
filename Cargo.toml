@@ -3,56 +3,58 @@ name = "core-services"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [features]
+default = []
 full = ["db-local", "db-remote", "grpc-client", "grpc-server", "host_machine", "retry", "s3", "services", "smtp", "local-storage", "db-red"]
 grpc-client = ["tonic/transport"]
 grpc-server = ["tonic", "tonic-middleware", "jsonwebtoken"]
 host_machine = ["tokio/process", "tokio/fs", "tokio/io-std", "tokio-stream"]
 local-storage = ["tokio/fs", "tokio/io-std", "md5", "zip", "flate2", "tar"]
 retry = []
-s3 = ["aws-config", "aws-sdk-s3", "aws-smithy-async"]
+s3 = ["aws-config", "aws-sdk-s3", "aws-smithy-async", "schema"]
 services = []
-smtp = ["lettre", "reqwest", "prost", "lettre/smtp-transport", "lettre/builder", "lettre/default"]
+smtp = ["lettre", "reqwest", "prost", "lettre/smtp-transport", "lettre/builder", "lettre/default", "schema"]
 db-remote = ["surrealdb", "surreal_devl", "surreal_derive_plus", "surrealdb/protocol-ws"]
 db-local = ["surrealdb", "surreal_devl", "surreal_derive_plus"]
-db-red = ["redb", "redb_model", "bincode"]
+db-red = ["redb", "bincode"]
 
 [dependencies]
-serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
-thiserror.workspace = true
-async-trait.workspace = true
-tokio = { workspace = true, features = ["rt", "time"] }
-futures-util = { workspace = true }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = {  version = "1.0.117"}
+thiserror = "2.0.12"
+async-trait = "0.1.88"
+tokio = { version = "1.46.1", default-features = false, features = ["rt", "time"] }
+futures-util.version = "0.3.31"
 pretty_env_logger = { version = "0.5.0" }
-log.workspace = true
-schema = { path = "../schema/rust" }
-lazy_static.workspace = true
-anyhow.workspace = true
-rand.workspace = true
+log = "0.4.22"
+schema = { path = "../schema/rust", default-features = false, optional = true }
+lazy_static = "1.5.0"
+anyhow = "1.0.98"
 
 # Optional dependencies based on features
-bincode = { workspace = true, optional = true }
-zip = { workspace = true, optional = true }
-md5 = { workspace = true, optional = true }
-flate2 = { workspace = true, optional = true }
-tar = { workspace = true, optional = true }
-tokio-stream = { version = "0.1.17", optional = true }
-tonic = { workspace = true, optional = true }
-prost = { workspace = true, optional = true }
+bincode = { version = "1.3.3", optional = true }
+zip = { version = "3.0.0", optional = true }
+md5 = { version = "0.7.0", optional = true }
+flate2 = { version = "1.1.1", optional = true }
+tar = { git = "https://github.com/dev-logs/tar-rs.git", optional = true }
+tokio-stream = { version = "0.1.16", default-features = false, optional = true }
+tonic = { version = "0.13.1", optional = true }
+prost = { version = "0.13.5", optional = true }
 tonic-middleware = { version = "0.1.4", optional = true }
 aws-config = { version = "1.1.7", features = ["behavior-version-latest"], optional = true }
 aws-sdk-s3 = { version = "1.41.0", optional = true }
 lettre = { version = "0.11.7", optional = true }
-surrealdb = { workspace = true, default-features = false, optional = true }
-surreal_devl = { workspace = true, optional = true }
-surreal_derive_plus = { workspace = true, optional = true }
+surrealdb = { version = "2.3.6", default-features = false, optional = true }
+surreal_devl = { version = "2.2.2", optional = true }
+surreal_derive_plus = { version = "2.2.3", optional = true }
 jsonwebtoken = { version = "9.3.0", optional = true }
-reqwest = { workspace = true, optional = true }
-bytes = { workspace = true }
-aws-smithy-async = {workspace = true, optional = true}
-redb = { workspace = true, optional = true }
-redb_model = { workspace = true, optional = true }
+reqwest = { version = "0.12.22", optional = true }
+bytes = {  version = "1.10.1"}
+aws-smithy-async = {version = "1.2.5", optional = true}
+redb = { version = "2.6.0", optional = true }
 
 [build-dependencies]
 
