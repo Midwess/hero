@@ -21,6 +21,7 @@ use core_services::utils::pool::allocator::PoolResourceProvider;
 use tokio::sync::Mutex;
 #[cfg(feature = "s3")]
 use tokio::sync::OnceCell;
+#[cfg(any(feature = "db-remote", feature = "db-local"))]
 type DbName = String;
 
 #[async_trait::async_trait]

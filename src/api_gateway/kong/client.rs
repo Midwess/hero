@@ -32,7 +32,8 @@ impl KongGatewayAdminClient {
                     resp.text().await.unwrap()
                 )));
             }
-        } else {
+        }
+        else {
             // Find all plugins associated with the route
             let resp = client.get(format!("{kong_url}/routes/{route_name}/plugins")).send().await.map_err(|it| {
                 Errors::UnnableToRegisterApiGateway(format!("Failed to retrieve plugins for route {route_name}: {it}"))
