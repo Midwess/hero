@@ -5,7 +5,7 @@ pub mod distributed_id;
 pub mod grpc_gateway;
 #[cfg(feature = "db-remote")]
 pub mod live_query;
-#[cfg(feature = "grpc-server")]
+#[cfg(feature = "tcp")]
 pub mod tcp;
 
 pub mod config;

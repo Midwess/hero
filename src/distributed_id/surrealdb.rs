@@ -1,14 +1,12 @@
 use chrono::Utc;
 use core_services::db::surrealdb::connection::SurrealDbConnection;
 use core_services::utils::pool::request::PoolRequest;
-use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use surreal_derive_plus::{surreal_quote, SurrealDerive};
+use surreal_derive_plus::surreal_quote;
 use surreal_devl::surreal_id::SurrealId;
 use surreal_devl::surreal_qr::RPath;
 use surrealdb::Error;
 use surrealdb::sql::{Id, Thing};
-use thiserror::Error;
 use crate::distributed_id::generator::DistributedIdGenerator;
 use crate::distributed_id::generator::Worker;
 use crate::distributed_id::generator::DistributedIdError;
@@ -125,7 +123,7 @@ impl DistributedIdGenerator {
 
         let created_worker = retry!(
             retries = 10,
-            delay = std::time::Duration::from_millis(500),
+            delay = Duration::from_millis(500),
             |_e: &DistributedIdError| true,
             { Worker::get_or_create_worker(name.clone(), db.clone()).await }
         )?;

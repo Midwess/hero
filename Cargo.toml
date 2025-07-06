@@ -7,10 +7,11 @@ edition = "2021"
 default = []
 full = ["grpc-client", "grpc-server", "db-local", "db-remote", "gateway", "s3"]
 grpc-client = ["tonic/transport"]
-grpc-server = ["tonic", "tonic-middleware", "core-services/grpc-server", "gateway"]
+grpc-server = ["tonic", "tonic-middleware", "core-services/grpc-server", "gateway", "tcp"]
 db-local = ["surrealdb", "surreal_devl", "surreal_derive_plus", "core-services/retry", "core-services/db-local"]
 db-remote = ["surrealdb/protocol-ws", "surreal_devl", "surreal_derive_plus", "core-services/retry", "core-services/db-remote"]
 gateway = ["reqwest", "reqwest/json"]
+tcp = []
 s3 = ["core-services/s3", "aws-sdk-s3", "aws-smithy-async"]
 
 [dependencies]
@@ -18,20 +19,17 @@ core-services = { path="../core-services", default-features = false }
 log = "0.4.27"
 chrono = "0.4.41"
 serde = { version = "1.0.219", features = ["derive"], default-features = false }
-serde_derive = { version = "1.0.203", default-features = false }
 serde_json = { version = "1.0.117"}
 lazy_static = "1.5.0"
 tokio = {version = "1.46.1", default-features = false}
 async-trait = "0.1.88"
 thiserror ="2.0.12"
-futures-util = {version = "0.3.31", default-features = false}
 
 surrealdb = { version = "2.3.6", default-features = false, optional = true }
 surreal_devl = { version = "2.2.2", optional = true }
 surreal_derive_plus = { version = "2.2.3", optional = true }
 tonic-middleware = { version = "0.1.4", optional = true }
 tonic = { version = "0.13.1", optional = true }
-prost = { version = "0.13.5", optional = true }
 aws-sdk-s3 = { version = "1.76.0", optional = true }
 reqwest = { version = "0.12.22", default-features = false, optional = true }
 aws-smithy-async = {version = "1.2.5", optional = true}
