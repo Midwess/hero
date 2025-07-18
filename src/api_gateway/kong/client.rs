@@ -20,7 +20,7 @@ impl KongGatewayAdminClient {
             // Add the rpc-web plugin to the route
             let resp = client
                 .post(format!("{kong_url}/routes/{route_name}/plugins"))
-                .json(&serde_json::json!({ "name": "rpc-web" }))
+                .json(&serde_json::json!({ "name": "grpc-web" }))
                 .send()
                 .await
                 .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to enable rpc-web plugin: {it}")))?;
@@ -32,8 +32,7 @@ impl KongGatewayAdminClient {
                     resp.text().await.unwrap()
                 )));
             }
-        }
-        else {
+        } else {
             // Find all plugins associated with the route
             let resp = client.get(format!("{kong_url}/routes/{route_name}/plugins")).send().await.map_err(|it| {
                 Errors::UnnableToRegisterApiGateway(format!("Failed to retrieve plugins for route {route_name}: {it}"))
@@ -52,10 +51,10 @@ impl KongGatewayAdminClient {
                 .await
                 .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Failed to parse plugins response: {it}")))?;
 
-            // Find and delete the rpc-web plugin
+            // Find and delete the grpc-web plugin
             if let Some(plugin_id) = plugins["data"].as_array().and_then(|plugins| {
                 plugins.iter().find_map(|plugin| {
-                    if plugin["name"] == "rpc-web" {
+                    if plugin["name"] == "grpc-web" {
                         plugin["id"].as_str().map(|id| id.to_string())
                     } else {
                         None
