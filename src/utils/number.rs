@@ -1,4 +1,4 @@
-use std::time::Instant;
+use n0_future::time::Instant;
 
 pub struct ExponentialGrowth {
     start_time: Instant,

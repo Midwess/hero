@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
-
+use futures_timer::Delay;
+use futures_util::{select, FutureExt};
 use super::allocator::PoolAllocator;
 use super::reponse::PoolResponse;
 
@@ -69,9 +70,17 @@ where
     pub async fn retrieve(&self) -> Option<PoolResponse<T>> {
         match (self.retrieving_timeout, self.pool.retrieve().await) {
             (_, Ok(resource)) => Some(resource),
-            (Some(timeout), Err(waiter)) => match tokio::time::timeout(timeout, waiter).await {
-                Ok(Ok(value)) => Some(value),
-                _ => None
+            (Some(timeout), Err(waiter)) => {
+                let value = select! {
+                    msg = waiter.fuse() => Some(msg),
+                    _ = Delay::new(timeout).fuse() => None,
+                    complete => None,
+                };
+
+                match value {
+                    Some(Ok(value)) => Some(value),
+                    _ => None
+                }
             },
             _ => None
         }

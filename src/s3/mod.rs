@@ -7,7 +7,7 @@ use schema::value::static_resource::static_resource::Source;
 use schema::value::static_resource::{S3Path, StaticResource};
 use std::sync::Arc;
 use std::time::Duration;
-
+use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use aws_smithy_async::rt::sleep::{AsyncSleep, Sleep};
 
 #[derive(Clone, Debug)]
@@ -141,5 +141,84 @@ impl S3Client {
         s3_object.source = Some(Source::Url(url.clone()));
 
         Ok(url)
+    }
+
+    pub async fn generate_multipart_upload_id(&self, s3_object: &StaticResource) -> Resolve<String> {
+        let path = match &s3_object.source {
+            Some(Source::S3Path(path)) => path.clone(),
+            _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned()))
+        };
+
+        let upload_req = self
+            .client
+            .create_multipart_upload()
+            .bucket(path.bucket())
+            .key(path.prefix())
+            .send()
+            .await?;
+
+        let Some(upload_id) = upload_req.upload_id else {
+            return Err(Errors::BadRequest("Cannot generate upload id".to_owned()))
+        };
+
+        Ok(upload_id)
+    }
+
+    pub async fn generate_multipart_upload_part_url(
+        &self,
+        s3_object: &StaticResource,
+        upload_id: String,
+        part_number: i32,
+        duration: Duration
+    ) -> Resolve<String> {
+        let path = match &s3_object.source {
+            Some(Source::S3Path(path)) => path.clone(),
+            _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned()))
+        };
+
+        let presigned_req = self
+            .client
+            .upload_part()
+            .upload_id(upload_id)
+            .part_number(part_number)
+            .bucket(path.bucket())
+            .key(path.prefix())
+            .presigned(PresigningConfig::expires_in(duration)?)
+            .await?;
+
+        Ok(presigned_req.uri().to_owned())
+    }
+
+    pub async fn complete_multipart_upload(
+        &self,
+        s3_object: &StaticResource,
+        upload_id: String,
+        part_ids: Vec<(i32, String)>
+    ) -> Resolve<()> {
+        let path = match &s3_object.source {
+            Some(Source::S3Path(path)) => path.clone(),
+            _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned()))
+        };
+
+        let completed_parts = part_ids.into_iter().map(|(part_number, e_tag)| {
+            CompletedPart::builder()
+                .part_number(part_number)
+                .e_tag(e_tag)
+                .build()
+        }).collect::<Vec<_>>();
+
+        let completed_upload = CompletedMultipartUpload::builder()
+            .set_parts(Some(completed_parts))
+            .build();
+
+        self.client
+            .complete_multipart_upload()
+            .bucket(path.bucket())
+            .key(path.prefix())
+            .upload_id(upload_id)
+            .multipart_upload(completed_upload)
+            .send().await?;
+
+        Ok(())
     }
 }
