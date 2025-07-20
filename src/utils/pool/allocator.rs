@@ -2,15 +2,15 @@ use futures_util::future::join_all;
 use log::*;
 use std::borrow::BorrowMut;
 use std::cmp::min;
+use n0_future::time::Instant;
 use std::collections::VecDeque;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
-use tokio::spawn;
-use tokio::task::{yield_now, JoinHandle};
-use tokio::time::sleep;
-
-use tokio::sync::{oneshot, Mutex};
+use std::time::Duration;
+use futures_timer::Delay;
+use futures_util::lock::Mutex;
+use n0_future::task::{spawn, JoinHandle};
+use tokio::sync::oneshot;
 
 use super::reponse::PoolResponse;
 
@@ -124,12 +124,13 @@ where
                 break;
             }
 
-            yield_now().await;
+            Delay::new(Duration::from_millis(1)).await;
         }
     }
 }
 
-#[async_trait::async_trait]
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 pub trait PoolResourceProvider<T>: Send + Sync
 where
     T: Send + Sync
@@ -164,12 +165,13 @@ where
         }
 
         let mut background_handle = self.background_handle.lock().await;
-        if background_handle.is_some() && !background_handle.as_ref().unwrap().is_finished() {
+        if background_handle.is_some() {
             return
         }
 
         let pool = self.pool.clone();
         *background_handle = {
+            let background_handle = self.background_handle.clone();
             Some(spawn(async move {
                 let pool = pool;
                 let mut curr_index = pool.min_size;
@@ -177,7 +179,7 @@ where
 
                 loop {
                     // yield first to make sure every lock can be quickly released
-                    yield_now().await;
+                    Delay::new(Duration::from_millis(1)).await;
 
                     if !pool.is_exceed_min_size().await {
                         break;
@@ -192,7 +194,7 @@ where
                     if curr_index >= number_of_idle_items {
                         if let Some(timeout) = min_timeout {
                             min_timeout = None;
-                            sleep(timeout).await;
+                            Delay::new(timeout).await;
                         }
 
                         curr_index = 0;
@@ -205,6 +207,8 @@ where
 
                     curr_index += 1;
                 }
+
+                background_handle.lock().await.take();
             }))
         };
     }

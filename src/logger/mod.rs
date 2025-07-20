@@ -8,14 +8,23 @@ use tokio::task::JoinHandle;
 use tokio::time::{self};
 
 pub fn setup() {
-    let mut log_builder = formatted_timed_builder();
-    if let Ok(filter_env) = std::env::var("RUST_LOG") {
-        log_builder.parse_filters(&filter_env);
-    } else {
-        log_builder.filter(None, log::LevelFilter::Info);
-    }
+    #[cfg(feature = "wasm-logger")]
+    {
+        let _ = console_log::init();
+        console_error_panic_hook::set_once();
+    };
 
-    log_builder.init();
+    #[cfg(not(feature = "wasm-logger"))]
+    {
+        let mut log_builder = formatted_timed_builder();
+        if let Ok(filter_env) = std::env::var("RUST_LOG") {
+            log_builder.parse_filters(&filter_env);
+        } else {
+            log_builder.filter(None, log::LevelFilter::Info);
+        }
+
+        log_builder.init();
+    };
 }
 
 pub struct ThrottleLogger {

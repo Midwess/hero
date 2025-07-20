@@ -7,7 +7,6 @@ macro_rules! retry {
         $block:block
     ) => {{
         use std::time::Duration;
-        use tokio::time::sleep;
         use log::warn;
 
         let mut attempt = 0;
@@ -41,7 +40,7 @@ macro_rules! retry {
                         $delay
                     );
 
-                    sleep($delay).await;
+                    futures_timer::Delay::new($delay).await;
                 }
             }
         }

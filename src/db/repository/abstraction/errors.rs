@@ -8,12 +8,14 @@ pub enum RepositoryError {
     #[cfg(any(feature = "db-local", feature = "db-remote"))]
     #[error("Error on db side {0}")]
     SurrealDbError(#[from] surrealdb::Error),
-    #[cfg(any(feature = "db-local", feature = "db-remote", feature = "db-red"))]
+    #[cfg(any(feature = "db-local", feature = "db-remote", feature = "db-red", feature = "db-idb"))]
     #[error("Error on db side {0}")]
     DbError(String),
     #[cfg(feature = "db-red")]
     #[error("Error on db side {0}")]
-    BincodeError(#[from] bincode::Error)
+    BincodeError(#[from] bincode::Error),
+    #[error("Json serialization error {0:?}")]
+    JsonSerializationError(#[from] serde_json::Error),
 }
 
 #[cfg(feature = "grpc-server")]
@@ -22,10 +24,15 @@ impl From<RepositoryError> for tonic::Status {
         match value {
             RepositoryError::NotFound(not_found, _) => tonic::Status::not_found(not_found.to_string()),
             RepositoryError::Conflict(conflict, _) => tonic::Status::already_exists(conflict.to_string()),
+            #[cfg(any(feature = "db-local", feature = "db-remote"))]
             RepositoryError::SurrealDbError(surreal_db_error) => tonic::Status::internal(surreal_db_error.to_string()),
+            #[cfg(any(feature = "db-local", feature = "db-remote", feature = "db-red"))]
             RepositoryError::DbError(db_error) => tonic::Status::internal(db_error.to_string()),
             #[cfg(feature = "db-red")]
-            RepositoryError::BincodeError(bincode_error) => tonic::Status::internal(bincode_error.to_string())
+            RepositoryError::BincodeError(bincode_error) => tonic::Status::internal(bincode_error.to_string()),
+            RepositoryError::JsonSerializationError(json_serialization_error) => tonic::Status::internal(
+                json_serialization_error.to_string(),
+            )
         }
     }
 }

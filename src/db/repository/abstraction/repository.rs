@@ -2,11 +2,19 @@ use super::errors::Resolve;
 use super::id::DbId;
 use super::table::Table;
 
-pub trait SendSync: Sized + Sync + Send {}
+#[cfg(target_family = "wasm")]
+pub trait SendSync: Sync {}
+#[cfg(not(target_family = "wasm"))]
+pub trait SendSync: Sync + Send {}
 
-impl<T> SendSync for T where T: Sized + Sync + Send {}
+#[cfg(target_family = "wasm")]
+impl<T> SendSync for T where T: Sync {}
 
-#[async_trait::async_trait]
+#[cfg(not(target_family = "wasm"))]
+impl<T> SendSync for T where T: Sync + Send {}
+
+#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
+#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 pub trait Repository<T, I>: Send + Sync
 where
     T: SendSync + Table<I>,
