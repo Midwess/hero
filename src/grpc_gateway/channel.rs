@@ -24,7 +24,7 @@ impl GrpcGatewayChannel {
     pub fn new() -> Self {
         Self {
             channel: Arc::new(Mutex::new(None)),
-            endpoint: format!("rpc://{}:{}", CONFIGS.kong.host, CONFIGS.kong.port).parse().unwrap()
+            endpoint: format!("grpc://{}:{}", CONFIGS.kong.host, CONFIGS.kong.port).parse().unwrap()
         }
     }
 

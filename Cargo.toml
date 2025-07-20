@@ -5,7 +5,7 @@ edition = "2021"
 
 [features]
 default = []
-full = ["grpc-client", "grpc-server", "db-local", "db-remote", "gateway", "s3"]
+backend = ["grpc-client", "grpc-server", "db-remote", "gateway", "s3"]
 grpc-client = ["tonic/transport"]
 grpc-server = ["tonic", "tonic-middleware", "core-services/grpc-server", "gateway", "tcp"]
 db-local = ["surrealdb", "surreal_devl", "surreal_derive_plus", "core-services/retry", "core-services/db-local", "futures-util"]
