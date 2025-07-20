@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GatewayService {
@@ -29,19 +30,124 @@ pub struct GatewayServiceBuilder {
     pub read_timeout: Option<u32>
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
+pub struct GatewayRouteExpression(String);
+
+impl Into<String> for GatewayRouteExpression {
+    fn into(self) -> String {
+        self.0
+    }
+}
+
+impl GatewayRouteExpression {
+    pub fn proto_namespace(proto_namespace: &str) -> Self {
+        let expr = format!(r#"^/{}"#, regex::escape(proto_namespace));
+        Self(expr)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct GatewayRoute {
     pub name: String,
     pub paths: Vec<String>,
     pub hosts: Vec<String>,
-    pub regex_priority: i32,
+    pub priority: i32,
     pub methods: Option<Vec<String>>,
     pub protocols: Option<Vec<String>>,
     pub strip_path: bool,
     pub preserve_host: bool,
     pub headers: HashMap<String, Vec<String>>,
-    #[serde(skip_serializing)]
     pub enable_web: bool
+}
+
+impl GatewayRoute {
+    pub fn as_request_body(&self) -> serde_json::Value {
+        json! ({
+            "name": self.name,
+            "priority": self.priority,
+            "strip_path": self.strip_path,
+            "preserve_host": self.preserve_host,
+            "expression": self.build_expression()
+        })
+    }
+    pub fn build_expression(&self) -> String {
+        let mut parts = vec![];
+
+        // Hosts
+        if !self.hosts.is_empty() {
+            if self.hosts.len() == 1 {
+                parts.push(format!("http.host == \"{}\"", self.hosts[0]));
+            } else {
+                let host_expr = self
+                    .hosts
+                    .iter()
+                    .map(|h| format!("http.host == \"{}\"", h))
+                    .collect::<Vec<_>>()
+                    .join(" || ");
+                parts.push(format!("({})", host_expr));
+            }
+        }
+
+        // Paths
+        if !self.paths.is_empty() {
+            if self.paths.len() == 1 {
+                let path = &self.paths[0];
+                parts.push(format!(r##"http.path ~ r#"{path}"#"##));
+            } else {
+                let path_expr = self
+                    .paths
+                    .iter()
+                    .map(|p| format!(r#"http.path ~ "{p}""#))
+                    .collect::<Vec<_>>()
+                    .join(" || ");
+                parts.push(format!("({})", path_expr));
+            }
+        }
+
+        // Methods
+        if let Some(methods) = &self.methods {
+            if methods.len() == 1 {
+                parts.push(format!("http.method == \"{}\"", methods[0]));
+            } else if !methods.is_empty() {
+                let method_expr = methods
+                    .iter()
+                    .map(|m| format!("http.method == \"{}\"", m))
+                    .collect::<Vec<_>>()
+                    .join(" || ");
+                parts.push(format!("({})", method_expr));
+            }
+        }
+
+        // Protocols
+        if let Some(protocols) = &self.protocols {
+            if protocols.len() == 1 {
+                parts.push(format!("net.protocol == \"{}\"", protocols[0]));
+            } else if !protocols.is_empty() {
+                let proto_expr = protocols
+                    .iter()
+                    .map(|p| format!("net.protocol == \"{}\"", p))
+                    .collect::<Vec<_>>()
+                    .join(" || ");
+                parts.push(format!("({})", proto_expr));
+            }
+        }
+
+        // Headers
+        for (key, values) in &self.headers {
+            if values.len() == 1 {
+                parts.push(format!(r##"http.headers.{key} == "{}""##, values[0]));
+            } else if !values.is_empty() {
+                let header_expr = values
+                    .iter()
+                    .map(|v| format!(r##"http.headers.{key} == "{v}""##))
+                    .collect::<Vec<_>>()
+                    .join(" || ");
+                parts.push(format!("({})", header_expr));
+            }
+        }
+
+        parts.join(" && ")
+    }
 }
 
 #[derive(Debug, Default)]
@@ -49,7 +155,7 @@ pub struct GatewayRouteBuilder {
     pub name: Option<String>,
     pub paths: Vec<String>,
     pub hosts: Vec<String>,
-    pub regex_priority: Option<i32>,
+    pub priority: Option<i32>,
     pub methods: Option<Vec<String>>,
     pub protocols: Option<Vec<String>>,
     pub strip_path: Option<bool>,
@@ -87,8 +193,8 @@ impl GatewayRouteBuilder {
         self
     }
 
-    pub fn regex_priority(mut self, regex_priority: i32) -> Self {
-        self.regex_priority = Some(regex_priority);
+    pub fn priority(mut self, priority: i32) -> Self {
+        self.priority = Some(priority);
         self
     }
 
@@ -155,7 +261,7 @@ impl GatewayRouteBuilder {
         let is_public = self.is_public.unwrap_or(false);
 
         if !is_public {
-            headers.insert("x-internal".to_owned(), vec!["true".to_owned()]);
+            headers.insert("xinternal".to_owned(), vec!["true".to_owned()]);
         }
 
         GatewayRoute {
@@ -163,7 +269,7 @@ impl GatewayRouteBuilder {
             paths: self.paths,
             methods: self.methods,
             hosts: self.hosts.clone(),
-            regex_priority: self.regex_priority.unwrap_or(1),
+            priority: self.priority.unwrap_or(0),
             protocols: Some(self.protocols.expect("Protocols is required")),
             strip_path: self.strip_path.unwrap_or(false),
             preserve_host: self.preserve_host.unwrap_or(true),

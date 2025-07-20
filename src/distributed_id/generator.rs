@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use std::time::Duration;
+use futures_timer::Delay;
 use thiserror::Error;
 
 pub static EPOCH_SINCE: u64 = 1735405200000; // 2024-12-29T00:00:00Z
@@ -63,7 +64,7 @@ impl DistributedIdGenerator {
             if self.sequence >= MAX_ID_IN_MS {
                 // Wait until we move to the next millisec
                 while timestamp == self.last_timestamp {
-                    tokio::time::sleep(Duration::from_millis(1)).await;
+                    Delay::new(Duration::from_millis(1)).await;
                     let new_now_utc = Utc::now();
                     let new_ms = new_now_utc.timestamp_millis() as u64 - EPOCH_SINCE;
                     if new_ms > timestamp {

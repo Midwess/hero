@@ -20,14 +20,14 @@ impl KongGatewayAdminClient {
             // Add the rpc-web plugin to the route
             let resp = client
                 .post(format!("{kong_url}/routes/{route_name}/plugins"))
-                .json(&serde_json::json!({ "name": "rpc-web" }))
+                .json(&serde_json::json!({ "name": "grpc-web" }))
                 .send()
                 .await
                 .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to enable rpc-web plugin: {it}")))?;
 
             if !resp.status().is_success() && StatusCode::CONFLICT != resp.status() {
                 return Err(Errors::UnnableToRegisterApiGateway(format!(
-                    "Failed to enable rpc-web plugin: {} {:?}",
+                    "Failed to enable grpc-web plugin: {} {:?}",
                     resp.status(),
                     resp.text().await.unwrap()
                 )));
@@ -52,10 +52,10 @@ impl KongGatewayAdminClient {
                 .await
                 .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Failed to parse plugins response: {it}")))?;
 
-            // Find and delete the rpc-web plugin
+            // Find and delete the grpc-web plugin
             if let Some(plugin_id) = plugins["data"].as_array().and_then(|plugins| {
                 plugins.iter().find_map(|plugin| {
-                    if plugin["name"] == "rpc-web" {
+                    if plugin["name"] == "grpc-web" {
                         plugin["id"].as_str().map(|id| id.to_string())
                     } else {
                         None
@@ -63,7 +63,7 @@ impl KongGatewayAdminClient {
                 })
             }) {
                 let _ = client.delete(format!("{kong_url}/plugins/{plugin_id}")).send().await.map_err(|it| {
-                    Errors::UnnableToRegisterApiGateway(format!("Failed to delete rpc-web plugin: {it}"))
+                    Errors::UnnableToRegisterApiGateway(format!("Failed to delete grpc-web plugin: {it}"))
                 })?;
             }
         }
@@ -79,10 +79,10 @@ impl ApiGatewayClient for KongGatewayAdminClient {
         let service_name = service.name.as_str();
         let client = reqwest::Client::new();
         for route in service.routes {
-            info!(target: "kong-admin", "Creating route {:?}", json!({"body": route}));
+            info!(target: "kong-admin", "Creating route {:?}", json!({"body": route.as_request_body()}));
             let resp = client
                 .post(format!("{kong_url}/services/{service_name}/routes"))
-                .json(&route)
+                .json(&route.as_request_body())
                 .send()
                 .await
                 .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unnable to register route {it}")))?;
@@ -93,7 +93,7 @@ impl ApiGatewayClient for KongGatewayAdminClient {
 
                     client
                         .patch(format!("{kong_url}/services/{service_name}/routes/{}", &route.name))
-                        .json(&route)
+                        .json(&route.as_request_body())
                         .send()
                         .await
                         .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unnable to register route {it}")))?

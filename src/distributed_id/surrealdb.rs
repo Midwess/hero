@@ -7,6 +7,7 @@ use surreal_devl::surreal_id::SurrealId;
 use surreal_devl::surreal_qr::RPath;
 use surrealdb::Error;
 use surrealdb::sql::{Id, Thing};
+use core_services::retry;
 use crate::distributed_id::generator::DistributedIdGenerator;
 use crate::distributed_id::generator::Worker;
 use crate::distributed_id::generator::DistributedIdError;
@@ -120,10 +121,10 @@ impl Worker {
 impl DistributedIdGenerator {
     pub async fn init(name: String, db: PoolRequest<SurrealDbConnection>) -> Result<Self, DistributedIdError> {
         use core_services::retry;
-
+        let delay = Duration::from_millis(500);
         let created_worker = retry!(
             retries = 10,
-            delay = Duration::from_millis(500),
+            delay = delay,
             |_e: &DistributedIdError| true,
             { Worker::get_or_create_worker(name.clone(), db.clone()).await }
         )?;
