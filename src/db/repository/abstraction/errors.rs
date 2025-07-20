@@ -29,7 +29,10 @@ impl From<RepositoryError> for tonic::Status {
             #[cfg(any(feature = "db-local", feature = "db-remote", feature = "db-red"))]
             RepositoryError::DbError(db_error) => tonic::Status::internal(db_error.to_string()),
             #[cfg(feature = "db-red")]
-            RepositoryError::BincodeError(bincode_error) => tonic::Status::internal(bincode_error.to_string())
+            RepositoryError::BincodeError(bincode_error) => tonic::Status::internal(bincode_error.to_string()),
+            RepositoryError::JsonSerializationError(json_serialization_error) => tonic::Status::internal(
+                json_serialization_error.to_string(),
+            )
         }
     }
 }
