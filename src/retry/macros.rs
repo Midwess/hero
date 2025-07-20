@@ -40,7 +40,7 @@ macro_rules! retry {
                         $delay
                     );
 
-                    futures_timer::Delay(&delay).await;
+                    futures_timer::Delay::new($delay).await;
                 }
             }
         }
