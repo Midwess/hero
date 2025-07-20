@@ -44,6 +44,11 @@ impl GatewayRouteExpression {
         let expr = format!(r#"^/{}"#, regex::escape(proto_namespace));
         Self(expr)
     }
+
+    pub fn start_with(path: &str) -> Self {
+        let expr = format!(r#"^{}"#, regex::escape(path));
+        Self(expr)
+    }
 }
 
 #[derive(Debug, Clone)]
