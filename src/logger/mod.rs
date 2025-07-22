@@ -1,20 +1,51 @@
-use log::info;
-use pretty_env_logger::formatted_timed_builder;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::Mutex;
-use tokio::task::JoinHandle;
-use tokio::time::{self};
+use log::info;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use futures_util::lock::Mutex;
+use n0_future::task::{JoinHandle, spawn};
+use n0_future::time;
+#[cfg(not(feature = "wasm-logger"))]
+use pretty_env_logger::formatted_timed_builder;
 
 pub fn setup() {
-    #[cfg(feature = "wasm-logger")]
+    #[cfg(target_arch = "wasm32")]
     {
-        let _ = console_log::init();
-        console_error_panic_hook::set_once();
-    };
+        use log::{Level, LevelFilter, Log, Metadata, Record};
 
-    #[cfg(not(feature = "wasm-logger"))]
+        struct WasmLogger;
+
+        impl Log for WasmLogger {
+            fn enabled(&self, metadata: &Metadata) -> bool {
+                metadata.level() <= Level::Info
+            }
+
+            fn log(&self, record: &Record) {
+                if self.enabled(record.metadata()) {
+                    let now = js_sys::Date::new_0().to_iso_string();
+                    web_sys::console::log_1(
+                        &format!(
+                            "[{}] {} - {}",
+                            now,
+                            record.level(),
+                            record.args()
+                        )
+                            .into(),
+                    );
+                }
+            }
+
+            fn flush(&self) {}
+        }
+
+        static LOGGER: WasmLogger = WasmLogger;
+        log::set_logger(&LOGGER).expect("failed to set logger");
+        log::set_max_level(LevelFilter::Info);
+
+        console_error_panic_hook::set_once();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     {
         let mut log_builder = formatted_timed_builder();
         if let Ok(filter_env) = std::env::var("RUST_LOG") {
@@ -24,7 +55,7 @@ pub fn setup() {
         }
 
         log_builder.init();
-    };
+    }
 }
 
 pub struct ThrottleLogger {
@@ -38,7 +69,7 @@ impl ThrottleLogger {
         let messages_clone = messages.clone();
         let ns = namespace.clone();
 
-        let join_handle = tokio::spawn(async move {
+        let join_handle = spawn(async move {
             let mut interval = time::interval(delay);
             interval.tick().await; // initial delay
 
