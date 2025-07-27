@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-
+use regex::Replacer;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -41,7 +41,8 @@ impl Into<String> for GatewayRouteExpression {
 
 impl GatewayRouteExpression {
     pub fn proto_namespace(proto_namespace: &str) -> Self {
-        let expr = format!(r#"^/{}"#, regex::escape(proto_namespace));
+        let proto_namespace = proto_namespace.replace(".", r#"\."#);
+        let expr = format!(r#"^/{proto_namespace}"#,);
         Self(expr)
     }
 
@@ -71,10 +72,12 @@ impl GatewayRoute {
             "name": self.name,
             "priority": self.priority,
             "strip_path": self.strip_path,
+            "protocols": self.protocols,
             "preserve_host": self.preserve_host,
             "expression": self.build_expression()
         })
     }
+
     pub fn build_expression(&self) -> String {
         let mut parts = vec![];
 
@@ -83,12 +86,8 @@ impl GatewayRoute {
             if self.hosts.len() == 1 {
                 parts.push(format!("http.host == \"{}\"", self.hosts[0]));
             } else {
-                let host_expr = self
-                    .hosts
-                    .iter()
-                    .map(|h| format!("http.host == \"{}\"", h))
-                    .collect::<Vec<_>>()
-                    .join(" || ");
+                let host_expr =
+                    self.hosts.iter().map(|h| format!("http.host == \"{}\"", h)).collect::<Vec<_>>().join(" || ");
                 parts.push(format!("({})", host_expr));
             }
         }
@@ -99,12 +98,8 @@ impl GatewayRoute {
                 let path = &self.paths[0];
                 parts.push(format!(r##"http.path ~ r#"{path}"#"##));
             } else {
-                let path_expr = self
-                    .paths
-                    .iter()
-                    .map(|p| format!(r#"http.path ~ "{p}""#))
-                    .collect::<Vec<_>>()
-                    .join(" || ");
+                let path_expr =
+                    self.paths.iter().map(|p| format!(r#"http.path ~ "{p}""#)).collect::<Vec<_>>().join(" || ");
                 parts.push(format!("({})", path_expr));
             }
         }
@@ -114,11 +109,8 @@ impl GatewayRoute {
             if methods.len() == 1 {
                 parts.push(format!("http.method == \"{}\"", methods[0]));
             } else if !methods.is_empty() {
-                let method_expr = methods
-                    .iter()
-                    .map(|m| format!("http.method == \"{}\"", m))
-                    .collect::<Vec<_>>()
-                    .join(" || ");
+                let method_expr =
+                    methods.iter().map(|m| format!("http.method == \"{}\"", m)).collect::<Vec<_>>().join(" || ");
                 parts.push(format!("({})", method_expr));
             }
         }
@@ -128,11 +120,8 @@ impl GatewayRoute {
             if protocols.len() == 1 {
                 parts.push(format!("net.protocol == \"{}\"", protocols[0]));
             } else if !protocols.is_empty() {
-                let proto_expr = protocols
-                    .iter()
-                    .map(|p| format!("net.protocol == \"{}\"", p))
-                    .collect::<Vec<_>>()
-                    .join(" || ");
+                let proto_expr =
+                    protocols.iter().map(|p| format!("net.protocol == \"{}\"", p)).collect::<Vec<_>>().join(" || ");
                 parts.push(format!("({})", proto_expr));
             }
         }
@@ -142,11 +131,8 @@ impl GatewayRoute {
             if values.len() == 1 {
                 parts.push(format!(r##"http.headers.{key} == "{}""##, values[0]));
             } else if !values.is_empty() {
-                let header_expr = values
-                    .iter()
-                    .map(|v| format!(r##"http.headers.{key} == "{v}""##))
-                    .collect::<Vec<_>>()
-                    .join(" || ");
+                let header_expr =
+                    values.iter().map(|v| format!(r##"http.headers.{key} == "{v}""##)).collect::<Vec<_>>().join(" || ");
                 parts.push(format!("({})", header_expr));
             }
         }
@@ -175,11 +161,6 @@ impl GatewayRouteBuilder {
 
     pub fn name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
-        self
-    }
-
-    pub fn enable_web(mut self) -> Self {
-        self.enable_web = true;
         self
     }
 
@@ -233,11 +214,6 @@ impl GatewayRouteBuilder {
     }
 
     pub fn grpc_web(mut self) -> Self {
-        self.protocols = Some(vec![
-            "http".to_string(),
-            "https".to_string(),
-        ]);
-
         self.enable_web = true;
 
         self
