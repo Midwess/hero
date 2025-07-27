@@ -41,7 +41,6 @@ impl Into<String> for GatewayRouteExpression {
 
 impl GatewayRouteExpression {
     pub fn proto_namespace(proto_namespace: &str) -> Self {
-        let proto_namespace = proto_namespace.replace(".", r#"\."#);
         let expr = format!(r#"^/{proto_namespace}"#,);
         Self(expr)
     }
@@ -116,18 +115,19 @@ impl GatewayRoute {
         }
 
         // Protocols
-        if let Some(protocols) = &self.protocols {
-            if protocols.len() == 1 {
-                parts.push(format!("net.protocol == \"{}\"", protocols[0]));
-            } else if !protocols.is_empty() {
-                let proto_expr =
-                    protocols.iter().map(|p| format!("net.protocol == \"{}\"", p)).collect::<Vec<_>>().join(" || ");
-                parts.push(format!("({})", proto_expr));
-            }
-        }
+        // if let Some(protocols) = &self.protocols {
+        //     if protocols.len() == 1 {
+        //         parts.push(format!("net.protocol == \"{}\"", protocols[0]));
+        //     } else if !protocols.is_empty() {
+        //         let proto_expr =
+        //             protocols.iter().map(|p| format!("net.protocol == \"{}\"", p)).collect::<Vec<_>>().join(" || ");
+        //         parts.push(format!("({})", proto_expr));
+        //     }
+        // }
 
         // Headers
         for (key, values) in &self.headers {
+            let key = key.replace("-", "_");
             if values.len() == 1 {
                 parts.push(format!(r##"http.headers.{key} == "{}""##, values[0]));
             } else if !values.is_empty() {

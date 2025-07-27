@@ -23,6 +23,8 @@ impl KongGatewayAdminClient {
             "https".to_owned()
         ]);
 
+        web_route.headers.insert("content-type".to_owned(), vec!["application/grpc-web+proto".to_owned()]);
+
         if enable_web {
             // Create route for web
             self.create_or_update_route(service_name, &web_route).await?;
@@ -45,13 +47,9 @@ impl KongGatewayAdminClient {
             }
         } else {
             // Delete the web route
-            let resp = client.delete(format!("{kong_url}/routes/{}", web_route.name)).send().await.map_err(|it| {
+            let _ = client.delete(format!("{kong_url}/routes/{}", web_route.name)).send().await.map_err(|it| {
                 Errors::UnnableToRegisterApiGateway(format!("Failed to delete web grpc route {}: {it}", web_route.name))
             })?;
-
-            if !resp.status().is_success() {
-                return Err(Errors::UnnableToRegisterApiGateway(format!("Failed to delete web grpc route {}: {:?}", web_route.name, resp.text().await)));
-            }
         }
 
         Ok(())
