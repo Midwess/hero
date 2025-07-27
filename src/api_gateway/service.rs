@@ -152,7 +152,8 @@ pub struct GatewayRouteBuilder {
     pub strip_path: Option<bool>,
     pub preserve_host: Option<bool>,
     pub is_public: Option<bool>,
-    pub enable_web: bool
+    pub is_grpc: bool,
+    pub enable_web: bool,
 }
 impl GatewayRouteBuilder {
     pub fn new() -> Self {
@@ -210,6 +211,8 @@ impl GatewayRouteBuilder {
             "grpcs".to_string(),
         ]);
 
+        self.is_grpc = true;
+
         self
     }
 
@@ -243,6 +246,10 @@ impl GatewayRouteBuilder {
 
         if !is_public {
             headers.insert("xinternal".to_owned(), vec!["true".to_owned()]);
+        }
+
+        if self.is_grpc {
+            headers.insert("content-type".to_owned(), vec!["application/grpc".to_owned()]);
         }
 
         GatewayRoute {
