@@ -35,8 +35,6 @@ pub trait IdbId: DbId + SendSync + Debug + serde::Serialize + for<'de> serde::De
         let self_json: Array = IdbId::serialize(self)?.unchecked_into();
         let other_json: Array = IdbId::serialize(other)?.unchecked_into();
 
-        log::info!("{self_json:?} vs {other_json:?}");
-
         if self_json.length() != other_json.length() {
             return Ok(false);
         }

@@ -91,7 +91,6 @@ where
         };
 
 
-        log::info!("from_id: {:?}, to_id: {:?}", from_id, to_id);
         let range_query = match (from_id, to_id) {
             (Some(from_id), Some(to_id)) => Some(Query::KeyRange(KeyRange::bound(&from_id, &to_id, Some(false), Some(false))?)),
             (Some(from_id), None) => Some(Query::KeyRange(KeyRange::lower_bound(&from_id, Some(false))?)),
@@ -133,7 +132,6 @@ where
         let store = transaction.object_store(table_name)?;
         let exact_id = IdbTable::id(&record);
         let key = IdbId::serialize(&exact_id)?;
-        log::info!("Deleting key: {:?}", key);
         let query = Query::Key(key);
         store.delete(query)?.await?;
         Ok(record)
