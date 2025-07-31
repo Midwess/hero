@@ -1,5 +1,6 @@
 use crate::db::repository::abstraction::id::DbId;
 use surreal_devl::proxy::default::{SurrealDeserializer, SurrealSerializer};
+use surrealdb::{RecordId, RecordIdKey};
 use surrealdb::sql::{Id, Thing, Value};
 
 pub trait SurrealDbId: DbId + SurrealSerializer + SurrealDeserializer {
@@ -11,6 +12,11 @@ pub trait SurrealDbId: DbId + SurrealSerializer + SurrealDeserializer {
         };
 
         Thing::from((tb, Id::Array(compound_id)))
+    }
+
+    fn record_id(self, tb: &str) -> RecordId {
+        let value = self.id(tb);
+        RecordId::from_inner(value)
     }
 
     fn from_thing(thing: Thing) -> Self {
