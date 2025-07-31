@@ -6,13 +6,14 @@ use futures_util::StreamExt;
 use std::sync::{Arc, Weak};
 use surrealdb::method::Stream;
 use surrealdb::opt::Resource;
-use surrealdb::{Notification, RecordId, Value};
+use surrealdb::{Notification, RecordId, RecordIdKey, Value};
+use surrealdb::sql::Thing;
 use tokio::sync::{watch, Mutex};
 use tokio::task::JoinHandle;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum LiveId {
-    Record(RecordId)
+    Record(Thing)
 }
 
 pub struct LiveStream {
@@ -24,10 +25,14 @@ pub struct LiveStream {
 impl LiveStream {
     pub fn new(id: LiveId, mut stream: Stream<Value>) -> Self {
         let (tx, rx) = watch::channel(None);
+        let id_cloned = id.clone();
         let join_handle = tokio::spawn(async move {
+            log::info!("Live stream started {id_cloned:?}");
             while let Some(value) = stream.next().await {
                 let _ = tx.send(Some(value));
             }
+
+            log::info!("Live stream closed {id_cloned:?}");
         });
 
         Self {
@@ -78,7 +83,10 @@ impl LiveQuery {
         drop(streams);
 
         let live_query_stream = match &id {
-            LiveId::Record(id) => self.db.select(Resource::from(id)).live().await?
+            LiveId::Record(id) => {
+                let record = RecordId::from_inner(id.clone());
+                self.db.select(Resource::from(record)).live().await?
+            }
         };
 
         let mut streams = self.streams.lock().await;
