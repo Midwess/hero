@@ -53,6 +53,10 @@ where
     }
 
     async fn find_one(&self, record_id: &Id) -> crate::db::repository::abstraction::errors::Resolve<Option<Record>> {
+        SurrealDbRepository::find_one_impl(self, record_id).await
+    }
+
+    async fn find_one_impl(&self, record_id: &Id) -> crate::db::repository::abstraction::errors::Resolve<Option<Record>> {
         let db = self.get_db().await;
         let table = Record::get_table().to_owned();
         let value = record_id.clone().serialize();
