@@ -15,7 +15,7 @@ use crate::db::repository::abstraction::errors::RepositoryError;
 pub enum Errors {
     #[error("Operation on db name {} got error {}", .db_name, .message)]
     DatabaseError { message: String, db_name: String },
-    #[error("Bad request {}", .0)]
+    #[error("{0}")]
     BadRequest(String),
     #[error("User {} already exist", .0)]
     UserAlreadyExist(String),
