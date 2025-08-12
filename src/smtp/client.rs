@@ -64,7 +64,7 @@ impl SmtpClient {
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/octet-stream"));
         let res = client
-            .post(self.crafter_url.clone())
+            .post(format!("{}/email", self.crafter_url))
             .body(buffer)
             .headers(headers)
             .send()
