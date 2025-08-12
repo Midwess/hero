@@ -8,6 +8,7 @@ use surreal_devl::proxy::default::{SurrealDeserializer, SurrealSerializer};
 use surreal_devl::surreal_id::SurrealId;
 use surreal_devl::surreal_qr::{RPath, SurrealQR};
 use surreal_devl::surreal_statement;
+use surrealdb::sql::Value;
 
 #[async_trait::async_trait]
 pub trait SurrealDbRepository<Record, Id>: Repository<Record, Id>
@@ -60,11 +61,45 @@ where
         let db = self.get_db().await;
         let table = Record::get_table().to_owned();
         let value = record_id.clone().serialize();
-        let mut id_statement = "".to_owned();
-        match value {
-            surrealdb::sql::Value::Array(array) => {
+
+        let mut from_index_has_extra_query = None;
+        let range_id = match &value {
+            Value::Array(array) => {
                 let mut matched_statement = 0;
+                let mut range_id = array.0.clone();
+                let mut is_none = false;
+                for (index, item) in range_id.iter_mut().enumerate() {
+                    if item.is_none() {
+                        is_none = true;
+                        from_index_has_extra_query = Some(index);
+                    }
+
+                    if is_none {
+                        *item = Value::None;
+                    }
+                };
+
+                if is_none {
+                    surreal_quote!(r#":#val(&range_id).."#)
+                }
+                else {
+                    surreal_quote!(r#":#val(&range_id)"#)
+                }
+            },
+            _ => {
+                surreal_quote!(r#":#val(&value)"#)
+            }
+        };
+
+        let extra_where_statement = match (from_index_has_extra_query, value) {
+            (Some(none_index), Value::Array(array)) => {
+                let mut matched_statement = 0;
+                let mut id_statement = "WHERE ".to_owned();
                 for (index, item) in array.0.iter().enumerate() {
+                    if (index < none_index) {
+                        continue;
+                    }
+
                     let value = SurrealQR(item.clone());
                     if value.is_none() {
                         continue;
@@ -78,14 +113,16 @@ where
 
                     matched_statement += 1;
                 }
+
+                id_statement
             }
             _ => {
-                id_statement = format!("id={}", surreal_statement::val(&value));
+                "".to_owned()
             }
-        }
+        };
 
         let result: Option<Record> = db
-            .query(surreal_quote!("SELECT * FROM #table WHERE #id_statement LIMIT 1"))
+            .query(surreal_quote!("SELECT * FROM #(table)#(range_id) #extra_where_statement LIMIT 1"))
             .await?
             .take(RPath::from(0))?;
         Ok(result)
