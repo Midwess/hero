@@ -5,6 +5,8 @@ use std::sync::Arc;
 
 #[cfg(feature = "s3")]
 use core_services::s3::S3Client;
+#[cfg(feature = "smtp")]
+use core_services::smtp::client::SmtpClient;
 #[cfg(feature = "db-remote")]
 use core_services::utils::pool::allocator::{PoolAllocator, PoolBuilder};
 #[cfg(feature = "db-remote")]
@@ -38,13 +40,17 @@ pub trait DependenciesInjection {
     async fn db_allocator(&self, db_name: DbName) -> Arc<PoolAllocator<SurrealDbConnection>>;
     #[cfg(feature = "db-remote")]
     async fn db(&self, db_name: DbName) -> PoolRequest<SurrealDbConnection>;
+    #[cfg(feature = "smtp")]
+    async fn smtp_client(&self) -> SmtpClient;
 }
 
 pub struct DevlogSdk {
     #[cfg(feature = "db-remote")]
     db_allocators: Mutex<HashMap<DbName, Arc<PoolAllocator<SurrealDbConnection>>>>,
     #[cfg(feature = "s3")]
-    s3_client: OnceCell<S3Client>
+    s3_client: OnceCell<S3Client>,
+    #[cfg(feature = "smtp")]
+    smtp_client: OnceCell<SmtpClient>
 }
 
 impl Default for DevlogSdk {
@@ -59,7 +65,9 @@ impl DevlogSdk {
             #[cfg(feature = "db-remote")]
             db_allocators: Mutex::new(HashMap::new()),
             #[cfg(feature = "s3")]
-            s3_client: OnceCell::new()
+            s3_client: OnceCell::new(),
+            #[cfg(feature = "smtp")]
+            smtp_client: OnceCell::new()
         }
     }
 }
@@ -148,5 +156,39 @@ impl DependenciesInjection for DevlogSdk {
         let _ = self.s3_client.set(s3_client.clone());
 
         s3_client
+    }
+
+    #[cfg(feature = "smtp")]
+    async fn smtp_client(&self) -> SmtpClient {
+        use core_services::smtp::client::SmtpPoolResourceProvider;
+        use core_services::utils::pool::allocator::{PoolAllocator, PoolBuilder};
+        use core_services::utils::pool::request::PoolRequestBuilder;
+        use lettre::SmtpTransport;
+        use std::sync::Arc;
+
+        use crate::config::CONFIGS;
+
+        if let Some(smtp_client) = self.smtp_client.get() {
+            return smtp_client.clone();
+        }
+
+        let smtp_provider: Box<dyn PoolResourceProvider<SmtpTransport>> = Box::new(SmtpPoolResourceProvider);
+
+        let smtp_allocator: Arc<PoolAllocator<SmtpTransport>> = PoolBuilder::new(smtp_provider)
+            .min_pool_size(1)
+            .max_pool_size(10)
+            .build()
+            .await;
+
+        let transport = PoolRequestBuilder::new().pool(smtp_allocator).build();
+
+        let smtp_client = SmtpClient {
+            transport,
+            crafter_url: CONFIGS.kong.url.clone()
+        };
+
+        let _ = self.smtp_client.set(smtp_client.clone());
+
+        smtp_client
     }
 }
