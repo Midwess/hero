@@ -184,7 +184,7 @@ impl DependenciesInjection for DevlogSdk {
 
         let smtp_client = SmtpClient {
             transport,
-            crafter_url: CONFIGS.kong.url.clone()
+            crafter_url: format!("http://{}:{}/crafter", CONFIGS.kong.host, CONFIGS.kong.port)
         };
 
         let _ = self.smtp_client.set(smtp_client.clone());
