@@ -7,11 +7,11 @@ use lettre::message::header::ContentType;
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{SmtpTransport, Transport};
 use log::info;
-use prost::Message;
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
+use prost::Message;
 use reqwest::StatusCode;
 use schema::crafter::email_template::Template;
-use schema::crafter::{CrafterRequest, CrafterResponse, EmailTemplate};
+use schema::crafter::EmailTemplate;
 
 pub struct SmtpPoolResourceProvider;
 
@@ -26,28 +26,23 @@ impl PoolResourceProvider<SmtpTransport> for SmtpPoolResourceProvider {
 
 #[derive(Clone)]
 pub struct SmtpClient {
-    pub transport: PoolRequest<SmtpTransport>
+    pub transport: PoolRequest<SmtpTransport>,
+    pub crafter_url: String
 }
 
 impl SmtpClient {
-    pub async fn send(&self, template: EmailTemplate) -> Resolve<()> {
+    pub async fn send(&self, template: EmailTemplate, receiver: String) -> Resolve<()> {
         let subject = match &template.template {
             Some(Template::Otp(_)) => "OTP verification".to_owned(),
-            Some(Template::Welcome(_)) => "Welcome".to_owned(),
-            None => "Devlog studio".to_owned()
-        };
-        let user_email = match &template.template {
-            Some(Template::Welcome(u)) => u.user_name.clone(),
-            Some(Template::Otp(_)) => {
-                todo!()
-            }
-            None => return Err(Errors::BadRequest("Template.template must be defined".to_owned()))
+            Some(Template::Welcome(_)) => "Welcome to Westrise".to_owned(),
+            Some(Template::SendFile(_)) => "Files received".to_owned(),
+            None => "Westrise".to_owned()
         };
 
         let html = self.get_html_template(&template).await?;
         let message = lettre::Message::builder()
-            .from(format!("Devlog studio <{}>", CONFIGS.smtp.username).parse().unwrap())
-            .to(user_email.clone().parse().unwrap())
+            .from(format!("Westrise <{}>", CONFIGS.smtp.username).parse().unwrap())
+            .to(receiver.parse().unwrap())
             .subject(subject)
             .header(ContentType::TEXT_HTML)
             .body(html)
@@ -63,12 +58,8 @@ impl SmtpClient {
 
     async fn get_html_template(&self, template: &EmailTemplate) -> Resolve<String> {
         let client = reqwest::Client::new();
-        let crafter_request = CrafterRequest {
-            template: template.clone()
-        };
-
         let mut buffer = Vec::new();
-        crafter_request.encode(&mut buffer).expect("Not able to serialize crafter request to a buffer");
+        template.encode(&mut buffer).expect("Not able to serialize crafter request to a buffer");
 
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/octet-stream"));
@@ -90,12 +81,13 @@ impl SmtpClient {
         }
 
         let bytes = res.bytes().await.expect("The response must be in binary format");
+        let crafter_response = String::from_utf8(bytes.to_vec())
+            .map_err(|e| Errors::FailedToSendEmail(format!("Failed to parse crafter response as UTF-8: {e}")))?;
 
-        let crafter_response = CrafterResponse::decode(bytes).expect("The response must be schema instance");
         info!(
             target: "smtp-client",
             "Received generated content for template={:?} from crafter, html={} chars",
-            &template, crafter_response.html.len());
-        Ok(crafter_response.html)
+            &template, crafter_response.len());
+        Ok(crafter_response)
     }
 }
