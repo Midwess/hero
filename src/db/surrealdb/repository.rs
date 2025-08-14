@@ -94,7 +94,7 @@ where
         let extra_where_statement = match (from_index_has_extra_query, value) {
             (Some(none_index), Value::Array(array)) => {
                 let mut matched_statement = 0;
-                let mut id_statement = "WHERE ".to_owned();
+                let mut id_statement = "".to_owned();
                 for (index, item) in array.0.iter().enumerate() {
                     if (index < none_index) {
                         continue;
@@ -106,7 +106,7 @@ where
                     }
 
                     if matched_statement == 0 {
-                        id_statement = format!("id[{index}]={}", surreal_statement::val(&value.0));
+                        id_statement = format!("WHERE id[{index}]={}", surreal_statement::val(&value.0));
                     } else {
                         id_statement.push_str(&format!(" AND id[{index}]={}", surreal_statement::val(&value.0)));
                     }
@@ -114,7 +114,11 @@ where
                     matched_statement += 1;
                 }
 
-                id_statement
+                if matched_statement > 0 {
+                    id_statement
+                } else {
+                    "".to_owned()
+                }
             }
             _ => {
                 "".to_owned()
