@@ -65,7 +65,6 @@ where
         let mut from_index_has_extra_query = None;
         let range_id = match &value {
             Value::Array(array) => {
-                let mut matched_statement = 0;
                 let mut range_id = array.0.clone();
                 let mut is_none = false;
                 for (index, item) in range_id.iter_mut().enumerate() {
@@ -96,7 +95,7 @@ where
                 let mut matched_statement = 0;
                 let mut id_statement = "".to_owned();
                 for (index, item) in array.0.iter().enumerate() {
-                    if (index < none_index) {
+                    if index < none_index {
                         continue;
                     }
 

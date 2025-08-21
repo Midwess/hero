@@ -1,8 +1,7 @@
 use futures_util::StreamExt;
-use idb::{Database, KeyPath, KeyRange, ObjectStoreParams, Query, TransactionMode};
-use wasm_bindgen::JsValue;
+use idb::{Database, KeyRange, Query, TransactionMode};
 use crate::db::repository::abstraction::errors::{RepositoryError, Resolve};
-use crate::db::repository::abstraction::repository::{Repository, SendSync};
+use crate::db::repository::abstraction::repository::Repository;
 use crate::db::idb::table::IdbTable;
 use crate::db::idb::id::IdbId;
 use crate::utils::never_send::NeverSend;
@@ -41,7 +40,7 @@ where
     }
 
     async fn find_one(&self, id: &I) -> Resolve<Option<T>> {
-        let mut result = IdbRepository::find_all_with_keys(self, Some(id), None, None).await?;
+        let result = IdbRepository::find_all_with_keys(self, Some(id), None, None).await?;
         if result.is_empty() {
             return Ok(None);
         }
@@ -67,7 +66,7 @@ where
 
     async fn find_all(&self, from: Option<&I>, to: Option<&I>, limit: Option<usize>) -> Resolve<Vec<T>> {
         let result = IdbRepository::find_all_with_keys(self, from, to, limit).await?;
-        Ok(result.into_iter().map(|(id, item)| item).collect())
+        Ok(result.into_iter().map(|(_id, item)| item).collect())
     }
 
     async fn find_all_with_keys(&self, from: Option<&I>, to: Option<&I>, limit: Option<usize>) -> Resolve<Vec<(I, T)>> {

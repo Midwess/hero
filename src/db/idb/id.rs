@@ -5,7 +5,6 @@ use js_sys::Array;
 use wasm_bindgen::{JsCast, JsValue};
 use super::table::convert_large_numbers_to_strings;
 use crate::db::repository::abstraction::repository::SendSync;
-use indexmap::IndexMap;
 
 pub trait IdbId: DbId + SendSync + Debug + serde::Serialize + for<'de> serde::Deserialize<'de> {
     // The default implementation will serialize your struct

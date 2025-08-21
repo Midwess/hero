@@ -1,6 +1,6 @@
 use crate::db::repository::abstraction::id::DbId;
 use surreal_devl::proxy::default::{SurrealDeserializer, SurrealSerializer};
-use surrealdb::{RecordId, RecordIdKey};
+use surrealdb::RecordId;
 use surrealdb::sql::{Id, Thing, Value};
 
 pub trait SurrealDbId: DbId + SurrealSerializer + SurrealDeserializer {
