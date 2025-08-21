@@ -6,7 +6,7 @@ use futures_util::StreamExt;
 use std::sync::{Arc, Weak};
 use surrealdb::method::Stream;
 use surrealdb::opt::Resource;
-use surrealdb::{Notification, RecordId, RecordIdKey, Value};
+use surrealdb::{Notification, RecordId, Value};
 use surrealdb::sql::Thing;
 use tokio::sync::{watch, Mutex};
 use tokio::task::JoinHandle;

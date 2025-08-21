@@ -1,7 +1,7 @@
 use core_services::services::base::Resolve;
 use core_services::services::errors::Errors;
 use log::info;
-use reqwest::{Response, StatusCode};
+use reqwest::StatusCode;
 use serde_json::json;
 
 use crate::api_gateway::client::ApiGatewayClient;
@@ -95,7 +95,7 @@ impl KongGatewayAdminClient {
 
 #[async_trait::async_trait]
 impl ApiGatewayClient for KongGatewayAdminClient {
-    async fn route_to(&self, mut service: GatewayService) -> Resolve<()> {
+    async fn route_to(&self, service: GatewayService) -> Resolve<()> {
         for route in service.routes {
             self.create_or_update_route(service.name.clone(), &route).await?;
 
