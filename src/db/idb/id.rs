@@ -19,7 +19,7 @@ pub trait IdbId: DbId + SendSync + Debug + serde::Serialize + for<'de> serde::De
 
     fn into_query_value(&self) -> Result<JsValue, RepositoryError> {
         let js_value = IdbId::serialize(self)?;
-        let array: Array = js_value.clone().unchecked_into();
+        let array: Array = js_value.unchecked_into();
         for i in 0..array.length() {
             let element = array.get(i);
             if element.is_undefined() {
@@ -45,7 +45,7 @@ pub trait IdbId: DbId + SendSync + Debug + serde::Serialize + for<'de> serde::De
                 continue;
             }
 
-            if self_element != other_element {
+            if self_element.ne(&other_element) {
                 return Ok(false);
             }
         }

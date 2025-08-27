@@ -5,8 +5,6 @@ use std::time::Duration;
 use futures_util::lock::Mutex;
 use n0_future::task::{JoinHandle, spawn};
 use n0_future::time;
-#[cfg(not(feature = "wasm-logger"))]
-use pretty_env_logger::formatted_timed_builder;
 
 pub fn setup() {
     #[cfg(target_arch = "wasm32")]
@@ -47,6 +45,7 @@ pub fn setup() {
 
     #[cfg(not(target_arch = "wasm32"))]
     {
+        use pretty_env_logger::formatted_timed_builder;
         let mut log_builder = formatted_timed_builder();
         if let Ok(filter_env) = std::env::var("RUST_LOG") {
             log_builder.parse_filters(&filter_env);
