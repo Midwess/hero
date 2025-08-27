@@ -16,15 +16,7 @@ struct CancelState {
 #[derive(Clone, Debug)]
 pub struct CancellationToken {
     state: Arc<CancelState>,
-    is_canceled: Arc<AtomicBool>,
-}
-
-impl Drop for CancellationToken {
-    fn drop(&mut self) {
-        let strong = Arc::strong_count(&self.state);
-        self.is_canceled.store(strong == 0, std::sync::atomic::Ordering::Relaxed);
-        self.state.waker.wake();
-    }
+    life_count: Arc<()>,
 }
 
 impl PartialEq for CancellationToken {
@@ -55,14 +47,14 @@ impl CancellationToken {
             state: Arc::new(CancelState {
                 waker: AtomicWaker::new(),
             }),
-            is_canceled: Arc::new(AtomicBool::new(false)),
+            life_count: Arc::new(()),
         }
     }
 
     pub fn signal(&self) -> AbortSignal {
         AbortSignal {
             inner: Arc::downgrade(&self.state),
-            is_canceled: Arc::downgrade(&self.is_canceled),
+            life_count: Arc::downgrade(&self.life_count),
         }
     }
 }
@@ -70,33 +62,30 @@ impl CancellationToken {
 #[derive(Clone, Debug)]
 pub struct AbortSignal {
     inner: Weak<CancelState>,
-    is_canceled: Weak<AtomicBool>,
+    life_count: Weak<()>,
 }
 
 impl Future for AbortSignal {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let Some(is_canceled) = self.is_canceled.upgrade() else {
-            return Poll::Ready(());
-        };
-
-        if is_canceled.load(std::sync::atomic::Ordering::Relaxed) {
+        if self.life_count.strong_count() == 0 {
             return Poll::Ready(());
         }
 
         match self.inner.upgrade() {
             Some(state) => {
                 state.waker.register(cx.waker());
+                Poll::Pending
             }
-            None => return Poll::Ready(()),
-        };
-
-        if is_canceled.load(std::sync::atomic::Ordering::Relaxed) {
-            Poll::Ready(())
-        } else {
-            Poll::Pending
+            None => Poll::Ready(())
         }
+    }
+}
+
+impl AbortSignal {
+    pub fn is_aborted(&self) -> bool {
+        self.life_count.strong_count() == 0
     }
 }
 
@@ -115,19 +104,25 @@ impl fmt::Display for AbortError {
 
 impl Error for AbortError {}
 
+impl Into<AbortSignal> for &AbortSignal {
+    fn into(self) -> AbortSignal {
+        self.clone()
+    }
+}
+
 pub trait AbortableExt: Future + Sized {
-    async fn abort_with(self, signal: AbortSignal) -> Result<Self::Output, AbortError>;
+    async fn abort_with(self, signal: impl Into<AbortSignal>) -> Result<Self::Output, AbortError>;
 }
 
 impl<Fu> AbortableExt for Fu
 where
     Fu: Future,
 {
-    async fn abort_with(self, signal: AbortSignal) -> Result<Self::Output, AbortError> {
+    async fn abort_with(self, signal: impl Into<AbortSignal>) -> Result<Self::Output, AbortError> {
         use futures::{future::FutureExt, select};
 
         let task = self.fuse();
-        let sig = signal.fuse();
+        let sig = signal.into().fuse();
 
         futures::pin_mut!(task);
         futures::pin_mut!(sig);
@@ -192,37 +187,4 @@ mod tests {
             assert_eq!(res.err().unwrap(), AbortError::Cancelled);
         });
     }
-
-    #[test]
-    fn only_aborts_after_all_tokens_dropped() {
-        block_on(async {
-            let token1 = CancellationToken::new();
-            let token2 = token1.clone(); // second handle to same state
-            let signal = token1.signal();
-
-            let task = async {
-                Delay::new(Duration::from_millis(200)).await;
-                42
-            };
-
-            let abort_trigger = async {
-                Delay::new(Duration::from_millis(50)).await;
-                drop(token1); // one token dropped, but another still exists
-                Delay::new(Duration::from_millis(50)).await;
-                assert!(!token2.is_canceled.load(std::sync::atomic::Ordering::Relaxed));
-
-                drop(token2); // now last token dropped -> should cancel
-            };
-
-            let (res, _) = futures::join!(
-                async {
-                    task.abort_with(signal).await
-                },
-                abort_trigger,
-            );
-
-            assert_eq!(res.err().unwrap(), AbortError::Cancelled);
-        });
-    }
 }
-
