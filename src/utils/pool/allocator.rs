@@ -7,10 +7,10 @@ use std::collections::VecDeque;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use std::time::Duration;
+use futures::channel::oneshot;
 use futures_timer::Delay;
 use futures_util::lock::Mutex;
 use n0_future::task::{spawn, JoinHandle};
-use tokio::sync::oneshot;
 
 use super::reponse::PoolResponse;
 

@@ -1,9 +1,8 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-
-use tokio::spawn;
-use tokio::sync::Mutex;
+use futures_util::lock::Mutex;
+use n0_future::task::spawn;
 
 type Cleanup = Pin<Box<dyn Future<Output = ()> + Send>>;
 
