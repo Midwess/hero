@@ -113,8 +113,9 @@ impl std::future::Future for Cancelled {
 
 use std::future::Future;
 use std::time::Duration;
+use futures_timer::Delay;
+use futures_util::{select, FutureExt};
 use thiserror::Error;
-use tokio::time::sleep;
 
 #[derive(Error, Debug)]
 pub enum TaskErrors {
@@ -126,17 +127,19 @@ pub trait FutureExtension: Future + Sized {
     fn with_cancel(self, cancellation: &CancellationToken) -> impl Future<Output = Result<Self::Output, TaskErrors>>;
 }
 
-impl<T: Future> FutureExtension for T {
+impl<T: Future + Unpin> FutureExtension for T {
     async fn with_cancel(self, cancellation: &CancellationToken) -> Result<Self::Output, TaskErrors> {
         if cancellation.is_cancelled() {
             return Err(TaskErrors::Cancelled)
         }
 
-        tokio::select! {
-            output = self => {
+        let mut self_ = self.fuse();
+        let mut cancelled = cancellation.cancelled().fuse();
+        select! {
+            output = self_ => {
                 Ok(output)
             },
-            _ = cancellation.cancelled() => {
+            _ = cancelled => {
                 Err(TaskErrors::Cancelled)
             }
         }
@@ -153,7 +156,7 @@ impl CancellationTokenExt for CancellationToken {
         let child = token.clone();
 
         spawn(async move {
-            sleep(duration).await;
+            Delay::new(duration).await;
             child.cancel();
         });
 
