@@ -6,3 +6,4 @@ pub mod never_send;
 pub mod maybe;
 pub mod cancellation;
 pub mod stream;
+pub mod yield_container;

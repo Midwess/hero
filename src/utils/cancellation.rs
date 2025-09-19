@@ -1,190 +1,162 @@
 use std::{
-    error::Error,
-    fmt,
-    future::Future,
-    pin::Pin,
-    sync::{Arc, Weak},
-    task::{Context, Poll},
+    sync::{Arc, Weak, Mutex, atomic::{AtomicBool, Ordering}},
 };
+use std::fmt::Debug;
+use n0_future::task::spawn;
 use futures::task::AtomicWaker;
 
 struct CancelState {
+    cancelled: AtomicBool,
     waker: AtomicWaker,
+    children: Mutex<Vec<Weak<CancelState>>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct CancellationToken {
     state: Arc<CancelState>,
-    life_count: Arc<()>,
+}
+
+impl Debug for CancellationToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CancellationToken")
+            .field("cancelled", &self.is_cancelled())
+            .finish()
+    }
 }
 
 impl PartialEq for CancellationToken {
-    fn eq(&self, _other: &Self) -> bool {
+    fn eq(&self, _: &Self) -> bool {
         true
     }
 }
 
 impl Eq for CancellationToken {}
 
-impl fmt::Debug for CancelState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("CancelState").finish_non_exhaustive()
-    }
-}
-
-impl Eq for CancelState {}
-
-impl PartialEq for CancelState {
-    fn eq(&self, _other: &Self) -> bool {
-        true
-    }
-}
-
 impl CancellationToken {
     pub fn new() -> Self {
-        CancellationToken {
+        Self {
             state: Arc::new(CancelState {
+                cancelled: AtomicBool::new(false),
                 waker: AtomicWaker::new(),
+                children: Mutex::new(Vec::new()),
             }),
-            life_count: Arc::new(()),
         }
     }
 
-    pub fn signal(&self) -> AbortSignal {
-        AbortSignal {
-            inner: Arc::downgrade(&self.state),
-            life_count: Arc::downgrade(&self.life_count),
+    /// Returns true if this token or its parent was cancelled.
+    pub fn is_cancelled(&self) -> bool {
+        self.state.cancelled.load(Ordering::SeqCst)
+    }
+
+    /// Cancel this token and recursively cancel all child tokens.
+    pub fn cancel(&self) {
+        if !self.state.cancelled.swap(true, Ordering::SeqCst) {
+            self.state.waker.wake();
+            let children = self.state.children.lock().unwrap();
+            for child_weak in children.iter() {
+                if let Some(child) = child_weak.upgrade() {
+                    child.cancelled.store(true, Ordering::SeqCst);
+                    child.waker.wake();
+                }
+            }
+        }
+    }
+
+    /// Creates a new child token that is linked to this token.
+    pub fn child_token(&self) -> Self {
+        let child = CancellationToken::new();
+        self.state.children.lock().unwrap().push(Arc::downgrade(&child.state));
+        if self.is_cancelled() {
+            child.cancel();
+        }
+        child
+    }
+
+    /// Returns a future that resolves when this token is cancelled.
+    pub fn cancelled(&self) -> Cancelled {
+        Cancelled {
+            state: Arc::downgrade(&self.state),
         }
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct AbortSignal {
-    inner: Weak<CancelState>,
-    life_count: Weak<()>,
+impl Drop for CancellationToken {
+    fn drop(&mut self) {
+        if Arc::strong_count(&self.state) == 1 {
+            self.cancel();
+        }
+    }
 }
 
-impl Future for AbortSignal {
+pub struct Cancelled {
+    state: Weak<CancelState>,
+}
+
+impl std::future::Future for Cancelled {
     type Output = ();
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if self.life_count.strong_count() == 0 {
-            return Poll::Ready(());
-        }
-
-        match self.inner.upgrade() {
-            Some(state) => {
-                state.waker.register(cx.waker());
-                Poll::Pending
+    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
+        if let Some(state) = self.state.upgrade() {
+            if state.cancelled.load(Ordering::SeqCst) {
+                std::task::Poll::Ready(())
             }
-            None => Poll::Ready(())
+            else {
+                state.waker.register(cx.waker());
+                std::task::Poll::Pending
+            }
+        }
+        else {
+            std::task::Poll::Ready(())
         }
     }
 }
 
-impl AbortSignal {
-    pub fn is_aborted(&self) -> bool {
-        self.life_count.strong_count() == 0
-    }
+use std::future::Future;
+use std::time::Duration;
+use thiserror::Error;
+use tokio::time::sleep;
+
+#[derive(Error, Debug)]
+pub enum TaskErrors {
+    #[error("Task cancelled")]
+    Cancelled
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum AbortError {
-    Cancelled,
+pub trait FutureExtension: Future + Sized {
+    fn with_cancel(self, cancellation: &CancellationToken) -> impl Future<Output = Result<Self::Output, TaskErrors>>;
 }
 
-impl fmt::Display for AbortError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            AbortError::Cancelled => write!(f, "The operation was cancelled"),
+impl<T: Future> FutureExtension for T {
+    async fn with_cancel(self, cancellation: &CancellationToken) -> Result<Self::Output, TaskErrors> {
+        if cancellation.is_cancelled() {
+            return Err(TaskErrors::Cancelled)
+        }
+
+        tokio::select! {
+            output = self => {
+                Ok(output)
+            },
+            _ = cancellation.cancelled() => {
+                Err(TaskErrors::Cancelled)
+            }
         }
     }
 }
 
-impl Error for AbortError {}
-
-impl Into<AbortSignal> for &AbortSignal {
-    fn into(self) -> AbortSignal {
-        self.clone()
-    }
+pub trait CancellationTokenExt {
+    fn timeout(duration: Duration) -> CancellationToken;
 }
 
-pub trait AbortableExt: Future + Sized {
-    async fn abort_with(self, signal: impl Into<AbortSignal>) -> Result<Self::Output, AbortError>;
-}
+impl CancellationTokenExt for CancellationToken {
+    fn timeout(duration: Duration) -> CancellationToken {
+        let token = CancellationToken::new();
+        let child = token.clone();
 
-impl<Fu> AbortableExt for Fu
-where
-    Fu: Future,
-{
-    async fn abort_with(self, signal: impl Into<AbortSignal>) -> Result<Self::Output, AbortError> {
-        use futures::{future::FutureExt, select};
-
-        let task = self.fuse();
-        let sig = signal.into().fuse();
-
-        futures::pin_mut!(task);
-        futures::pin_mut!(sig);
-
-        select! {
-            res = task => Ok(res),
-            _ = sig => Err(AbortError::Cancelled),
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use futures::executor::block_on;
-    use futures_timer::Delay;
-    use std::time::Duration;
-
-    #[test]
-    fn completes_without_abort() {
-        block_on(async {
-            let token = CancellationToken::new();
-            let signal = token.signal();
-
-            let task = async {
-                Delay::new(Duration::from_millis(50)).await;
-                123
-            };
-
-            let result = task.abort_with(signal).await;
-            assert_eq!(result.unwrap(), 123);
+        spawn(async move {
+            sleep(duration).await;
+            child.cancel();
         });
-    }
 
-    #[test]
-    fn aborts_in_middle_of_task() {
-        block_on(async {
-            let token = CancellationToken::new();
-            let signal = token.signal();
-
-            let task = async {
-                // Simulate some work that should be cut off early
-                for i in 0..10 {
-                    Delay::new(Duration::from_millis(100)).await;
-                    println!("step {}", i);
-                }
-                999
-            };
-
-            // Trigger cancellation after a short delay
-            let abort_trigger = async {
-                Delay::new(Duration::from_millis(250)).await;
-                drop(token); // dropping triggers abort
-            };
-
-            let (res, _) = futures::join!(
-                async {
-                    task.abort_with(signal).await
-                },
-                abort_trigger,
-            );
-
-            assert_eq!(res.err().unwrap(), AbortError::Cancelled);
-        });
+        token
     }
 }

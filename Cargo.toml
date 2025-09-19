@@ -71,6 +71,8 @@ web-sys = "0.3.77"
 futures = "0.3.31"
 chrono = "0.4.42"
 http = "0.2.12"
+tokio-util = "0.7.16"
+futures-executor = "0.3.31"
 
 [build-dependencies]
 

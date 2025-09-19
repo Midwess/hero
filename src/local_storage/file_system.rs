@@ -45,7 +45,6 @@ impl FileEntry {
             }
         }
 
-        // Ensure the file exists by creating it if it doesn't
         if !path.exists() {
             fs::File::create(&path).await?;
         }
