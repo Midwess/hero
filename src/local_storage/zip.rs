@@ -26,11 +26,6 @@ pub struct ZipStream {
     reader: DuplexReader,
     current_writer: Option<EntryStreamWriter<DuplexWriter>>,
     current_index: usize,
-
-    // I don't know why this is needed,
-    // but it's required to stop the writer from being dropped
-    // before all the data is fully retrieved.
-    _writer: Option<DuplexWriter>
 }
 
 impl ZipStream {
@@ -66,12 +61,11 @@ impl ZipStream {
             inputs,
             current_index: 0,
             buffer,
-            _writer: None
         })
     }
 
     pub fn chunk_size(&self) -> usize {
-        self.buffer.capacity()
+        self.buffer.len()
     }
 }
 
@@ -83,6 +77,7 @@ impl IOCursor for ZipStream {
         };
 
         let read_size = max_read.unwrap_or(self.chunk_size() as u64) as usize;
+        let read_size = read_size.min(self.chunk_size());
         let read_buffer = &mut self.buffer.as_mut()[..read_size];
         if let Ok(amount) = self.reader.read(read_buffer).await {
             if amount > 0 {
@@ -112,8 +107,7 @@ impl IOCursor for ZipStream {
             return self.next(max_read).await;
         }
 
-        let finalize = zip_writer.close().await?;
-        self._writer = Some(finalize);
+        zip_writer.close().await?;
         self.next(max_read).await
     }
 
@@ -143,20 +137,18 @@ mod tests {
         let entries = folder.collect_all_entries().await.unwrap();
 
         let mut expected_files = HashMap::new();
-        let mut total_file_size = 0;
         for entry in &entries {
             let relative_path = entry.relative_path(&source_folder).unwrap();
             let relative_path_str = relative_path.to_string_lossy().replace("\\", "/");
             let content = fs::read(&entry.path).await.unwrap();
-            total_file_size += content.len() as u64;
             expected_files.insert(relative_path_str, content);
         }
 
-        let chunk_size = 1096;
+        let chunk_size = 200;
         let mut zip_cursor = folder.cursor(chunk_size).await.unwrap();
 
         let mut zip_data = Vec::new();
-        while let Some(chunk) = zip_cursor.next(None).await.unwrap() {
+        while let Some(chunk) = zip_cursor.next(Some(199)).await.unwrap() {
             zip_data.extend_from_slice(&chunk);
         }
 
@@ -167,6 +159,42 @@ mod tests {
         assert!(zip_entry.size > 0, "Zip entry size should be greater than 0");
         if let Err(e) = decompress_and_verify(&zip_data, &expected_files).await {
             panic!("Zip decompression failed: {e:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_validate_existing_zip_file() {
+        setup();
+        let zip_path = std::path::PathBuf::from("test.zip");
+        
+        if !zip_path.exists() {
+            log::warn!("test.zip not found in current directory, skipping validation test");
+            return;
+        }
+
+        let zip_data = match fs::read(&zip_path).await {
+            Ok(data) => data,
+            Err(e) => {
+                panic!("Failed to read test.zip: {}", e);
+            }
+        };
+
+        match ZipFileReader::new(zip_data).await {
+            Ok(zip_reader) => {
+                let entries = zip_reader.file().entries();
+                log::info!("test.zip is valid and contains {} entries", entries.len());
+                
+                for entry in entries.iter() {
+                    if let Ok(name) = entry.filename().as_str() {
+                        log::info!("Entry: {} (size: {})", name, entry.uncompressed_size());
+                    }
+                }
+                
+                assert!(!entries.is_empty(), "test.zip should contain at least one entry");
+            }
+            Err(e) => {
+                panic!("test.zip is not a valid zip file: {}", e);
+            }
         }
     }
 

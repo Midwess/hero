@@ -88,15 +88,14 @@ impl AsyncRead for DuplexReader {
 
         while count < buf.len() {
             match Pin::new(&mut self.receiver).poll_next(cx) {
-                Poll::Ready(Some(b)) => {
+                Ready(Some(b)) => {
                     buf[count] = b;
                     count += 1;
                 }
-                Poll::Ready(None) => {
-                    log::info!("DuplexReader read EOF {}", count);
+                Ready(None) => {
                     return Ready(Ok(count));
                 }
-                Poll::Pending => {
+                Pending => {
                     break;
                 }
             }

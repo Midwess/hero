@@ -202,7 +202,8 @@ impl IOCursor for FileCursor {
             return Ok(None);
         }
 
-        let read_size = max_read.unwrap_or(self.buffer.capacity() as u64) as usize;
+        let read_size = max_read.unwrap_or(self.buffer.len() as u64) as usize;
+        let read_size = read_size.min(self.buffer.len());
         let read_buffer = &mut self.buffer.as_mut()[..read_size];
         let bytes_read = self.file.read(read_buffer).await?;
         if bytes_read == 0 {
