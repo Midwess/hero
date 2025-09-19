@@ -1,3 +1,6 @@
 #[cfg(feature = "local-storage")]
 pub mod file_system;
-pub mod abstraction;
+pub mod entry;
+pub mod stream;
+#[cfg(feature = "zip")]
+pub mod zip;

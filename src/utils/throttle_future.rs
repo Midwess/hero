@@ -2,10 +2,9 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
-
-use tokio::sync::Mutex;
-use tokio::task::JoinHandle;
-use tokio::{spawn, time};
+use futures_util::lock::Mutex;
+use n0_future::task::{spawn, JoinHandle};
+use n0_future::time;
 
 pub type ThrottleFn<T> = Box<dyn (FnMut(T) -> Pin<Box<dyn Future<Output = ()> + Send + 'static>>) + Send + Sync>;
 

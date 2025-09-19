@@ -10,7 +10,7 @@ pub type S3Connection = aws_sdk_s3::client::Client;
 pub type SmtpTransport = lettre::SmtpTransport;
 
 #[cfg(feature = "host_machine")]
-pub mod host_machine;
+pub mod shell;
 
 #[cfg(feature = "retry")]
 pub mod retry;
@@ -31,3 +31,6 @@ pub mod db;
 pub mod logger;
 pub mod services;
 pub mod utils;
+
+#[cfg(feature = "token")]
+pub mod token;

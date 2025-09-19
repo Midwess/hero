@@ -6,7 +6,6 @@ use std::{
     sync::{Arc, Weak},
     task::{Context, Poll},
 };
-use std::sync::atomic::AtomicBool;
 use futures::task::AtomicWaker;
 
 struct CancelState {
@@ -133,6 +132,7 @@ where
         }
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;

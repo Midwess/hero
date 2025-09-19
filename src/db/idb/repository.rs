@@ -1,4 +1,3 @@
-use futures_util::StreamExt;
 use idb::{Database, KeyRange, Query, TransactionMode};
 use crate::db::repository::abstraction::errors::{RepositoryError, Resolve};
 use crate::db::repository::abstraction::repository::Repository;
@@ -163,24 +162,25 @@ where
     }
 }
 
-#[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
-#[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+// wasm32 implementation
+#[cfg(target_arch = "wasm32")]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl<X, T, I> Repository<T, I> for X
 where
     X: IdbRepository<T, I> + Send + Sync,
     T: Send + Sync + IdbTable<I> + Clone,
-    I: Send + Sync + IdbId + Clone
+    I: Send + Sync + IdbId + Clone,
 {
     async fn create(&self, data: T) -> Resolve<T>
     where
-        T: 'async_trait
+        T: 'async_trait,
     {
         IdbRepository::create(self, data).await
     }
 
     async fn update_one(&self, data: T) -> Resolve<T>
     where
-        T: 'async_trait
+        T: 'async_trait,
     {
         IdbRepository::update_one(self, data).await
     }

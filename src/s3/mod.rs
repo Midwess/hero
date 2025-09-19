@@ -9,6 +9,21 @@ use std::sync::Arc;
 use std::time::Duration;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use aws_smithy_async::rt::sleep::{AsyncSleep, Sleep};
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct UploadPart {
+    pub part_number: i32,
+    pub upload_url: String,
+    // None means the client will decide
+    pub x_content_length: Option<u64>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MultipartUpload{
+    pub upload_id: String,
+    pub parts: Vec<UploadPart>,
+}
 
 #[derive(Clone, Debug)]
 pub struct S3SleepAsync {}
@@ -99,7 +114,7 @@ impl S3Client {
         Ok(())
     }
 
-    pub async fn sign_download(&self, s3_object: &mut StaticResource, duration: Duration) -> Resolve<String> {
+    pub async fn sign_download(&self, s3_object: &StaticResource, duration: Duration) -> Resolve<String> {
         let path = match &s3_object.source {
             Some(Source::S3Path(path)) => path.clone(),
             Some(Source::Url(url)) => return Ok(url.clone()),
@@ -116,12 +131,11 @@ impl S3Client {
             .await?;
 
         let url = presigned_req.uri().to_owned();
-        s3_object.source = Some(Source::Url(url.clone()));
 
         Ok(url)
     }
 
-    pub async fn sign_upload(&self, s3_object: &mut StaticResource, duration: Duration) -> Resolve<String> {
+    pub async fn sign_upload(&self, s3_object: &StaticResource, duration: Duration) -> Resolve<String> {
         let path = match &s3_object.source {
             Some(Source::S3Path(path)) => path.clone(),
             Some(Source::Url(url)) => return Ok(url.clone()),
@@ -138,12 +152,27 @@ impl S3Client {
             .await?;
 
         let url = presigned_req.uri().to_owned();
-        s3_object.source = Some(Source::Url(url.clone()));
 
         Ok(url)
     }
 
-    pub async fn generate_multipart_upload_id(&self, s3_object: &StaticResource) -> Resolve<String> {
+    pub async fn generate_multipart_upload_urls_with_size(
+        &self,
+        s3_object: &StaticResource,
+        part_size: u64,
+        total_file_size: u64,
+        duration: Duration,
+    ) -> Resolve<MultipartUpload> {
+        let part_count = ((total_file_size + part_size - 1) / part_size) as i32;
+        self.generate_multipart_upload_urls(s3_object, part_count, duration).await
+    }
+
+    pub async fn generate_multipart_upload_urls(
+        &self,
+        s3_object: &StaticResource,
+        part_count: i32,
+        duration: Duration,
+    ) -> Resolve<MultipartUpload> {
         let path = match &s3_object.source {
             Some(Source::S3Path(path)) => path.clone(),
             _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned()))
@@ -161,51 +190,48 @@ impl S3Client {
             return Err(Errors::BadRequest("Cannot generate upload id".to_owned()))
         };
 
-        Ok(upload_id)
-    }
+        let presigning_config = PresigningConfig::expires_in(duration)?;
+        let mut upload_parts = Vec::new();
 
-    pub async fn generate_multipart_upload_part_url(
-        &self,
-        s3_object: &StaticResource,
-        upload_id: String,
-        part_number: i32,
-        duration: Duration
-    ) -> Resolve<String> {
-        let path = match &s3_object.source {
-            Some(Source::S3Path(path)) => path.clone(),
-            _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned()))
-        };
-
-        let presigned_req = self
-            .client
-            .upload_part()
-            .upload_id(upload_id)
-            .part_number(part_number)
-            .bucket(path.bucket())
-            .key(path.prefix())
-            .presigned(PresigningConfig::expires_in(duration)?)
-            .await?;
-
-        Ok(presigned_req.uri().to_owned())
-    }
-
-    pub async fn complete_multipart_upload(
-        &self,
-        s3_object: &StaticResource,
-        upload_id: String,
-        part_ids: Vec<(i32, String)>
-    ) -> Resolve<()> {
-        let path = match &s3_object.source {
-            Some(Source::S3Path(path)) => path.clone(),
-            _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned()))
-        };
-
-        let completed_parts = part_ids.into_iter().map(|(part_number, e_tag)| {
-            CompletedPart::builder()
+        for part_number in 1..=part_count {
+            let presigned_req = self
+                .client
+                .upload_part()
+                .bucket(path.bucket())
+                .key(path.prefix())
+                .upload_id(&upload_id)
                 .part_number(part_number)
-                .e_tag(e_tag)
-                .build()
-        }).collect::<Vec<_>>();
+                .presigned(presigning_config.clone())
+                .await?;
+
+            upload_parts.push(UploadPart {
+                part_number,
+                upload_url: presigned_req.uri().to_string(),
+                x_content_length: None,
+            });
+        }
+
+        Ok(MultipartUpload {
+            upload_id,
+            parts: upload_parts,
+        })
+    }
+
+    pub async fn complete_multipart_upload(&self, s3_object: &StaticResource, upload_id: String, e_tags: Vec<String>) -> Resolve<()> {
+        let path = match &s3_object.source {
+            Some(Source::S3Path(path)) => path.clone(),
+            _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned()))
+        };
+
+        let completed_parts: Vec<_> = e_tags.into_iter()
+            .enumerate()
+            .map(|(i, e_tag)| {
+                CompletedPart::builder()
+                    .e_tag(e_tag)
+                    .part_number((i + 1) as i32)
+                    .build()
+            })
+            .collect();
 
         let completed_upload = CompletedMultipartUpload::builder()
             .set_parts(Some(completed_parts))
@@ -218,7 +244,7 @@ impl S3Client {
             .upload_id(upload_id)
             .multipart_upload(completed_upload)
             .send().await?;
-
+    
         Ok(())
     }
 }
