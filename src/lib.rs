@@ -1,6 +1,6 @@
 extern crate core;
 
-#[cfg(any(feature = "db-local", feature = "db-remote"))]
+#[cfg(any(feature = "db-remote"))]
 use surrealdb::engine::any::Any;
 
 #[cfg(feature = "s3")]
@@ -21,7 +21,7 @@ pub mod s3;
 #[cfg(feature = "smtp")]
 pub mod smtp;
 
-#[cfg(any(feature = "db-local", feature = "db-remote"))]
+#[cfg(any(feature = "db-remote"))]
 pub type Db = surrealdb::Surreal<Any>;
 
 pub mod local_storage;
@@ -34,3 +34,6 @@ pub mod utils;
 
 #[cfg(feature = "token")]
 pub mod token;
+
+#[cfg(feature = "wasm")]
+pub mod wasm;

@@ -118,6 +118,7 @@ where
     }
 
     async fn delete_one(&self, id: &I) -> Resolve<T> {
+        log::info!("Deleting item {:?}", id);
         let Some(item) = RedbRepository::find_one(self, id).await? else {
             return Err(RepositoryError::NotFound(
                 format!("{:?}: {:?}", T::get_table(), id),

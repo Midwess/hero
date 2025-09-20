@@ -28,7 +28,7 @@ impl AsyncWrite for DuplexWriter {
 
         while count < buf.len() {
             match self.sender.poll_ready(cx) {
-                Poll::Ready(Ok(())) => {
+                Ready(Ok(())) => {
                     match self.sender.unbounded_send(buf[count]) {
                         Ok(()) => {
                             count += 1;
@@ -41,13 +41,13 @@ impl AsyncWrite for DuplexWriter {
                         }
                     }
                 }
-                Poll::Ready(Err(_)) => {
+                Ready(Err(_)) => {
                     return Ready(Err(std::io::Error::new(
                         std::io::ErrorKind::BrokenPipe,
                         "channel closed",
                     )));
                 }
-                Poll::Pending => {
+                Pending => {
                     if count == 0 {
                         return Pending;
                     }

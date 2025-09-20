@@ -1,6 +1,7 @@
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Weak};
 use futures_util::lock::Mutex;
+use n0_future::future::block_on;
 use n0_future::task::spawn;
 use thiserror::Error;
 
@@ -25,7 +26,7 @@ impl<T: Send + 'static> YieldContainer<T> {
         };
 
         {
-            let mut lock = futures_executor::block_on(container.lock());
+            let mut lock = block_on(container.lock());
             *lock = Some(yieldable);
         }
 

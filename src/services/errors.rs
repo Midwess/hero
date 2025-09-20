@@ -2,13 +2,13 @@
 use aws_sdk_s3::error::SdkError;
 #[cfg(feature = "s3")]
 use aws_sdk_s3::presigning::PresigningConfigError;
-#[cfg(any(feature = "db-local", feature = "db-remote"))]
+#[cfg(any(feature = "db-remote"))]
 use surreal_devl::surreal_qr::SurrealResponseError;
 use thiserror::Error;
 #[cfg(feature = "grpc-server")]
 use tonic::Status;
 
-#[cfg(any(feature = "db-local", feature = "db-remote"))]
+#[cfg(any(feature = "db-remote"))]
 use crate::db::repository::abstraction::errors::RepositoryError;
 
 #[derive(Error, Debug)]
@@ -50,14 +50,14 @@ pub enum Errors {
     FailedToDownloadFile(String),
     #[error("Invalid s3 path format {}", .0)]
     InvalidS3Path(String),
-    #[cfg(any(feature = "db-local", feature = "db-remote"))]
+    #[cfg(any(feature = "db-remote"))]
     #[error("Repository error {}", .0)]
     RepositoryError(#[from] RepositoryError),
     #[error("Json error {}", .0)]
     JsonError(#[from] serde_json::Error)
 }
 
-#[cfg(any(feature = "db-local", feature = "db-remote"))]
+#[cfg(any(feature = "db-remote"))]
 impl From<surrealdb::Error> for Errors {
     fn from(value: surrealdb::Error) -> Self {
         Self::DatabaseError {
@@ -67,7 +67,7 @@ impl From<surrealdb::Error> for Errors {
     }
 }
 
-#[cfg(any(feature = "db-local", feature = "db-remote"))]
+#[cfg(any(feature = "db-remote"))]
 impl From<SurrealResponseError> for Errors {
     fn from(value: SurrealResponseError) -> Self {
         Self::UnexpectedDataFormat(format!("{:?}", &value))
