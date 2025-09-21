@@ -19,7 +19,7 @@ pub enum DistributedIdError {
     WorkerOutOfBound(String, String)
 }
 
-#[cfg_attr(any(feature = "db-remote", feature = "db-local"), derive(surreal_derive_plus::SurrealDerive, serde::Deserialize, serde::Serialize))]
+#[cfg_attr(any(feature = "db-remote"), derive(surreal_derive_plus::SurrealDerive, serde::Deserialize, serde::Serialize))]
 #[derive(Debug, Clone)]
 pub struct Worker {
     pub distributed_id: u64,

@@ -1,12 +1,12 @@
 use chrono::{DateTime, Utc};
-#[cfg(any(feature = "db-local", feature = "db-remote"))]
+#[cfg(any(feature = "db-remote"))]
 use core_services::utils::pool::request::PoolRequest;
 use generator::{DistributedIdGenerator, EPOCH_SINCE};
 use std::sync::Arc;
 use tokio::sync::{Mutex, OnceCell};
 
 pub mod generator;
-#[cfg(any(feature = "db-local", feature = "db-remote"))]
+#[cfg(any(feature = "db-remote"))]
 pub mod surrealdb;
 
 pub static DISTRIBUTED_ID_GENERATOR: OnceCell<Arc<Mutex<DistributedIdGenerator>>> = OnceCell::const_new();
@@ -22,7 +22,7 @@ pub fn id_to_unix_timestamp(id: u64) -> u64 {
     epoch_since_ms + timestamp
 }
 
-#[cfg(any(feature = "db-local", feature = "db-remote"))]
+#[cfg(any(feature = "db-remote"))]
 pub async fn init_id_generator(app_name: String, db: PoolRequest<core_services::db::surrealdb::connection::SurrealDbConnection>) {
     use std::time::Duration;
     use tokio::time::sleep;

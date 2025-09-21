@@ -17,13 +17,13 @@ use core_services::{
     utils::pool::request::PoolRequest
 };
 
-#[cfg(any(feature = "db-remote", feature = "db-local", feature = "s3"))]
+#[cfg(any(feature = "db-remote", feature = "s3"))]
 use core_services::utils::pool::allocator::PoolResourceProvider;
 #[cfg(feature = "db-remote")]
 use tokio::sync::Mutex;
 #[cfg(feature = "s3")]
 use tokio::sync::OnceCell;
-#[cfg(any(feature = "db-remote", feature = "db-local"))]
+#[cfg(any(feature = "db-remote"))]
 type DbName = String;
 
 #[async_trait::async_trait]
