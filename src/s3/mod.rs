@@ -218,6 +218,7 @@ impl S3Client {
     }
 
     pub async fn complete_multipart_upload(&self, s3_object: &StaticResource, upload_id: String, e_tags: Vec<String>) -> Resolve<()> {
+        log::info!("Completing multipart upload {e_tags:?} {upload_id} {s3_object:?}");
         let path = match &s3_object.source {
             Some(Source::S3Path(path)) => path.clone(),
             _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned()))
@@ -243,8 +244,10 @@ impl S3Client {
             .key(path.prefix())
             .upload_id(upload_id)
             .multipart_upload(completed_upload)
-            .send().await?;
-    
+            .send()
+            .await?;
+
+        log::info!("Completed multipart upload");
         Ok(())
     }
 }

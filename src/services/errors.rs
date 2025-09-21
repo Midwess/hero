@@ -75,16 +75,32 @@ impl From<SurrealResponseError> for Errors {
 }
 
 #[cfg(feature = "s3")]
-impl<E, R> From<SdkError<E, R>> for Errors {
-    fn from(value: SdkError<E, R>) -> Self {
-        Self::AwsS3Error(value.to_string())
+impl<E, R> From<SdkError<E, R>> for Errors
+where
+    E: std::fmt::Debug,
+    R: std::fmt::Debug,
+{
+    fn from(err: SdkError<E, R>) -> Self {
+        let msg = match &err {
+            SdkError::ConstructionFailure(e) => format!("S3 ConstructionFailure: {:?}", e),
+            SdkError::DispatchFailure(e) => format!("S3 DispatchFailure: {:?}", e),
+            SdkError::ResponseError(e) => format!(
+                "S3 ResponseError: raw={:?}, service={:?}",
+                e.raw(), e
+            ),
+            SdkError::ServiceError(e) => format!("S3 ServiceError: {:?}", e.err()),
+            SdkError::TimeoutError(e) => format!("S3 TimeoutError: {:?}", e),
+            other => format!("S3 Unknown error: {:?}", other),
+        };
+
+        Self::AwsS3Error(msg)
     }
 }
 
 #[cfg(feature = "s3")]
 impl From<PresigningConfigError> for Errors {
     fn from(value: PresigningConfigError) -> Self {
-        Self::AwsS3Error(value.to_string())
+        Self::AwsS3Error(format!("{:?}", value))
     }
 }
 

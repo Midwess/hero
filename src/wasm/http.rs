@@ -1,16 +1,15 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use wasm_bindgen::JsCast;
-use web_sys::{Blob, XmlHttpRequest as WasmXmlHttpRequest, Event, ProgressEvent, EventTarget, AbortController};
+use web_sys::{Blob, XmlHttpRequest as WasmXmlHttpRequest, Event, ProgressEvent, AbortController};
 use js_sys::Uint8Array;
-use futures::channel::mpsc::{unbounded, UnboundedReceiver};
-use futures::channel::mpsc;
+use futures::channel::mpsc::{channel, Receiver};
 use futures::StreamExt;
-use futures_util::lock::Mutex;
+use futures_util::SinkExt;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use crate::utils::never_send::NeverSend;
-use wasm_bindgen_futures::JsFuture;
+use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::{Request, RequestInit, Response, Headers};
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::prelude::JsValue;
@@ -30,10 +29,9 @@ pub enum Body {
     Uint8Array(Uint8Array),
 }
 
-#[derive(Clone)]
 pub struct XmlHttpRequest {
     xml_http: Arc<NeverSend<WasmXmlHttpRequest>>,
-    progress_rx: Arc<Mutex<UnboundedReceiver<ProgressEvent>>>,
+    event_rx: Receiver<XhrEvent>,
 }
 
 pub struct FetchRequest {
@@ -93,41 +91,78 @@ impl HttpClient {
         self
     }
 
-    pub fn xhr(self) -> XmlHttpRequest {
+    pub fn xhr(self) -> Result<XmlHttpRequest, JsValue> {
         let url = self.url.expect("URL must be set before send()");
-        let xhr = WasmXmlHttpRequest::new().unwrap();
-        xhr.open(&self.method, &url).unwrap();
+        let xml_http = Arc::new(NeverSend(WasmXmlHttpRequest::new()?));
+        xml_http.open_with_async(&self.method, &url, true)?;
 
-        for (k, v) in self.headers {
-            xhr.set_request_header(&k, &v).unwrap();
+        for (k, v) in &self.headers {
+            xml_http.set_request_header(k, v)?;
         }
 
-        let xml_http = Arc::new(NeverSend(xhr));
-        let (tx, rx) = unbounded::<ProgressEvent>();
+        // We want small buffer to avoid any overhead
+        // the consumer must consuming fast.
+        let (tx, rx) = channel::<XhrEvent>(8);
 
-        {
-            let tx_clone = tx.clone();
-            let progress_closure = Closure::wrap(Box::new(move |e: ProgressEvent| {
-                let _ = tx_clone.unbounded_send(e);
-            }) as Box<dyn FnMut(_)>);
+        let mut tx1 = tx.clone();
+        let progress_closure = Closure::wrap(Box::new(move |e: ProgressEvent| {
+            let _ = tx1.try_send(XhrEvent::InProgress(e));
+        }) as Box<dyn FnMut(_)>);
+        let x_upload = xml_http.upload().unwrap();
+        x_upload.set_onprogress(Some(progress_closure.as_ref().unchecked_ref()));
+        progress_closure.forget();
 
-            xml_http.set_onprogress(Some(progress_closure.as_ref().unchecked_ref()));
-        }
+        let tx2 = tx.clone();
+        let xhr_clone = xml_http.clone();
+        let onload_closure = Closure::wrap(Box::new(move |_: Event| {
+            let mut headers_map = HashMap::new();
+            if let Ok(headers_str) = xhr_clone.get_all_response_headers() {
+                headers_map = parse_headers_to_hashmap(&headers_str);
+            }
+            let body = xhr_clone.response().unwrap_or(JsValue::NULL);
+            let mut tx2 = tx2.clone();
+            spawn_local(async move {
+                let _ = tx2.send(XhrEvent::Complete {
+                    headers: headers_map,
+                    body,
+                }).await;
+            });
+        }) as Box<dyn FnMut(_)>);
+        xml_http.set_onload(Some(onload_closure.as_ref().unchecked_ref()));
+        onload_closure.forget();
+
+        let tx3 = tx.clone();
+        let onerror_closure = Closure::wrap(Box::new(move |_: Event| {
+            let mut tx3 = tx3.clone();
+            spawn_local(async move {
+                let _ = tx3.send(XhrEvent::Error(JsValue::from_str("Network error"))).await;
+            });
+        }) as Box<dyn FnMut(_)>);
+        xml_http.set_onerror(Some(onerror_closure.as_ref().unchecked_ref()));
+        onerror_closure.forget();
+
+        let tx4 = tx.clone();
+        let onabort_closure = Closure::wrap(Box::new(move |_: Event| {
+            let mut tx4 = tx4.clone();
+            spawn_local(async move {
+                let _ = tx4.send(XhrEvent::Error(JsValue::from_str("Aborted"))).await;
+            });
+        }) as Box<dyn FnMut(_)>);
+        xml_http.set_onabort(Some(onabort_closure.as_ref().unchecked_ref()));
+        onabort_closure.forget();
 
         match self.body {
-            Some(Body::Text(s)) => xml_http.send_with_opt_str(Some(&s)).unwrap(),
-            Some(Body::Blob(b)) => xml_http.send_with_opt_blob(Some(&b)).unwrap(),
-            Some(Body::Bytes(ref bytes)) => {
-                xml_http.send_with_opt_u8_array(Some(bytes)).unwrap();
-            }
-            Some(Body::Uint8Array(u8a)) => xml_http.send_with_opt_js_u8_array(Some(&u8a)).unwrap(),
-            None => xml_http.send().unwrap(),
+            Some(Body::Text(s)) => xml_http.send_with_opt_str(Some(&s))?,
+            Some(Body::Blob(b)) => xml_http.send_with_opt_blob(Some(&b))?,
+            Some(Body::Bytes(ref bytes)) => xml_http.send_with_opt_u8_array(Some(bytes))?,
+            Some(Body::Uint8Array(u8a)) => xml_http.send_with_opt_js_u8_array(Some(&u8a))?,
+            None => xml_http.send()?
         };
 
-        XmlHttpRequest {
+        Ok(XmlHttpRequest {
             xml_http,
-            progress_rx: Arc::new(Mutex::new(rx)),
-        }
+            event_rx: rx,
+        })
     }
 
     pub fn fetch(self) -> Result<FetchRequest, JsValue> {
@@ -176,64 +211,36 @@ impl HttpClient {
     }
 }
 
+#[derive(Debug)]
+pub enum XhrEvent {
+    InProgress(ProgressEvent),
+    Complete {
+        headers: HashMap<String, String>,
+        body: JsValue,
+    },
+    Error(JsValue),
+}
+
 impl XmlHttpRequest {
-    pub async fn response(&self) -> Result<JsValue, JsValue> {
-        let xhr = &self.xml_http;
-
-        // Either error or response come first
-        let (tx, mut rx) = mpsc::channel::<Result<JsValue, JsValue>>(1);
-
-        let onload = {
-            let xhr = xhr.clone();
-            let mut tx = tx.clone();
-            Closure::once(Box::new(move |_: Event| {
-                match xhr.response() {
-                    Ok(resp) => {
-                        let _ = tx.try_send(Ok(resp));
-                    }
-                    Err(e) => {
-                        let _ = tx.try_send(Err(e));
-                    }
-                }
-            }) as Box<dyn FnMut(_)>)
-        };
-        xhr.set_onload(Some(onload.as_ref().unchecked_ref()));
-
-        let onerror = {
-            let mut tx = tx.clone();
-            Closure::once(Box::new(move |_: Event| {
-                let _ = tx.try_send(Err(JsValue::from_str("Network error")));
-            }) as Box<dyn FnMut(_)>)
-        };
-        xhr.set_onerror(Some(onerror.as_ref().unchecked_ref()));
-
-        let onabort = {
-            let mut tx = tx.clone();
-            Closure::once(Box::new(move |_: Event| {
-                let _ = tx.try_send(Err(JsValue::from_str("Aborted")));
-            }) as Box<dyn FnMut(_)>)
-        };
-        xhr.set_onabort(Some(onabort.as_ref().unchecked_ref()));
-
-        let Some(result) = rx.next().await else {
-            return Err(JsValue::from_str("Response channel closed"));
-        };
-
-        xhr.set_onload(None);
-        xhr.set_onerror(None);
-        xhr.set_onabort(None);
-        xhr.set_onprogress(None);
-
-        onload.forget();
-        onerror.forget();
-        onabort.forget();
-
-        result
+    pub async fn next_event(&mut self) -> Option<XhrEvent> {
+        self.event_rx.next().await
     }
 
-    pub async fn next_event(&self) -> Option<ProgressEvent> {
-        let mut rx = self.progress_rx.lock().await;
-        rx.next().await
+    pub async fn response(mut self) -> Result<(HashMap<String, String>, JsValue), JsValue> {
+        while let Some(event) = self.next_event().await {
+            match event {
+                XhrEvent::Complete {
+                    headers,
+                    body
+                } => return Ok((headers, body)),
+                XhrEvent::Error(err) => return Err(err),
+                XhrEvent::InProgress(_) => {
+                    // Ignore progress events here or handle if desired
+                }
+            }
+        }
+
+        Err(JsValue::from_str("Response channel closed"))
     }
 }
 
@@ -287,4 +294,18 @@ impl Drop for FetchRequest {
             controller.abort();
         }
     }
+}
+
+fn parse_headers_to_hashmap(headers_str: &str) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    for line in headers_str.split("\r\n") {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        if let Some((key, value)) = line.split_once(':') {
+            map.insert(key.trim().to_string(), value.trim().to_string());
+        }
+    }
+    map
 }

@@ -6,3 +6,6 @@ pub mod repository;
 #[cfg(feature = "db-idb")]
 #[cfg(not(any(feature = "db-remote")))]
 pub mod idb;
+
+#[cfg(feature = "db-remote")]
+pub mod surrealdb;
