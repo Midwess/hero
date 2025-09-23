@@ -2,17 +2,17 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use wasm_bindgen::JsCast;
 use web_sys::{Blob, XmlHttpRequest as WasmXmlHttpRequest, Event, ProgressEvent, AbortController};
-use js_sys::Uint8Array;
+use js_sys::{Object, Reflect, Uint8Array};
 use futures::channel::mpsc::{channel, Receiver};
-use futures::StreamExt;
+use futures::{AsyncRead, StreamExt};
 use futures_util::SinkExt;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
 use crate::utils::never_send::NeverSend;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::{Request, RequestInit, Response, Headers};
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::prelude::JsValue;
+use wasm_streams::ReadableStream;
 
 pub struct HttpClient {
     method: String,
@@ -21,12 +21,12 @@ pub struct HttpClient {
     body: Option<Body>,
 }
 
-#[derive(Clone)]
 pub enum Body {
     Text(String),
     Blob(Blob),
     Bytes(Vec<u8>),
     Uint8Array(Uint8Array),
+    AsyncReader(Box<dyn AsyncRead + Unpin + 'static>)
 }
 
 pub struct XmlHttpRequest {
@@ -82,6 +82,27 @@ impl HttpClient {
     pub fn body_uint8array(mut self, u8a: Uint8Array) -> Self {
         self.body = Some(Body::Uint8Array(u8a));
         self
+    }
+
+    pub fn is_support_duplex_stream() -> bool {
+        let global = js_sys::global();
+        let request_ctor = Reflect::get(&global, &JsValue::from_str("Request"))
+            .expect("Request ctor should exist");
+        let proto = Reflect::get(&request_ctor, &JsValue::from_str("prototype"))
+            .expect("Request.prototype should exist");
+        Reflect::has(&proto, &JsValue::from_str("duplex")).unwrap_or(false)
+    }
+
+    /// Allow body as an AsyncRead
+    /// only supported on some browser like Chrome or Edge.
+    /// if the browser is not supported, it will return error
+    pub fn body_stream(mut self, value: impl AsyncRead + Unpin + 'static) -> Result<Self, anyhow::Error> {
+        if !Self::is_support_duplex_stream() {
+            return Err(anyhow::anyhow!("Browser does not support duplex stream"));
+        }
+
+        self.body = Some(Body::AsyncReader(Box::new(value)));
+        Ok(self)
     }
 
     pub fn body_json<T: Serialize>(mut self, value: &T) -> Self {
@@ -156,6 +177,7 @@ impl HttpClient {
             Some(Body::Blob(b)) => xml_http.send_with_opt_blob(Some(&b))?,
             Some(Body::Bytes(ref bytes)) => xml_http.send_with_opt_u8_array(Some(bytes))?,
             Some(Body::Uint8Array(u8a)) => xml_http.send_with_opt_js_u8_array(Some(&u8a))?,
+            Some(Body::AsyncReader(ref reader)) => return Err(JsValue::from_str("Async reader not supported for xhr")),
             None => xml_http.send()?
         };
 
@@ -184,10 +206,10 @@ impl HttpClient {
         opts.set_headers(&headers);
 
         // Set up body appropriately
-        if let Some(body) = &self.body {
+        if let Some(body) = self.body {
             match body {
                 Body::Text(s) => {
-                    opts.set_body(&JsValue::from_str(s));
+                    opts.set_body(&JsValue::from_str(&s));
                 }
                 Body::Blob(b) => {
                     opts.set_body(b.as_ref());
@@ -197,7 +219,17 @@ impl HttpClient {
                     opts.set_body(&u8array);
                 }
                 Body::Uint8Array(u8a) => {
-                    opts.set_body(u8a);
+                    opts.set_body(&u8a);
+                }
+                Body::AsyncReader(reader) => {
+                    let readable_stream = ReadableStream::from_async_read(reader, 1024 * 1024);
+                    let init_obj: &Object = opts.as_ref();
+                    Reflect::set(
+                        init_obj,
+                        &JsValue::from_str("duplex"),
+                        &JsValue::from_str("half"),
+                    )?;
+                    opts.set_body(readable_stream.as_raw());
                 }
             }
         }
@@ -251,39 +283,40 @@ impl Drop for XmlHttpRequest {
 }
 
 impl FetchRequest {
-    pub async fn response(&self) -> Result<Response, JsValue> {
+    pub async fn response(self) -> Result<(HashMap<String, String>, JsValue), JsValue> {
         let window = web_sys::window()
             .ok_or_else(|| JsValue::from_str("No global window"))?;
-
         let resp_js = JsFuture::from(window.fetch_with_request(&self.request)).await?;
-        resp_js.dyn_into::<Response>()
-    }
+        let resp: Response = resp_js.dyn_into()
+            .map_err(|_| JsValue::from_str("Failed to convert to Response"))?;
 
-    pub async fn text(&self) -> Result<String, JsValue> {
-        let response = self.response().await?;
-        let text_promise = response.text()?;
-        let text_js = JsFuture::from(text_promise).await?;
-        text_js.as_string()
-            .ok_or_else(|| JsValue::from_str("Failed to convert response to string"))
-    }
+        // Check status code
+        let status = resp.status();
+        if status < 200 || status >= 300 {
+            return Err(JsValue::from_str(&format!("HTTP error: status {}", status)));
+        }
 
-    pub async fn bytes(&self) -> Result<js_sys::Uint8Array, JsValue> {
-        let response = self.response().await?;
-        let array_buffer_promise = response.array_buffer()?;
-        let array_buffer = JsFuture::from(array_buffer_promise).await?;
-        Ok(js_sys::Uint8Array::new(&array_buffer))
-    }
+        let headers_iter = resp.headers().entries();
+        let mut headers_map = HashMap::new();
+        let mut entries = js_sys::try_iter(&headers_iter)?
+            .ok_or_else(|| JsValue::from_str("Failed to iterate headers"))?;
+        while let Some(entry) = entries.next().transpose()? {
+            let pair: js_sys::Array = entry.dyn_into()
+                .map_err(|_| JsValue::from_str("Invalid header entry"))?;
+            let key = pair.get(0).as_string().unwrap_or_default();
+            let value = pair.get(1).as_string().unwrap_or_default();
+            headers_map.insert(key, value);
+        }
 
-    pub async fn json<T: DeserializeOwned>(&self) -> Result<T, JsValue> {
-        let text = self.text().await?;
-        serde_json::from_str(&text)
-            .map_err(|e| JsValue::from_str(&format!("JSON deserialization failed: {}", e)))
-    }
+        let Ok(json_promise) = resp.json().map(JsFuture::from) else {
+            return Ok((headers_map, JsValue::NULL))
+        };
 
-    pub async fn json_raw(&self) -> Result<JsValue, JsValue> {
-        let response = self.response().await?;
-        let json_promise = response.json()?;
-        JsFuture::from(json_promise).await
+        let Ok(json_js) = json_promise.await else {
+            return Ok((headers_map, JsValue::NULL))
+        };
+
+        Ok((headers_map, json_js))
     }
 }
 

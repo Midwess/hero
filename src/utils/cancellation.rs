@@ -92,7 +92,7 @@ pub struct Cancelled {
     state: Weak<CancelState>,
 }
 
-impl std::future::Future for Cancelled {
+impl Future for Cancelled {
     type Output = ();
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {

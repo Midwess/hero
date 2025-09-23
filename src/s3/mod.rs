@@ -156,23 +156,10 @@ impl S3Client {
         Ok(url)
     }
 
-    pub async fn generate_multipart_upload_urls_with_size(
+    pub async fn create_multipart_upload(
         &self,
         s3_object: &StaticResource,
-        part_size: u64,
-        total_file_size: u64,
-        duration: Duration,
-    ) -> Resolve<MultipartUpload> {
-        let part_count = ((total_file_size + part_size - 1) / part_size) as i32;
-        self.generate_multipart_upload_urls(s3_object, part_count, duration).await
-    }
-
-    pub async fn generate_multipart_upload_urls(
-        &self,
-        s3_object: &StaticResource,
-        part_count: i32,
-        duration: Duration,
-    ) -> Resolve<MultipartUpload> {
+    ) -> Resolve<String> {
         let path = match &s3_object.source {
             Some(Source::S3Path(path)) => path.clone(),
             _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned()))
@@ -190,35 +177,36 @@ impl S3Client {
             return Err(Errors::BadRequest("Cannot generate upload id".to_owned()))
         };
 
+        Ok(upload_id)
+    }
+
+    pub async fn generate_part_upload_url(
+        &self,
+        s3_object: &StaticResource,
+        upload_id: &str,
+        part_number: usize,
+        duration: Duration,
+    ) -> Resolve<String> {
+        let path = match &s3_object.source {
+            Some(Source::S3Path(path)) => path.clone(),
+            _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned()))
+        };
+
         let presigning_config = PresigningConfig::expires_in(duration)?;
-        let mut upload_parts = Vec::new();
+        let presigned_req = self
+            .client
+            .upload_part()
+            .bucket(path.bucket())
+            .key(path.prefix())
+            .upload_id(upload_id)
+            .part_number(part_number as i32)
+            .presigned(presigning_config.clone())
+            .await?;
 
-        for part_number in 1..=part_count {
-            let presigned_req = self
-                .client
-                .upload_part()
-                .bucket(path.bucket())
-                .key(path.prefix())
-                .upload_id(&upload_id)
-                .part_number(part_number)
-                .presigned(presigning_config.clone())
-                .await?;
-
-            upload_parts.push(UploadPart {
-                part_number,
-                upload_url: presigned_req.uri().to_string(),
-                x_content_length: None,
-            });
-        }
-
-        Ok(MultipartUpload {
-            upload_id,
-            parts: upload_parts,
-        })
+        Ok(presigned_req.uri().to_string())
     }
 
     pub async fn complete_multipart_upload(&self, s3_object: &StaticResource, upload_id: String, e_tags: Vec<String>) -> Resolve<()> {
-        log::info!("Completing multipart upload {e_tags:?} {upload_id} {s3_object:?}");
         let path = match &s3_object.source {
             Some(Source::S3Path(path)) => path.clone(),
             _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned()))

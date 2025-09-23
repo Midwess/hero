@@ -21,7 +21,7 @@ smtp = ["lettre", "reqwest", "prost", "lettre/smtp-transport", "lettre/builder",
 db-remote = ["surrealdb", "surreal_devl", "surreal_derive_plus", "surrealdb/protocol-ws"]
 db-red = ["redb", "bincode"]
 db-idb = ["idb", "wasm-bindgen", "serde-wasm-bindgen"]
-wasm = ["web-sys", "js-sys", "wasm-logger", "wasm-bindgen", "wasm-bindgen-futures"]
+wasm = ["web-sys", "js-sys", "wasm-logger", "wasm-bindgen", "wasm-bindgen-futures", "wasm-streams"]
 wasm-logger = ["console_log", "console_error_panic_hook", "web-sys", "js-sys"]
 token = ["jsonwebtoken"]
 
@@ -65,8 +65,9 @@ aws-smithy-async = {version = "1.2.5", optional = true}
 redb = { version = "^3.0.0", optional = true }
 idb = { version = "0.6.4", optional = true }
 serde-wasm-bindgen = { version = "0.6.5", optional = true }
+wasm-streams = { version = "0.4.2", optional = true }
 
-web-sys = { version = "0.3.80", optional = true, features = ["XmlHttpRequest", "Window", "EventTarget", "ProgressEvent", "Document", "Blob", "AbortController", "Request", "RequestInit", "AbortSignal", "Response", "Headers"] }
+web-sys = { version = "0.3.80", optional = true, features = ["XmlHttpRequest", "Window", "EventTarget", "ProgressEvent", "Document", "Blob", "AbortController", "Request", "RequestInit", "AbortSignal", "Response", "Headers", "XmlHttpRequestUpload"]}
 js-sys = { version = "0.3.80", optional = true }
 console_log = { version = "1.0.0", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
