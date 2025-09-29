@@ -177,7 +177,7 @@ impl HttpClient {
             Some(Body::Blob(b)) => xml_http.send_with_opt_blob(Some(&b))?,
             Some(Body::Bytes(ref bytes)) => xml_http.send_with_opt_u8_array(Some(bytes))?,
             Some(Body::Uint8Array(u8a)) => xml_http.send_with_opt_js_u8_array(Some(&u8a))?,
-            Some(Body::AsyncReader(ref reader)) => return Err(JsValue::from_str("Async reader not supported for xhr")),
+            Some(Body::AsyncReader(_)) => return Err(JsValue::from_str("Async reader not supported for xhr")),
             None => xml_http.send()?
         };
 
