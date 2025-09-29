@@ -1,9 +1,9 @@
 use anyhow::Result;
 use bytes::BytesMut;
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
 use rayon::prelude::*;
 use async_stream::stream;
+use n0_future::time::SystemTime;
 use tokio::fs::{self, OpenOptions};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::task::spawn_blocking;
@@ -143,7 +143,7 @@ impl Folder {
     pub async fn cursor(&self, chunk_size: usize) -> Result<Box<dyn IOCursor>> {
         let entry = FileEntry {
             is_dir: false,
-            modified_at: SystemTime::now(),
+            modified_at: SystemTime::now().into(),
             size: self.size().await,
             path: self.path.clone(),
         };

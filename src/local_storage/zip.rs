@@ -6,6 +6,7 @@ use async_zip::base::write::{EntryStreamWriter, ZipFileWriter};
 use bytes::BytesMut;
 use futures::Stream;
 use anyhow::Result;
+use chrono::Utc;
 use n0_future::io::AsyncWriteExt;
 use crate::local_storage::entry::FileEntry;
 use crate::local_storage::stream::IOCursor;
@@ -45,8 +46,8 @@ impl ZipStream {
 
         let zip_entry = FileEntry {
             is_dir: false,
+            modified_at: Utc::now().into(),
             size: total_size, // This will not correctly reflect the actual size of the zip file
-            modified_at: chrono::Utc::now().into(),
             path: path.clone()
         };
 

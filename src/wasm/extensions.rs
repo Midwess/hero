@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use js_sys::Uint8Array;
+use js_sys::{Reflect, Uint8Array};
 use wasm_bindgen::JsValue;
 
 pub trait VecExtension {
@@ -10,6 +10,20 @@ pub trait VecExtension {
     }
 
     fn into_uint_array_leak(&self) -> Uint8Array;
+}
+
+pub trait FileExtension {
+    fn webkit_path(&self) -> Option<String>;
+}
+
+impl FileExtension for web_sys::File {
+    fn webkit_path(&self) -> Option<String> {
+        let Ok(request_ctor) = Reflect::get(self, &JsValue::from_str("webkitRelativePath")) else {
+            return None;
+        };
+
+        request_ctor.as_string()
+    }
 }
 
 impl VecExtension for Vec<u8> {
