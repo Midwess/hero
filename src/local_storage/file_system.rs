@@ -1,8 +1,13 @@
 use anyhow::Result;
 use bytes::BytesMut;
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
+use rayon::prelude::*;
+use async_stream::stream;
 use tokio::fs::{self, OpenOptions};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::task::spawn_blocking;
+use walkdir::WalkDir;
 use crate::local_storage::entry::FileEntry;
 use crate::local_storage::stream::IOCursor;
 use crate::local_storage::zip::ZipStream;
@@ -136,34 +141,46 @@ impl Folder {
 
     #[cfg(feature = "zip")]
     pub async fn cursor(&self, chunk_size: usize) -> Result<Box<dyn IOCursor>> {
-        let entries = self.collect_all_entries().await?;
-        let mut cursors = Vec::new();
-        for entry in entries {
-            let cursor = entry.cursor(chunk_size).await?;
-            cursors.push(cursor);
-        }
+        let entry = FileEntry {
+            is_dir: false,
+            modified_at: SystemTime::now(),
+            size: self.size().await,
+            path: self.path.clone(),
+        };
 
-        let cursor = ZipStream::new(cursors, self.path.clone(), chunk_size).await?;
+        let path = self.path.clone();
+        let stream = stream! {
+            let mut pending_paths = vec![path];
+
+            while let Some(current_path) = pending_paths.pop() {
+                if current_path.is_dir() {
+                    let mut dir_entries = fs::read_dir(&current_path).await?;
+                    while let Some(dir_entry) = dir_entries.next_entry().await? {
+                        pending_paths.push(dir_entry.path());
+                    }
+                }
+                else {
+                    let cursor = FileCursor::new(current_path, chunk_size).await?;
+                    yield Ok(Box::new(cursor) as Box<dyn IOCursor>);
+                }
+            }
+        };
+
+        let cursor = ZipStream::new_from_stream(Box::pin(stream), entry, chunk_size).await?;
         Ok(Box::new(cursor))
     }
 
-    pub async fn collect_all_entries(&self) -> Result<Vec<FileEntry>> {
-        let mut entries = Vec::new();
-        let mut pending_paths = vec![self.path.clone()];
-
-        while let Some(current_path) = pending_paths.pop() {
-            if current_path.is_dir() {
-                let mut dir_entries = fs::read_dir(&current_path).await?;
-                while let Some(dir_entry) = dir_entries.next_entry().await? {
-                    pending_paths.push(dir_entry.path());
-                }
-            } else {
-                let entry = FileEntry::existing(&current_path).await?;
-                entries.push(entry);
-            }
-        }
-
-        Ok(entries)
+    pub async fn size(&self) -> u64 {
+        let path = self.path.clone();
+        spawn_blocking(move || {
+            WalkDir::new(&path)
+                .into_iter()
+                .par_bridge()
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().is_file())
+                .filter_map(|e| e.metadata().map(|m| m.len()).ok())
+                .sum()
+        }).await.unwrap()
     }
 }
 
