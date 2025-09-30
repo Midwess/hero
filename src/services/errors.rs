@@ -127,7 +127,7 @@ impl From<Errors> for Status {
             Errors::TcpFailure(_) => Self::internal("Service failed to start"),
             Errors::FailedToDownloadFile(_) => Self::internal("Failed to download file"),
             Errors::InvalidS3Path(_) => Self::invalid_argument("Invalid s3 path"),
-            #[cfg(any(feature = "db-local", feature = "db-remote"))]
+            #[cfg(feature = "db-remote")]
             Errors::RepositoryError(_) => Self::internal("Internal error, contact support"),
             Errors::JsonError(_) => Self::internal("Internal error, contact support")
         }

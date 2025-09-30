@@ -84,6 +84,11 @@ impl HttpClient {
         self
     }
 
+    pub fn body(mut self, body: Body) -> Self {
+        self.body = Some(body);
+        self
+    }
+
     pub fn is_support_duplex_stream() -> bool {
         let global = js_sys::global();
         let request_ctor = Reflect::get(&global, &JsValue::from_str("Request"))

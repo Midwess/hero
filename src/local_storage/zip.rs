@@ -10,15 +10,13 @@ use chrono::Utc;
 use n0_future::io::AsyncWriteExt;
 use crate::local_storage::entry::FileEntry;
 use crate::local_storage::stream::IOCursor;
-use futures_util::AsyncReadExt;
 use n0_future::StreamExt;
-use crate::utils::stream::{duplex, DuplexReader, DuplexWriter};
 
 impl FileEntry {
     pub fn zip_entry(&self, base_path: &PathBuf) -> ZipEntry {
         let name = self.relative_path(base_path).unwrap().to_string_lossy().to_string();
         ZipEntryBuilder::new(name.into(), Compression::Stored)
-            .last_modification_date(chrono::Utc::now().into())
+            .last_modification_date(Utc::now().into())
             .uncompressed_size(self.size)
             .compressed_size(self.size)
             .build()
@@ -29,15 +27,15 @@ pub type ZipInputStream = Pin<Box<dyn Stream<Item = Result<Box<dyn IOCursor>>> +
 
 pub struct ZipStream {
     inputs: ZipInputStream,
-    buffer: BytesMut,
     zip_entry: FileEntry,
-    reader: DuplexReader,
-    current_writer: Option<EntryStreamWriter<DuplexWriter>>,
+    current_writer: Option<EntryStreamWriter<Vec<u8>>>,
     current_cursor: Option<Box<dyn IOCursor>>,
+    chunk_size: usize,
+    buffer: BytesMut,
 }
 
 impl ZipStream {
-    pub async fn new(inputs: Vec<Box<dyn IOCursor>>, path: PathBuf, max_chunk_size: usize) -> anyhow::Result<Self> {
+    pub async fn new(inputs: Vec<Box<dyn IOCursor>>, path: PathBuf, max_chunk_size: usize) -> Result<Self> {
         let mut total_size = 0u64;
         for input in inputs.iter() {
             let entry = input.entry().await?;
@@ -60,11 +58,11 @@ impl ZipStream {
         Self::new_from_stream(Box::pin(inputs), zip_entry, max_chunk_size).await
     }
 
-    pub async fn new_from_stream(mut stream: ZipInputStream, zip_entry: FileEntry, max_chunk_size: usize) -> anyhow::Result<Self> {
-        let (writer, reader) = duplex();
+    pub async fn new_from_stream(mut stream: ZipInputStream, zip_entry: FileEntry, max_chunk_size: usize) -> Result<Self> {
         let max_chunk_size = max_chunk_size.min(zip_entry.size as usize);
-        let mut buffer = BytesMut::with_capacity(max_chunk_size);
-        buffer.resize(max_chunk_size, 0u8);
+        let writer = Vec::with_capacity(max_chunk_size);
+        let mut buffer = BytesMut::new();
+
         let zip_writer = ZipFileWriter::new(writer);
         let Some(Ok(first_cursor)) = stream.next().await else {
             return Err(anyhow::anyhow!("No entries to zip"));
@@ -74,35 +72,37 @@ impl ZipStream {
 
         Ok(Self {
             zip_entry,
-            inputs: stream,
             buffer,
-            reader,
+            chunk_size: max_chunk_size,
+            inputs: stream,
             current_cursor: Some(first_cursor),
             current_writer: Some(zip_writer.write_entry_stream(first_entry).await?),
         })
     }
 
     pub fn chunk_size(&self) -> usize {
-        self.buffer.len()
+        self.chunk_size
     }
 }
 
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 impl IOCursor for ZipStream {
-    async fn next(&mut self, max_read: Option<u64>) -> anyhow::Result<Option<&[u8]>> {
-        if let Some(writer) = self.current_writer.as_mut() {
-            writer.flush().await?;
-        };
-
+    async fn next(&mut self, max_read: Option<u64>) -> Result<Option<&[u8]>> {
         let read_size = max_read.unwrap_or(self.chunk_size() as u64) as usize;
         let read_size = read_size.min(self.chunk_size());
-        let read_buffer = &mut self.buffer.as_mut()[..read_size];
-        if let Ok(amount) = self.reader.read(read_buffer).await {
-            if amount > 0 {
-                let bytes = &self.buffer[..amount];
-                return Ok(Some(bytes))
+        let chunk_size = self.chunk_size();
+        if let Some(writer) = self.current_writer.as_mut() {
+            let most_inner = writer.most_inner_mut().expect("Only store mode is supported");
+            let read_size = most_inner.len().min(read_size);
+            if read_size > 0 {
+                self.buffer.clear();
+                let drained_bytes: Vec<u8> = most_inner.drain(..read_size).collect();
+                self.buffer.extend_from_slice(&drained_bytes);
+                return Ok(Some(self.buffer.as_ref()));
             }
+
+            most_inner.resize(chunk_size, 0);
         }
 
         if let (Some(writer), Some(cursor)) = (self.current_writer.as_mut(), self.current_cursor.as_mut()) {
@@ -134,7 +134,7 @@ impl IOCursor for ZipStream {
         self.next(max_read).await
     }
 
-    async fn entry(&self) -> anyhow::Result<FileEntry> {
+    async fn entry(&self) -> Result<FileEntry> {
         Ok(self.zip_entry.clone())
     }
 }
