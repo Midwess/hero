@@ -160,7 +160,10 @@ impl Folder {
                     }
                 }
                 else {
-                    let cursor = FileCursor::new(current_path, chunk_size).await?;
+                    let Ok(file_size) = current_path.metadata().map(|it| it.len()) else {
+                        continue;
+                    };
+                    let cursor = FileCursor::new(current_path, chunk_size.min(file_size as usize)).await?;
                     yield Ok(Box::new(cursor) as Box<dyn IOCursor>);
                 }
             }

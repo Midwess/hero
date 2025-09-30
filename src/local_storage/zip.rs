@@ -3,7 +3,6 @@ use std::pin::Pin;
 use async_stream::stream;
 use async_zip::{Compression, ZipEntry, ZipEntryBuilder};
 use async_zip::base::write::{EntryStreamWriter, ZipFileWriter};
-use bytes::BytesMut;
 use futures::Stream;
 use anyhow::Result;
 use chrono::Utc;
@@ -25,13 +24,25 @@ impl FileEntry {
 
 pub type ZipInputStream = Pin<Box<dyn Stream<Item = Result<Box<dyn IOCursor>>> + Send + Sync>>;
 
+enum WriterState {
+    ProcessingEntry {
+        writer: EntryStreamWriter<Vec<u8>>,
+        cursor: Box<dyn IOCursor>,
+    },
+    Finalizing {
+        writer: Vec<u8>,
+    },
+    Completed,
+}
+
 pub struct ZipStream {
     inputs: ZipInputStream,
     zip_entry: FileEntry,
-    current_writer: Option<EntryStreamWriter<Vec<u8>>>,
-    current_cursor: Option<Box<dyn IOCursor>>,
+    state: WriterState,
     chunk_size: usize,
-    buffer: BytesMut,
+    buffer: Vec<u8>, // Use Vec<u8> instead of BytesMut for better control
+    buffer_pos: usize,
+    buffer_len: usize,
 }
 
 impl ZipStream {
@@ -45,7 +56,7 @@ impl ZipStream {
         let zip_entry = FileEntry {
             is_dir: false,
             modified_at: Utc::now().into(),
-            size: total_size, // This will not correctly reflect the actual size of the zip file
+            size: total_size,
             path: path.clone()
         };
 
@@ -59,29 +70,102 @@ impl ZipStream {
     }
 
     pub async fn new_from_stream(mut stream: ZipInputStream, zip_entry: FileEntry, max_chunk_size: usize) -> Result<Self> {
-        let max_chunk_size = max_chunk_size.min(zip_entry.size as usize);
-        let writer = Vec::with_capacity(max_chunk_size);
-        let mut buffer = BytesMut::new();
+        let chunk_size = max_chunk_size.min(zip_entry.size as usize);
 
+        // Pre-allocate buffer to avoid frequent reallocations
+        let buffer = vec![0u8; chunk_size];
+
+        let writer = Vec::with_capacity(chunk_size);
         let zip_writer = ZipFileWriter::new(writer);
+
         let Some(Ok(first_cursor)) = stream.next().await else {
             return Err(anyhow::anyhow!("No entries to zip"));
         };
 
         let first_entry = first_cursor.entry().await?.zip_entry(&zip_entry.path);
+        let entry_writer = zip_writer.write_entry_stream(first_entry).await?;
 
         Ok(Self {
             zip_entry,
-            buffer,
-            chunk_size: max_chunk_size,
+            chunk_size,
             inputs: stream,
-            current_cursor: Some(first_cursor),
-            current_writer: Some(zip_writer.write_entry_stream(first_entry).await?),
+            buffer,
+            buffer_pos: 0,
+            buffer_len: 0,
+            state: WriterState::ProcessingEntry {
+                writer: entry_writer,
+                cursor: first_cursor,
+            },
         })
     }
 
     pub fn chunk_size(&self) -> usize {
         self.chunk_size
+    }
+
+    async fn fill_buffer_from_writer(&mut self, read_size: usize) -> Result<bool> {
+        let writer_data = match &mut self.state {
+            WriterState::ProcessingEntry { writer, .. } => {
+                writer.most_inner_mut()
+            }
+            WriterState::Finalizing { writer } => {
+                Some(writer)
+            }
+            WriterState::Completed => return Ok(false),
+        };
+
+        if let Some(data) = writer_data {
+            let available = data.len().min(read_size);
+            if available > 0 {
+                if self.buffer.len() < available {
+                    self.buffer.resize(available, 0);
+                }
+
+                self.buffer[..available].copy_from_slice(data.drain(..available).as_slice());
+                self.buffer_pos = 0;
+                self.buffer_len = available;
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    async fn process_current_cursor(&mut self, max_read: Option<u64>) -> Result<bool> {
+        if let WriterState::ProcessingEntry { writer, cursor } = &mut self.state {
+            if let Some(chunk) = cursor.next(max_read).await? {
+                writer.write_all(chunk).await?;
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    async fn advance_to_next_entry(&mut self) -> Result<bool> {
+        let WriterState::ProcessingEntry { writer, .. } =
+            std::mem::replace(&mut self.state, WriterState::Completed) else {
+            return Ok(false);
+        };
+
+        let zip_writer = writer.close().await?;
+
+        match self.inputs.next().await {
+            Some(Ok(next_cursor)) => {
+                let entry = next_cursor.entry().await?.zip_entry(&self.zip_entry.path);
+                let new_entry_writer = zip_writer.write_entry_stream(entry).await?;
+
+                self.state = WriterState::ProcessingEntry {
+                    writer: new_entry_writer,
+                    cursor: next_cursor,
+                };
+                Ok(true)
+            }
+            Some(Err(e)) => Err(e),
+            None => {
+                let final_data = zip_writer.close().await?;
+                self.state = WriterState::Finalizing { writer: final_data };
+                Ok(true)
+            }
+        }
     }
 }
 
@@ -89,49 +173,25 @@ impl ZipStream {
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 impl IOCursor for ZipStream {
     async fn next(&mut self, max_read: Option<u64>) -> Result<Option<&[u8]>> {
-        let read_size = max_read.unwrap_or(self.chunk_size() as u64) as usize;
-        let read_size = read_size.min(self.chunk_size());
-        let chunk_size = self.chunk_size();
-        if let Some(writer) = self.current_writer.as_mut() {
-            let most_inner = writer.most_inner_mut().expect("Only store mode is supported");
-            let read_size = most_inner.len().min(read_size);
-            if read_size > 0 {
-                self.buffer.clear();
-                let drained_bytes: Vec<u8> = most_inner.drain(..read_size).collect();
-                self.buffer.extend_from_slice(&drained_bytes);
-                return Ok(Some(self.buffer.as_ref()));
+        let read_size = max_read.unwrap_or(self.chunk_size as u64) as usize;
+        let read_size = read_size.min(self.chunk_size);
+
+        loop {
+            // First, try to serve from existing buffer data
+            if self.fill_buffer_from_writer(read_size).await? {
+                return Ok(Some(&self.buffer[self.buffer_pos..self.buffer_pos + self.buffer_len]));
             }
 
-            most_inner.resize(chunk_size, 0);
-        }
+            // Try to process current cursor
+            if self.process_current_cursor(max_read).await? {
+                continue; // Loop back to try filling buffer again
+            }
 
-        if let (Some(writer), Some(cursor)) = (self.current_writer.as_mut(), self.current_cursor.as_mut()) {
-            if let Some(chunk) = cursor.next(max_read).await? {
-                writer.write_all(&chunk).await?;
-                return self.next(max_read).await
+            // Need to advance to next entry or finalize
+            if !self.advance_to_next_entry().await? {
+                return Ok(None); // No more data
             }
         }
-
-        let Some(writer) = self.current_writer.take() else {
-            return Ok(None);
-        };
-
-        let zip_writer = writer.close().await?;
-        self.current_cursor = match self.inputs.next().await {
-            Some(Ok(t)) => Some(t),
-            Some(Err(e)) => return Err(e),
-            None => None,
-        };
-
-        if let Some(next_cursor) = self.current_cursor.as_mut() {
-            let entry = next_cursor.entry().await?.zip_entry(&self.zip_entry.path);
-            let new_entry_stream = zip_writer.write_entry_stream(entry).await?;
-            self.current_writer = Some(new_entry_stream);
-            return self.next(max_read).await;
-        }
-
-        zip_writer.close().await?;
-        self.next(max_read).await
     }
 
     async fn entry(&self) -> Result<FileEntry> {

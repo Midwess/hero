@@ -1,5 +1,4 @@
 use bytes::{Bytes, BytesMut};
-use n0_future::time::Instant;
 use crate::local_storage::entry::FileEntry;
 
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
@@ -24,10 +23,7 @@ pub trait IOCursor: Send + Sync {
             let current = self.next(Some(remaining as u64)).await?;
             match current {
                 Some(data) => {
-                    if data.is_empty() {
-                        return Ok(offset);
-                    }
-                    let copy_len = data.len().min(remaining);
+                    let copy_len = data.len();
                     buf[offset..offset + copy_len].copy_from_slice(&data[..copy_len]);
                     offset += copy_len;
                     remaining -= copy_len;
