@@ -26,27 +26,3 @@ pub trait SurrealDbId: DbId + SurrealSerializer + SurrealDeserializer {
         }
     }
 }
-
-impl SurrealDbId for Thing {}
-
-impl DbId for Thing {
-    fn soft_deleted(&self) -> bool {
-        false
-    }
-
-    fn soft_delete(&mut self) {}
-
-    fn soft_restore(&mut self) {}
-}
-
-impl SurrealDbId for i64 {}
-
-impl DbId for i64 {
-    fn soft_deleted(&self) -> bool {
-        false
-    }
-
-    fn soft_delete(&mut self) {}
-
-    fn soft_restore(&mut self) {}
-}
