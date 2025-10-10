@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 use core_services::utils::pool::request::PoolRequest;
 use generator::{DistributedIdGenerator, EPOCH_SINCE};
 use std::sync::Arc;
+use n0_future::future::block_on;
 use tokio::sync::{Mutex, OnceCell};
 
 pub mod generator;
@@ -14,6 +15,10 @@ pub static DISTRIBUTED_ID_GENERATOR: OnceCell<Arc<Mutex<DistributedIdGenerator>>
 pub async fn gen_id() -> u64 {
     let generator = DISTRIBUTED_ID_GENERATOR.get().unwrap();
     generator.lock().await.next_id().await.unwrap()
+}
+
+pub fn gen_id_sync() -> u64 {
+    block_on(async { gen_id().await })
 }
 
 pub fn id_to_unix_timestamp(id: u64) -> u64 {
