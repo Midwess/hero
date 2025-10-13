@@ -1,9 +1,10 @@
 use std::{
-    sync::{Arc, Weak, Mutex, atomic::{AtomicBool, Ordering}},
+    sync::{Arc, Weak, atomic::{AtomicBool, Ordering}},
 };
 use std::fmt::Debug;
 use n0_future::task::spawn;
 use futures::task::AtomicWaker;
+use parking_lot::Mutex;
 
 struct CancelState {
     cancelled: AtomicBool,
@@ -45,19 +46,36 @@ impl CancellationToken {
 
     /// Returns true if this token or its parent was cancelled.
     pub fn is_cancelled(&self) -> bool {
-        self.state.cancelled.load(Ordering::SeqCst)
+        self.state.cancelled.load(Ordering::Acquire) // Use Acquire for better memory ordering
     }
 
     /// Cancel this token and recursively cancel all child tokens.
     pub fn cancel(&self) {
-        if !self.state.cancelled.swap(true, Ordering::SeqCst) {
+        if !self.state.cancelled.swap(true, Ordering::AcqRel) {
+            // Wake up any pending futures
             self.state.waker.wake();
-            let children = self.state.children.lock().unwrap();
-            for child_weak in children.iter() {
-                if let Some(child) = child_weak.upgrade() {
-                    child.cancelled.store(true, Ordering::SeqCst);
-                    child.waker.wake();
-                }
+
+            // Cancel all children
+            // Use a block to limit the lock scope (best practice)
+            let children = {
+                let mut children_lock = self.state.children.lock();
+                // Collect valid children and clean up weak references
+                let mut valid_children = Vec::new();
+                children_lock.retain(|weak_ref| {
+                    if let Some(child) = weak_ref.upgrade() {
+                        valid_children.push(child);
+                        true
+                    } else {
+                        false // Remove dead weak references
+                    }
+                });
+                valid_children
+            }; // Lock is dropped here
+
+            // Cancel children without holding the lock
+            for child in children {
+                child.cancelled.store(true, Ordering::Release);
+                child.waker.wake();
             }
         }
     }
@@ -65,10 +83,18 @@ impl CancellationToken {
     /// Creates a new child token that is linked to this token.
     pub fn child_token(&self) -> Self {
         let child = CancellationToken::new();
-        self.state.children.lock().unwrap().push(Arc::downgrade(&child.state));
+
+        // Add child to parent's list within a limited scope
+        {
+            let mut children = self.state.children.lock();
+            children.push(Arc::downgrade(&child.state));
+        }
+
+        // If parent is already cancelled, cancel the child
         if self.is_cancelled() {
             child.cancel();
         }
+
         child
     }
 
@@ -85,18 +111,24 @@ impl CancellationToken {
 }
 
 pub struct DropGuard {
-    token: CancellationToken,
+    token: Option<CancellationToken>,
 }
 
 impl DropGuard {
     pub fn new(token: CancellationToken) -> Self {
-        Self { token }
+        Self { token: Some(token) }
+    }
+
+    pub fn disarm(&mut self) {
+        self.token = None;
     }
 }
 
 impl Drop for DropGuard {
     fn drop(&mut self) {
-        self.token.cancel();
+        if let Some(token) = &self.token {
+            token.cancel();
+        }
     }
 }
 
@@ -109,15 +141,18 @@ impl Future for Cancelled {
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
         if let Some(state) = self.state.upgrade() {
-            if state.cancelled.load(Ordering::SeqCst) {
+            if state.cancelled.load(Ordering::Acquire) {
                 std::task::Poll::Ready(())
-            }
-            else {
+            } else {
                 state.waker.register(cx.waker());
-                std::task::Poll::Pending
+                if state.cancelled.load(Ordering::Acquire) {
+                    std::task::Poll::Ready(())
+                } else {
+                    std::task::Poll::Pending
+                }
             }
-        }
-        else {
+        } else {
+            // Parent is dropped, consider it cancelled
             std::task::Poll::Ready(())
         }
     }
@@ -173,5 +208,33 @@ impl CancellationTokenExt for CancellationToken {
         });
 
         token
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn test_cancellation_token_basic() {
+        let token = CancellationToken::new();
+        assert!(!token.is_cancelled());
+
+        token.cancel();
+        assert!(token.is_cancelled());
+    }
+
+    #[test]
+    fn test_child_token() {
+        let parent = CancellationToken::new();
+        let child = parent.child_token();
+
+        assert!(!parent.is_cancelled());
+        assert!(!child.is_cancelled());
+
+        parent.cancel();
+        assert!(parent.is_cancelled());
+        assert!(child.is_cancelled());
     }
 }
