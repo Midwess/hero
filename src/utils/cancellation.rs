@@ -78,13 +78,25 @@ impl CancellationToken {
             state: Arc::downgrade(&self.state),
         }
     }
+
+    pub fn drop_guard(&self) -> DropGuard {
+        DropGuard::new(self.clone())
+    }
 }
 
-impl Drop for CancellationToken {
+pub struct DropGuard {
+    token: CancellationToken,
+}
+
+impl DropGuard {
+    pub fn new(token: CancellationToken) -> Self {
+        Self { token }
+    }
+}
+
+impl Drop for DropGuard {
     fn drop(&mut self) {
-        if Arc::strong_count(&self.state) == 1 {
-            self.cancel();
-        }
+        self.token.cancel();
     }
 }
 
