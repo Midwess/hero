@@ -162,6 +162,7 @@ use std::future::Future;
 use std::time::Duration;
 use futures_timer::Delay;
 use futures_util::{select, FutureExt};
+use n0_future::pin;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -174,13 +175,14 @@ pub trait FutureExtension: Future + Sized {
     fn with_cancel(self, cancellation: &CancellationToken) -> impl Future<Output = Result<Self::Output, TaskErrors>>;
 }
 
-impl<T: Future + Unpin> FutureExtension for T {
+impl<T: Future> FutureExtension for T {
     async fn with_cancel(self, cancellation: &CancellationToken) -> Result<Self::Output, TaskErrors> {
         if cancellation.is_cancelled() {
             return Err(TaskErrors::Cancelled)
         }
 
-        let mut self_ = self.fuse();
+        let self_ = self.fuse();
+        pin!(self_);
         let mut cancelled = cancellation.cancelled().fuse();
         select! {
             output = self_ => {
