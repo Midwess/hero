@@ -8,7 +8,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = []
-backend = ["db-remote", "grpc-client", "grpc-server", "host_machine", "retry", "s3", "services", "smtp", "local-storage", "tokio"]
+backend = ["db-remote", "grpc-client", "grpc-server", "retry", "s3", "services", "smtp", "local-storage", "tokio"]
 grpc-client = ["tonic/transport"]
 grpc-server = ["tonic", "jsonwebtoken"]
 host_machine = ["tokio/process", "tokio/fs", "tokio/io-std", "tokio-stream", "tokio"]
