@@ -21,7 +21,6 @@ use core_services::{
 use core_services::utils::pool::allocator::PoolResourceProvider;
 #[cfg(feature = "db-remote")]
 use tokio::sync::Mutex;
-#[cfg(feature = "s3")]
 use tokio::sync::OnceCell;
 #[cfg(any(feature = "db-remote"))]
 type DbName = String;
@@ -125,7 +124,6 @@ impl DependenciesInjection for DevlogSdk {
     fn s3_client(&self) -> S3Client {
         use aws_sdk_s3::config::{BehaviorVersion, Credentials, Region};
         use aws_sdk_s3::Client;
-        use core_services::s3::S3SleepAsync;
         use std::env;
 
         if let Some(s3_client) = self.s3_client.get() {
@@ -142,8 +140,7 @@ impl DependenciesInjection for DevlogSdk {
         let mut s3_config_builder = aws_sdk_s3::Config::builder()
             .behavior_version(BehaviorVersion::latest())
             .region(Region::new(region))
-            .credentials_provider(credentials)
-            .sleep_impl(S3SleepAsync::new());
+            .credentials_provider(credentials);
 
         s3_config_builder = s3_config_builder.endpoint_url(endpoint_url).force_path_style(true);
 

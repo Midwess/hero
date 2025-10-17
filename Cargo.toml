@@ -29,7 +29,7 @@ n0-future = "0.2.0"
 
 lettre = { version = "0.11.7", optional = true }
 futures-util = { version = "0.3.31", optional = true }
-surrealdb = { version = "2.3.6", default-features = false, optional = true }
+surrealdb = { version = "2.3.10", default-features = false, optional = true }
 surreal_devl = { version = "2.2.4", optional = true }
 surreal_derive_plus = { version = "2.2.5", optional = true }
 tonic-middleware = { version = "0.1.4", optional = true }
