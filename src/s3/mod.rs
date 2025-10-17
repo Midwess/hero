@@ -8,7 +8,6 @@ use schema::value::static_resource::{S3Path, StaticResource};
 use std::sync::Arc;
 use std::time::Duration;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
-use aws_smithy_async::rt::sleep::{AsyncSleep, Sleep};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -23,27 +22,6 @@ pub struct UploadPart {
 pub struct MultipartUpload{
     pub upload_id: String,
     pub parts: Vec<UploadPart>,
-}
-
-#[derive(Clone, Debug)]
-pub struct S3SleepAsync {}
-
-impl Default for S3SleepAsync {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl S3SleepAsync {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl AsyncSleep for S3SleepAsync {
-    fn sleep(&self, duration: Duration) -> Sleep {
-        Sleep::new(tokio::time::sleep(duration))
-    }
 }
 
 pub struct S3ClientResourceProvider;
