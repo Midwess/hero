@@ -4,7 +4,7 @@ use serde::{Serialize, Deserialize};
 use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey, Algorithm};
 use thiserror::Error;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims<T> {
     exp: usize,
     iat: usize,
@@ -21,7 +21,7 @@ pub enum JwtErrors {
     InvalidSecret,
 }
 
-pub fn create_jwt_token<T>(data: T, secret: &str, expiration: Duration) -> Result<String, JwtErrors>
+pub fn create_jwt_token<T: Clone>(data: T, secret: &str, expiration: Duration) -> Result<String, JwtErrors>
 where
     T: Serialize,
 {
