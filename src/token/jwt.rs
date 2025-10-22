@@ -43,7 +43,7 @@ where
     Ok(token)
 }
 
-pub fn decode_jwt_token<T>(token: &str, secret: &str) -> Result<T, JwtErrors>
+pub fn decode_jwt_token<T: Clone>(token: &str, secret: &str) -> Result<T, JwtErrors>
 where
     T: for<'de> Deserialize<'de>,
 {
