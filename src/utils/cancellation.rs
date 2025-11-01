@@ -48,6 +48,14 @@ impl CancellationToken {
     pub fn is_cancelled(&self) -> bool {
         self.state.cancelled.load(Ordering::Acquire) // Use Acquire for better memory ordering
     }
+    
+    pub fn cancel_after(&self, duration: Duration) {
+        let token = self.clone();
+        spawn(async move {
+            Delay::new(duration).await;
+            token.cancel();
+        });
+    }
 
     /// Cancel this token and recursively cancel all child tokens.
     pub fn cancel(&self) {
