@@ -16,6 +16,7 @@ impl KongGatewayAdminClient {
         let kong_url = self.url.clone();
         let client = reqwest::Client::new();
 
+        log::info!(target: "kong-admin", "Enabling CORS plugin for route {:?}", route.name);
         if enable_cors {
             // Add the CORS plugin to the route
             let resp = client
@@ -24,22 +25,9 @@ impl KongGatewayAdminClient {
                     "name": "cors",
                     "config": {
                         "origins": ["*"],
-                        "headers": [
-                            "Accept",
-                            "Accept-Language",
-                            "Content-Language",
-                            "Content-Type",
-                            "Authorization",
-                            "x-grpc-web",
-                            "grpc-timeout",
-                            "x-user-agent"
-                        ],
-                        "exposed_headers": [
-                            "grpc-status",
-                            "grpc-message",
-                            "grpc-status-details-bin"
-                        ],
-                        "methods": ["GET", "POST", "OPTIONS"]
+                        "headers": ["*"],
+                        "exposed_headers": ["*"],
+                        "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]
                     }
                 }))
                 .send()
