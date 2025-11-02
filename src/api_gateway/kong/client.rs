@@ -49,7 +49,6 @@ impl KongGatewayAdminClient {
                             "Authorization",
                             "Content-Type"
                         ],
-                        "credentials": true,
                         "max_age": 3600
                     }
                 }))
@@ -132,6 +131,8 @@ impl KongGatewayAdminClient {
                     resp.text().await.unwrap()
                 )));
             }
+            
+            self.handle_cors_plugin(&web_route, true).await?;
         } else {
             // Delete the web route
             let _ = client.delete(format!("{kong_url}/routes/{}", web_route.name)).send().await.map_err(|it| {
