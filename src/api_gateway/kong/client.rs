@@ -12,6 +12,66 @@ pub struct KongGatewayAdminClient {
 }
 
 impl KongGatewayAdminClient {
+    async fn handle_cors_plugin(&self, route: &GatewayRoute, enable_cors: bool) -> Resolve<()> {
+        let kong_url = self.url.clone();
+        let client = reqwest::Client::new();
+
+        if enable_cors {
+            // Add the CORS plugin to the route
+            let resp = client
+                .post(format!("{kong_url}/routes/{}/plugins", route.name))
+                .json(&json!({
+                    "name": "cors",
+                    "config": {
+                        "origins": ["*"]
+                    }
+                }))
+                .send()
+                .await
+                .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to enable CORS plugin: {it}")))?;
+
+            if !resp.status().is_success() && StatusCode::CONFLICT != resp.status() {
+                return Err(Errors::UnnableToRegisterApiGateway(format!(
+                    "Failed to enable CORS plugin: {} {:?}",
+                    resp.status(),
+                    resp.text().await.unwrap()
+                )));
+            }
+        } else {
+            // Get the plugin ID first, then delete it
+            let plugins_resp = client
+                .get(format!("{kong_url}/routes/{}/plugins", route.name))
+                .send()
+                .await
+                .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to get plugins: {it}")))?;
+
+            if plugins_resp.status().is_success() {
+                let plugins: serde_json::Value = plugins_resp.json().await
+                    .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to parse plugins response: {it}")))?;
+
+                if let Some(plugins_array) = plugins.get("data").and_then(|d| d.as_array()) {
+                    for plugin in plugins_array {
+                        if let Some(name) = plugin.get("name").and_then(|n| n.as_str()) {
+                            if name == "cors" {
+                                if let Some(plugin_id) = plugin.get("id").and_then(|id| id.as_str()) {
+                                    let _ = client
+                                        .delete(format!("{kong_url}/plugins/{}", plugin_id))
+                                        .send()
+                                        .await
+                                        .map_err(|it| Errors::UnnableToRegisterApiGateway(format!(
+                                            "Failed to delete CORS plugin {}: {it}", plugin_id
+                                        )))?;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     async fn handle_web_plugin(&self, service_name: String, route: &GatewayRoute, enable_web: bool) -> Resolve<()> {
         let kong_url = self.url.clone();
         let client = reqwest::Client::new();
@@ -99,6 +159,7 @@ impl ApiGatewayClient for KongGatewayAdminClient {
         for route in service.routes {
             self.create_or_update_route(service.name.clone(), &route).await?;
 
+            self.handle_cors_plugin(&route, route.allow_cross_origin).await?;
             self.handle_web_plugin(service.name.clone(), &route, route.enable_web).await?;
         }
 

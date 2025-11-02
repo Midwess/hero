@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use futures_util::io::AllowStdIo;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -61,7 +62,9 @@ pub struct GatewayRoute {
     pub strip_path: bool,
     pub preserve_host: bool,
     pub headers: HashMap<String, Vec<String>>,
-    pub enable_web: bool
+    pub enable_web: bool,
+    /// Allow CORS on all origins
+    pub allow_cross_origin: bool
 }
 
 impl GatewayRoute {
@@ -153,6 +156,7 @@ pub struct GatewayRouteBuilder {
     pub is_public: Option<bool>,
     pub is_grpc: bool,
     pub enable_web: bool,
+    pub allow_cross_origin: bool,
 }
 impl GatewayRouteBuilder {
     pub fn new() -> Self {
@@ -239,6 +243,11 @@ impl GatewayRouteBuilder {
         self
     }
 
+    pub fn allow_cross_origin(mut self, allow: bool) -> Self {
+        self.allow_cross_origin = allow;
+        self
+    }
+
     pub fn build(self) -> GatewayRoute {
         let mut headers: HashMap<String, Vec<String>> = HashMap::new();
         let is_public = self.is_public.unwrap_or(false);
@@ -261,7 +270,8 @@ impl GatewayRouteBuilder {
             strip_path: self.strip_path.unwrap_or(false),
             preserve_host: self.preserve_host.unwrap_or(true),
             headers,
-            enable_web: self.enable_web
+            enable_web: self.enable_web,
+            allow_cross_origin: self.allow_cross_origin
         }
     }
 }
