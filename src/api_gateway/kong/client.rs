@@ -23,7 +23,23 @@ impl KongGatewayAdminClient {
                 .json(&json!({
                     "name": "cors",
                     "config": {
-                        "origins": ["*"]
+                        "origins": ["*"],
+                        "headers": [
+                            "Accept",
+                            "Accept-Language",
+                            "Content-Language",
+                            "Content-Type",
+                            "Authorization",
+                            "x-grpc-web",
+                            "grpc-timeout",
+                            "x-user-agent"
+                        ],
+                        "exposed_headers": [
+                            "grpc-status",
+                            "grpc-message",
+                            "grpc-status-details-bin"
+                        ],
+                        "methods": ["GET", "POST", "OPTIONS"]
                     }
                 }))
                 .send()
