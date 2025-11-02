@@ -24,10 +24,33 @@ impl KongGatewayAdminClient {
                 .json(&json!({
                     "name": "cors",
                     "config": {
-                        "origins": ["*"],
-                        "headers": ["*"],
-                        "exposed_headers": ["*"],
-                        "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]
+                        "origins": ["*"], // Allow all origins
+                        "methods": [
+                            "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"
+                        ],
+                        "headers": [
+                            "Accept",
+                            "Accept-Encoding",
+                            "Authorization",
+                            "Content-Type",
+                            "X-Grpc-Web",
+                            "Grpc-Timeout",
+                            "Grpc-Encoding",
+                            "Grpc-Accept-Encoding",
+                            "User-Agent",
+                            "Referer",
+                            "Origin"
+                        ],
+                        "exposed_headers": [
+                            "Grpc-Status",
+                            "Grpc-Message",
+                            "Grpc-Encoding",
+                            "Grpc-Accept-Encoding",
+                            "Authorization",
+                            "Content-Type"
+                        ],
+                        "credentials": true,
+                        "max_age": 3600
                     }
                 }))
                 .send()
