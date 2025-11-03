@@ -233,7 +233,7 @@ impl GatewayRouteBuilder {
 
         self.methods = Some(
             [
-                "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "CONNECT", "TRACE"
+                "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "CONNECT", "TRACE", "OPTIONS"
             ]
             .iter()
             .map(|s| s.to_string())
