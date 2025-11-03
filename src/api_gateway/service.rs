@@ -58,7 +58,7 @@ pub struct GatewayRoute {
     pub name: String,
     pub paths: Vec<String>,
     pub hosts: Vec<String>,
-    pub priority: i32,
+    pub priority: u32,
     pub methods: Option<Vec<String>>,
     pub protocols: Option<Vec<String>>,
     pub strip_path: bool,
@@ -148,7 +148,7 @@ pub struct GatewayRouteBuilder {
     pub name: Option<String>,
     pub paths: Vec<String>,
     pub hosts: Vec<String>,
-    pub priority: Option<i32>,
+    pub priority: Option<u32>,
     pub methods: Option<Vec<String>>,
     pub protocols: Option<Vec<String>>,
     pub strip_path: Option<bool>,
@@ -183,7 +183,7 @@ impl GatewayRouteBuilder {
         self
     }
 
-    pub fn priority(mut self, priority: i32) -> Self {
+    pub fn priority(mut self, priority: u32) -> Self {
         self.priority = Some(priority);
         self
     }
