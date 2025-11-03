@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use futures_util::io::AllowStdIo;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -16,7 +15,9 @@ pub struct GatewayService {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub write_timeout: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub read_timeout: Option<u32>
+    pub read_timeout: Option<u32>,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub enable_cors: bool
 }
 
 #[derive(Debug, Default)]
@@ -27,7 +28,8 @@ pub struct GatewayServiceBuilder {
     pub retries: Option<u8>,
     pub connect_timeout: Option<u32>,
     pub write_timeout: Option<u32>,
-    pub read_timeout: Option<u32>
+    pub read_timeout: Option<u32>,
+    pub enable_cors: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -62,9 +64,7 @@ pub struct GatewayRoute {
     pub strip_path: bool,
     pub preserve_host: bool,
     pub headers: HashMap<String, Vec<String>>,
-    pub enable_web: bool,
-    /// Allow CORS on all origins
-    pub allow_cross_origin: bool
+    pub enable_grpc_web: bool,
 }
 
 impl GatewayRoute {
@@ -155,8 +155,8 @@ pub struct GatewayRouteBuilder {
     pub preserve_host: Option<bool>,
     pub is_public: Option<bool>,
     pub is_grpc: bool,
-    pub enable_web: bool,
-    pub allow_cross_origin: bool,
+    pub enable_grpc_web: bool,
+    pub enable_web_cors: bool,
 }
 impl GatewayRouteBuilder {
     pub fn new() -> Self {
@@ -220,7 +220,7 @@ impl GatewayRouteBuilder {
     }
 
     pub fn grpc_web(mut self) -> Self {
-        self.enable_web = true;
+        self.enable_grpc_web = true;
 
         self
     }
@@ -233,18 +233,13 @@ impl GatewayRouteBuilder {
 
         self.methods = Some(
             [
-                "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD", "CONNECT", "TRACE"
+                "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "CONNECT", "TRACE"
             ]
             .iter()
             .map(|s| s.to_string())
             .collect()
         );
 
-        self
-    }
-
-    pub fn allow_cross_origin(mut self, allow: bool) -> Self {
-        self.allow_cross_origin = allow;
         self
     }
 
@@ -270,8 +265,7 @@ impl GatewayRouteBuilder {
             strip_path: self.strip_path.unwrap_or(false),
             preserve_host: self.preserve_host.unwrap_or(true),
             headers,
-            enable_web: self.enable_web,
-            allow_cross_origin: self.allow_cross_origin
+            enable_grpc_web: self.enable_grpc_web,
         }
     }
 }
@@ -283,6 +277,11 @@ impl GatewayServiceBuilder {
 
     pub fn name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
+        self
+    }
+
+    pub fn enable_cors(mut self, enable: bool) -> Self {
+        self.enable_cors = enable;
         self
     }
 
@@ -330,7 +329,8 @@ impl GatewayServiceBuilder {
             retries: self.retries,
             connect_timeout: self.connect_timeout,
             write_timeout: self.write_timeout,
-            read_timeout: self.read_timeout
+            read_timeout: self.read_timeout,
+            enable_cors: self.enable_cors
         }
     }
 }

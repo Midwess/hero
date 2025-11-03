@@ -1,6 +1,5 @@
 use core_services::services::base::Resolve;
 use core_services::services::errors::Errors;
-use log::info;
 use reqwest::StatusCode;
 use serde_json::json;
 
@@ -12,15 +11,15 @@ pub struct KongGatewayAdminClient {
 }
 
 impl KongGatewayAdminClient {
-    async fn handle_cors_plugin(&self, route: &GatewayRoute, enable_cors: bool) -> Resolve<()> {
+    async fn handle_cors_plugin(&self, service_name: String, enable_cors: bool) -> Resolve<()> {
         let kong_url = self.url.clone();
         let client = reqwest::Client::new();
 
-        log::info!(target: "kong-admin", "Enabling CORS plugin for route {:?}", route.name);
+        log::info!(target: "kong-admin", "Enabling CORS plugin for service {:?}", service_name);
         if enable_cors {
-            // Add the CORS plugin to the route
+            // Add the CORS plugin to the service
             let resp = client
-                .post(format!("{kong_url}/routes/{}/plugins", route.name))
+                .post(format!("{kong_url}/services/{}/plugins", service_name))
                 .json(&json!({
                     "name": "cors",
                     "config": {
@@ -42,14 +41,8 @@ impl KongGatewayAdminClient {
                             "Origin"
                         ],
                         "exposed_headers": [
-                            "Grpc-Status",
-                            "Grpc-Message",
-                            "Grpc-Encoding",
-                            "Grpc-Accept-Encoding",
-                            "Authorization",
-                            "Content-Type"
-                        ],
-                        "max_age": 3600
+                            "*"
+                        ]
                     }
                 }))
                 .send()
@@ -63,10 +56,11 @@ impl KongGatewayAdminClient {
                     resp.text().await.unwrap()
                 )));
             }
-        } else {
+        }
+        else {
             // Get the plugin ID first, then delete it
             let plugins_resp = client
-                .get(format!("{kong_url}/routes/{}/plugins", route.name))
+                .get(format!("{kong_url}/services/{}/plugins", service_name))
                 .send()
                 .await
                 .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to get plugins: {it}")))?;
@@ -98,7 +92,7 @@ impl KongGatewayAdminClient {
         Ok(())
     }
 
-    async fn handle_web_plugin(&self, service_name: String, route: &GatewayRoute, enable_web: bool) -> Resolve<()> {
+    async fn handle_grpc_web_plugin(&self, service_name: String, route: &GatewayRoute, enable_web: bool) -> Resolve<()> {
         let kong_url = self.url.clone();
         let client = reqwest::Client::new();
 
@@ -131,9 +125,8 @@ impl KongGatewayAdminClient {
                     resp.text().await.unwrap()
                 )));
             }
-            
-            self.handle_cors_plugin(&web_route, true).await?;
-        } else {
+        }
+        else {
             // Delete the web route
             let _ = client.delete(format!("{kong_url}/routes/{}", web_route.name)).send().await.map_err(|it| {
                 Errors::UnnableToRegisterApiGateway(format!("Failed to delete web grpc route {}: {it}", web_route.name))
@@ -144,7 +137,7 @@ impl KongGatewayAdminClient {
     }
 
     async fn create_or_update_route(&self, service_name: String, route: &GatewayRoute) -> Resolve<()> {
-        info!(target: "kong-admin", "Creating route {:?}", json!({"body": route.as_request_body()}));
+        log::info!(target: "kong-admin", "Creating route {:?}", json!({"body": route.as_request_body()}));
         let kong_url = self.url.clone();
         let client = reqwest::Client::new();
 
@@ -157,7 +150,7 @@ impl KongGatewayAdminClient {
 
         let resp = match resp.status() {
             StatusCode::CONFLICT => {
-                info!(target: "kong-admin", "Route already exist, change to update {:?}", route.as_request_body());
+                log::info!(target: "kong-admin", "Route already exist, change to update {:?}", route.as_request_body());
 
                 client
                     .patch(format!("{kong_url}/services/{service_name}/routes/{}", &route.name))
@@ -184,11 +177,11 @@ impl KongGatewayAdminClient {
 #[async_trait::async_trait]
 impl ApiGatewayClient for KongGatewayAdminClient {
     async fn route_to(&self, service: GatewayService) -> Resolve<()> {
+        self.handle_cors_plugin(service.name.clone(), service.enable_cors).await?;
         for route in service.routes {
             self.create_or_update_route(service.name.clone(), &route).await?;
 
-            self.handle_cors_plugin(&route, route.allow_cross_origin).await?;
-            self.handle_web_plugin(service.name.clone(), &route, route.enable_web).await?;
+            self.handle_grpc_web_plugin(service.name.clone(), &route, route.enable_grpc_web).await?;
         }
 
         Ok(())
@@ -198,7 +191,7 @@ impl ApiGatewayClient for KongGatewayAdminClient {
         let kong_url = self.url.as_str();
         let client = reqwest::Client::new();
 
-        info!(target: "kong-admin", "Creating service {}", json!({"body": service}));
+        log::info!(target: "kong-admin", "Creating service {}", json!({"body": service}));
         let resp = client.post(format!("{kong_url}/services")).json(&service).send().await.map_err(|it| {
             Errors::UnnableToRegisterApiGateway(format!("Unable to register service, failed to create {it}"))
         })?;
@@ -241,6 +234,6 @@ impl ApiGatewayClient for KongGatewayAdminClient {
 
         let service: GatewayService = resp.json().await.map_err(|it| Errors::GatewayOperationFailed(it.to_string()))?;
 
-        return Ok(Some(service));
+        Ok(Some(service))
     }
 }
