@@ -92,6 +92,33 @@ impl KongGatewayAdminClient {
         Ok(())
     }
 
+    async fn handle_options_route(&self, service_name: String, route: &GatewayRoute, enable_web: bool) -> Resolve<()> {
+        if enable_web {
+            let mut options_route = route.clone();
+            options_route.name = format!("{}_-_option", route.name);
+            options_route.methods = Some(vec!["OPTIONS".to_owned()]);
+            options_route.protocols = Some(vec![
+                "http".to_owned(),
+                "https".to_owned()
+            ]);
+
+            // Create route for OPTIONS requests
+            self.create_or_update_route(service_name, &options_route).await?;
+        }
+        else {
+            let kong_url = self.url.clone();
+            let client = reqwest::Client::new();
+
+            // Delete the OPTIONS route
+            let options_route_name = format!("{}_-_option", route.name);
+            let _ = client.delete(format!("{kong_url}/services/{service_name}/routes/{}", options_route_name)).send().await.map_err(|it| {
+                Errors::UnnableToRegisterApiGateway(format!("Failed to delete OPTIONS route {}: {it}", options_route_name))
+            })?;
+        }
+
+        Ok(())
+    }
+
     async fn handle_grpc_web_plugin(&self, service_name: String, route: &GatewayRoute, enable_web: bool) -> Resolve<()> {
         let kong_url = self.url.clone();
         let client = reqwest::Client::new();
@@ -107,7 +134,7 @@ impl KongGatewayAdminClient {
 
         if enable_web {
             // Create route for web
-            self.create_or_update_route(service_name, &web_route).await?;
+            self.create_or_update_route(service_name.clone(), &web_route).await?;
             // Add the grpc-web plugin to the route
             let resp = client
                 .post(format!("{kong_url}/routes/{}/plugins", web_route.name))
@@ -128,10 +155,12 @@ impl KongGatewayAdminClient {
         }
         else {
             // Delete the web route
-            let _ = client.delete(format!("{kong_url}/routes/{}", web_route.name)).send().await.map_err(|it| {
+            let _ = client.delete(format!("{kong_url}/services/{service_name}/routes/{}", web_route.name)).send().await.map_err(|it| {
                 Errors::UnnableToRegisterApiGateway(format!("Failed to delete web grpc route {}: {it}", web_route.name))
             })?;
         }
+
+        self.handle_options_route(service_name, &web_route, enable_web).await?;
 
         Ok(())
     }
