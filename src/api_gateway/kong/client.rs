@@ -101,6 +101,8 @@ impl KongGatewayAdminClient {
                 "http".to_owned(),
                 "https".to_owned()
             ]);
+            options_route.headers = Default::default();
+            options_route.priority += 1;
 
             // Create route for OPTIONS requests
             self.create_or_update_route(service_name, &options_route).await?;
