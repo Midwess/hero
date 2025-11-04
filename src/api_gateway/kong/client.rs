@@ -127,6 +127,7 @@ impl KongGatewayAdminClient {
 
         let mut web_route = route.clone();
         web_route.name = format!("{}_-_web", web_route.name);
+        web_route.priority += 1;
         web_route.protocols = Some(vec![
             "http".to_owned(),
             "https".to_owned()

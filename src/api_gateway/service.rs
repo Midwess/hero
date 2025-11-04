@@ -251,10 +251,6 @@ impl GatewayRouteBuilder {
             headers.insert("xinternal".to_owned(), vec!["true".to_owned()]);
         }
 
-        if self.is_grpc {
-            headers.insert("content-type".to_owned(), vec!["application/grpc".to_owned()]);
-        }
-
         GatewayRoute {
             name: self.name.expect("Route name is required"),
             paths: self.paths,
