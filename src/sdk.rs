@@ -1,6 +1,5 @@
 #[cfg(feature = "db-remote")]
 use std::collections::HashMap;
-#[cfg(feature = "db-remote")]
 use std::sync::Arc;
 
 #[cfg(feature = "s3")]
@@ -16,9 +15,6 @@ use core_services::{
     db::surrealdb::connection::{SurrealDbConnection, SurrealDbConnectionInfo, SurrealDbPoolResourceProvider},
     utils::pool::request::PoolRequest
 };
-
-#[cfg(any(feature = "db-remote", feature = "s3"))]
-use core_services::utils::pool::allocator::PoolResourceProvider;
 #[cfg(feature = "db-remote")]
 use tokio::sync::Mutex;
 use tokio::sync::OnceCell;

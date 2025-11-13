@@ -1,16 +1,19 @@
 use chrono::{DateTime, Utc};
-#[cfg(any(feature = "db-remote"))]
-use core_services::utils::pool::request::PoolRequest;
 use generator::{DistributedIdGenerator, EPOCH_SINCE};
-use std::sync::Arc;
 use n0_future::future::block_on;
+use std::sync::Arc;
 use tokio::sync::{Mutex, OnceCell};
 
+#[cfg(feature = "distributed_id")]
+pub mod etcd;
 pub mod generator;
-#[cfg(any(feature = "db-remote"))]
-pub mod surrealdb;
+
+#[cfg(feature = "distributed_id")]
+pub use etcd::EtcdWorkerOptions;
 
 pub static DISTRIBUTED_ID_GENERATOR: OnceCell<Arc<Mutex<DistributedIdGenerator>>> = OnceCell::const_new();
+#[cfg(feature = "distributed_id")]
+static WORKER_LEASE_GUARD: OnceCell<etcd::WorkerLeaseGuard> = OnceCell::const_new();
 
 pub async fn gen_id() -> u64 {
     let generator = DISTRIBUTED_ID_GENERATOR.get().unwrap();
@@ -27,25 +30,24 @@ pub fn id_to_unix_timestamp(id: u64) -> u64 {
     epoch_since_ms + timestamp
 }
 
-#[cfg(any(feature = "db-remote"))]
-pub async fn init_id_generator(app_name: String, db: PoolRequest<core_services::db::surrealdb::connection::SurrealDbConnection>) {
-    use std::time::Duration;
-    use tokio::time::sleep;
+#[cfg(any(feature = "distributed_id"))]
+pub async fn init_id_generator(app_name: String, options: EtcdWorkerOptions) -> Result<(), generator::DistributedIdError> {
+    if DISTRIBUTED_ID_GENERATOR.get().is_some() {
+        return Ok(());
+    }
 
-    let distributed_id_generator = DistributedIdGenerator::init(app_name.clone(), db.clone()).await.unwrap();
-    let _ = DISTRIBUTED_ID_GENERATOR.set(Arc::new(Mutex::new(distributed_id_generator)));
-    // Reset the worker every 10 minutes
-    // Make sure there will be no duplicate ids due to one worker being restarted
-    // and another is running for too long.
-    tokio::spawn(async move {
-        loop {
-            sleep(Duration::from_secs(10 * 60)).await;
-            let new_worker = DistributedIdGenerator::init(app_name.clone(), db.clone()).await.unwrap();
-            let mut worker = DISTRIBUTED_ID_GENERATOR.get().unwrap().lock().await;
-            *worker = new_worker;
-            log::info!("Reset distributed id generator worker {worker:?}");
-        }
-    });
+    let (worker, guard) = etcd::register_worker(&app_name, options).await?;
+
+    WORKER_LEASE_GUARD
+        .set(guard)
+        .map_err(|_| generator::DistributedIdError::Coordinator("worker lease already registered".into()))?;
+
+    let generator = DistributedIdGenerator::from_worker(worker);
+    DISTRIBUTED_ID_GENERATOR
+        .set(Arc::new(Mutex::new(generator)))
+        .map_err(|_| generator::DistributedIdError::Coordinator("distributed id generator already initialized".into()))?;
+
+    Ok(())
 }
 
 pub fn init_scoped_id_generator(app_name: String) {

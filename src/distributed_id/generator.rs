@@ -1,25 +1,24 @@
 use chrono::{DateTime, Utc};
-use std::time::Duration;
 use futures_timer::Delay;
+use std::time::Duration;
 use thiserror::Error;
 
-pub static EPOCH_SINCE: u64 = 1735405200000; // 2024-12-29T00:00:00Z
+pub const EPOCH_SINCE: u64 = 1735405200000; // 2024-12-29T00:00:00Z
 
-pub static CONCURRENT_COLLISION_THRESHOLD: u64 = 4096;
+pub const MAX_ID_IN_MS: u64 = 1024;
 
-pub static MAX_ID_IN_MS: u64 = 1024;
-
-pub static TIMESTAMP_LENGTH: u64 = 2 ^ 41;
+pub const MAX_WORKER_ID: u16 = (1 << 13) - 1;
 
 #[derive(Error, Debug)]
 pub enum DistributedIdError {
-    #[error("Worker error {0}")]
-    WorkerError(String),
-    #[error("Worker out of bounds of database {} worker name {}", .0, .1)]
-    WorkerOutOfBound(String, String)
+    #[error("Invalid coordinator configuration: {0}")]
+    InvalidConfig(String),
+    #[error("Coordinator error: {0}")]
+    Coordinator(String),
+    #[error("Worker id space exhausted in namespace {0}")]
+    WorkerIdsExhausted(String)
 }
 
-#[cfg_attr(any(feature = "db-remote"), derive(surreal_derive_plus::SurrealDerive, serde::Deserialize, serde::Serialize))]
 #[derive(Debug, Clone)]
 pub struct Worker {
     pub distributed_id: u64,
@@ -36,6 +35,14 @@ pub struct DistributedIdGenerator {
 }
 
 impl DistributedIdGenerator {
+    pub fn from_worker(worker: Worker) -> Self {
+        Self {
+            worker,
+            last_timestamp: 0,
+            sequence: 0
+        }
+    }
+
     pub fn init_scoped(app_name: String) -> Self {
         Self {
             worker: Worker {
