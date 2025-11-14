@@ -163,7 +163,8 @@ impl WorkerLeaseGuard {
         keep_alive_interval: Duration
     ) -> Result<Self, DistributedIdError> {
         let mut keep_alive_client = client.clone();
-        let (_keeper, mut stream) = keep_alive_client
+        // Keep the keeper so we can call its `keep_alive` method periodically.
+        let (mut keeper, mut stream) = keep_alive_client
             .lease_keep_alive(lease_id)
             .await
             .map_err(|err| DistributedIdError::Coordinator(format!(
@@ -187,6 +188,15 @@ impl WorkerLeaseGuard {
             loop {
                 ticker.tick().await;
 
+                // Actively send a keep-alive request using the keeper. This is
+                // required by the etcd client so the lease is actually refreshed.
+                if let Err(err) = keeper.keep_alive().await {
+                    log::warn!(target: "distributed-id", "failed to send etcd lease keep-alive: {err:?}");
+                    break;
+                }
+
+                // Observe the resulting keep-alive response on the stream. If the
+                // stream yields an error or ends, stop the keep-alive loop.
                 match stream.next().await {
                     Some(Ok(_)) => {
                         // Keep-alive successful
