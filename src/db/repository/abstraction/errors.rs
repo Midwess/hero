@@ -8,7 +8,6 @@ pub enum RepositoryError {
     #[cfg(any(feature = "db-remote"))]
     #[error("Error on db side {0}")]
     SurrealDbError(#[from] surrealdb::Error),
-    #[cfg(any(feature = "db-remote", feature = "db-red", feature = "db-idb"))]
     #[error("Error on db side {0}")]
     DbError(String),
     #[cfg(feature = "db-red")]
@@ -26,7 +25,6 @@ impl From<RepositoryError> for tonic::Status {
             RepositoryError::Conflict(conflict, _) => tonic::Status::already_exists(conflict.to_string()),
             #[cfg(feature = "db-remote")]
             RepositoryError::SurrealDbError(surreal_db_error) => tonic::Status::internal(surreal_db_error.to_string()),
-            #[cfg(any(feature = "db-remote", feature = "db-red"))]
             RepositoryError::DbError(db_error) => tonic::Status::internal(db_error.to_string()),
             #[cfg(feature = "db-red")]
             RepositoryError::BincodeError(bincode_error) => tonic::Status::internal(bincode_error.to_string()),
