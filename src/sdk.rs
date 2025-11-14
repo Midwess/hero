@@ -18,6 +18,7 @@ use core_services::{
 #[cfg(feature = "db-remote")]
 use tokio::sync::Mutex;
 use tokio::sync::OnceCell;
+
 #[cfg(any(feature = "db-remote"))]
 type DbName = String;
 
@@ -77,6 +78,7 @@ impl DependenciesInjection for DevlogSdk {
     #[cfg(feature = "db-remote")]
     async fn enable_db(&self, db_name: DbName, min_pool_size: usize, max_pool_size: usize) {
         use crate::config::CONFIGS;
+        use core_services::utils::pool::allocator::PoolResourceProvider;
 
         let db_provider: Box<dyn PoolResourceProvider<SurrealDbConnection>> = Box::new(SurrealDbPoolResourceProvider {
             info: SurrealDbConnectionInfo {
@@ -155,7 +157,9 @@ impl DependenciesInjection for DevlogSdk {
     async fn smtp_client(&self) -> SmtpClient {
         use core_services::smtp::client::SmtpPoolResourceProvider;
         use core_services::utils::pool::allocator::{PoolAllocator, PoolBuilder};
+
         use core_services::utils::pool::request::PoolRequestBuilder;
+        use core_services::utils::pool::allocator::PoolResourceProvider;
         use lettre::SmtpTransport;
         use std::sync::Arc;
 
