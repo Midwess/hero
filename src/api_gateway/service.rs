@@ -116,17 +116,6 @@ impl GatewayRoute {
             }
         }
 
-        // Protocols
-        // if let Some(protocols) = &self.protocols {
-        //     if protocols.len() == 1 {
-        //         parts.push(format!("net.protocol == \"{}\"", protocols[0]));
-        //     } else if !protocols.is_empty() {
-        //         let proto_expr =
-        //             protocols.iter().map(|p| format!("net.protocol == \"{}\"", p)).collect::<Vec<_>>().join(" || ");
-        //         parts.push(format!("({})", proto_expr));
-        //     }
-        // }
-
         // Headers
         for (key, values) in &self.headers {
             let key = key.replace("-", "_");
@@ -249,6 +238,10 @@ impl GatewayRouteBuilder {
 
         if !is_public {
             headers.insert("xinternal".to_owned(), vec!["true".to_owned()]);
+        }
+
+        if self.is_grpc {
+            headers.insert("content-type".to_owned(), vec!["application/grpc".to_owned()]);
         }
 
         GatewayRoute {

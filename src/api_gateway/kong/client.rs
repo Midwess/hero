@@ -133,6 +133,7 @@ impl KongGatewayAdminClient {
             "https".to_owned()
         ]);
 
+        web_route.headers.remove("content-type");
         web_route.headers.insert("content-type".to_owned(), vec!["application/grpc-web+proto".to_owned()]);
 
         if enable_web {
