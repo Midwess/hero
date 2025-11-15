@@ -3,7 +3,8 @@ use chrono::Utc;
 use etcd_client::{Client, Compare, CompareOp, PutOptions, Txn, TxnOp};
 use serde_json::json;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::atomic::{AtomicI64, AtomicU16, Ordering};
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::sync::Mutex as TokioMutex;
 use tokio::task::JoinHandle;
@@ -148,19 +149,29 @@ impl EtcdWorkerOptions {
     }
 }
 
+#[derive(Clone)]
 pub struct WorkerLeaseGuard {
     client: Client,
-    lease_id: i64,
-    key: String,
-    keep_alive_task: Arc<TokioMutex<Option<JoinHandle<()>>>>
+    lease_id: Arc<AtomicI64>,
+    key: Arc<RwLock<String>>,
+    worker_id: Arc<AtomicU16>,
+    keep_alive_task: Arc<TokioMutex<Option<JoinHandle<()>>>>,
+    app_name: String,
 }
+
+const MAX_RECONNECT_DELAY: Duration = Duration::from_secs(60);
+const INITIAL_RECONNECT_DELAY: Duration = Duration::from_secs(1);
 
 impl WorkerLeaseGuard {
     pub async fn new(
         client: Client,
         lease_id: i64,
         key: String,
-        keep_alive_interval: Duration
+        worker_id: u16,
+        keep_alive_interval: Duration,
+        endpoints: Vec<String>,
+        app_name: String,
+        options: EtcdWorkerOptions,
     ) -> Result<Self, DistributedIdError> {
         let mut keep_alive_client = client.clone();
         // Keep the keeper so we can call its `keep_alive` method periodically.
@@ -176,38 +187,106 @@ impl WorkerLeaseGuard {
             keep_alive_interval
         };
 
+        let endpoints_clone = endpoints.clone();
+        let app_name_clone = app_name.clone();
+        let options_clone = options.clone();
+        let lease_id_shared = Arc::new(AtomicI64::new(lease_id));
+        let key_shared = Arc::new(RwLock::new(key.clone()));
+        let worker_id_shared = Arc::new(AtomicU16::new(worker_id));
+        let lease_id_task = Arc::clone(&lease_id_shared);
+        let key_task = Arc::clone(&key_shared);
+        let worker_id_task = Arc::clone(&worker_id_shared);
+
         let keep_alive_task = tokio::spawn(async move {
             use n0_future::StreamExt;
             
-            if let Err(err) = stream.next().await.transpose() {
-                log::warn!(target: "distributed-id", "initial etcd lease keep-alive failed: {err:?}");
-                return;
-            }
-
             let mut ticker = tokio::time::interval(interval_duration);
+            let mut reconnect_delay = INITIAL_RECONNECT_DELAY;
+            let mut consecutive_failures = 0u32;
+            let mut current_lease_id = lease_id;
+
             loop {
                 ticker.tick().await;
 
                 // Actively send a keep-alive request using the keeper. This is
                 // required by the etcd client so the lease is actually refreshed.
                 if let Err(err) = keeper.keep_alive().await {
-                    log::warn!(target: "distributed-id", "failed to send etcd lease keep-alive: {err:?}");
-                    break;
+                    log::warn!(target: "distributed-id", "failed to send etcd lease keep-alive (attempt {}): {err:?}", consecutive_failures + 1);
+                    consecutive_failures += 1;
+
+                    // Try to reconnect with exponential backoff
+                    match try_reconnect(&mut keep_alive_client, &mut keeper, &mut stream, 
+                                     &endpoints_clone, &mut current_lease_id, &mut reconnect_delay, 
+                                     &mut consecutive_failures, &app_name_clone, &options_clone, &key_task, &worker_id_task).await {
+                        ReconnectResult::Success => {
+                            // Update shared lease_id
+                            lease_id_task.store(current_lease_id, Ordering::SeqCst);
+                            continue;
+                        }
+                        ReconnectResult::Failed => {
+                            log::warn!(target: "distributed-id", 
+                                "failed to reconnect to etcd after multiple attempts, continuing with worker_id {}", 
+                                worker_id_task.load(Ordering::SeqCst)
+                            );
+                            break;
+                        }
+                    }
                 }
 
                 // Observe the resulting keep-alive response on the stream. If the
                 // stream yields an error or ends, stop the keep-alive loop.
                 match stream.next().await {
                     Some(Ok(_)) => {
-                        // Keep-alive successful
+                        // Keep-alive successful - reset reconnect delay
+                        if consecutive_failures > 0 {
+                            log::info!(target: "distributed-id", "etcd lease keep-alive recovered after {} failures", consecutive_failures);
+                            consecutive_failures = 0;
+                            reconnect_delay = INITIAL_RECONNECT_DELAY;
+                        }
                     }
                     Some(Err(err)) => {
-                        log::warn!(target: "distributed-id", "failed to keep etcd lease alive: {err:?}");
-                        break;
+                        log::warn!(target: "distributed-id", "failed to keep etcd lease alive (attempt {}): {err:?}", consecutive_failures + 1);
+                        consecutive_failures += 1;
+
+                        // Try to reconnect with exponential backoff
+                        match try_reconnect(&mut keep_alive_client, &mut keeper, &mut stream, 
+                                         &endpoints_clone, &mut current_lease_id, &mut reconnect_delay, 
+                                         &mut consecutive_failures, &app_name_clone, &options_clone, &key_task, &worker_id_task).await {
+                            ReconnectResult::Success => {
+                                // Update shared lease_id
+                                lease_id_task.store(current_lease_id, Ordering::SeqCst);
+                                continue;
+                            }
+                            ReconnectResult::Failed => {
+                                log::warn!(target: "distributed-id", 
+                                    "failed to reconnect to etcd after multiple attempts, continuing with worker_id {}", 
+                                    worker_id_task.load(Ordering::SeqCst)
+                                );
+                                break;
+                            }
+                        }
                     }
                     None => {
-                        log::warn!(target: "distributed-id", "etcd lease keep-alive stream ended unexpectedly");
-                        break;
+                        log::warn!(target: "distributed-id", "etcd lease keep-alive stream ended unexpectedly (attempt {})", consecutive_failures + 1);
+                        consecutive_failures += 1;
+
+                        // Try to reconnect with exponential backoff
+                        match try_reconnect(&mut keep_alive_client, &mut keeper, &mut stream, 
+                                         &endpoints_clone, &mut current_lease_id, &mut reconnect_delay, 
+                                         &mut consecutive_failures, &app_name_clone, &options_clone, &key_task, &worker_id_task).await {
+                            ReconnectResult::Success => {
+                                // Update shared lease_id
+                                lease_id_task.store(current_lease_id, Ordering::SeqCst);
+                                continue;
+                            }
+                            ReconnectResult::Failed => {
+                                log::warn!(target: "distributed-id", 
+                                    "failed to reconnect to etcd after multiple attempts, continuing with worker_id {}", 
+                                    worker_id_task.load(Ordering::SeqCst)
+                                );
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -215,18 +294,128 @@ impl WorkerLeaseGuard {
 
         Ok(Self {
             client,
-            lease_id,
-            key,
-            keep_alive_task: Arc::new(TokioMutex::new(Some(keep_alive_task)))
+            lease_id: lease_id_shared,
+            key: key_shared,
+            worker_id: worker_id_shared,
+            keep_alive_task: Arc::new(TokioMutex::new(Some(keep_alive_task))),
+            app_name,
         })
+    }
+
+    pub async fn worker_id(&self) -> u16 {
+        self.worker_id.load(Ordering::SeqCst)
+    }
+}
+
+enum ReconnectResult {
+    Success,
+    Failed,
+}
+
+async fn try_reconnect(
+    client: &mut Client,
+    keeper: &mut etcd_client::LeaseKeeper,
+    stream: &mut etcd_client::LeaseKeepAliveStream,
+    endpoints: &[String],
+    lease_id: &mut i64,
+    reconnect_delay: &mut Duration,
+    consecutive_failures: &mut u32,
+    app_name: &str,
+    options: &EtcdWorkerOptions,
+    key_shared: &Arc<RwLock<String>>,
+    worker_id_shared: &Arc<AtomicU16>,
+) -> ReconnectResult {
+    const MAX_RECONNECT_ATTEMPTS: u32 = 10;
+    
+    if *consecutive_failures >= MAX_RECONNECT_ATTEMPTS {
+        log::error!(target: "distributed-id", 
+            "exceeded maximum reconnection attempts ({}), will continue using worker_id {}", 
+            MAX_RECONNECT_ATTEMPTS, 
+            worker_id_shared.load(Ordering::SeqCst)
+        );
+        return ReconnectResult::Failed;
+    }
+
+    log::info!(target: "distributed-id", "attempting to reconnect to etcd (delay: {:?}, attempt: {})", reconnect_delay, consecutive_failures);
+    tokio::time::sleep(*reconnect_delay).await;
+
+    // Try to reconnect
+    match Client::connect(endpoints.to_vec(), None).await {
+        Ok(new_client) => {
+            *client = new_client;
+            log::info!(target: "distributed-id", "successfully reconnected to etcd");            
+            log::info!(target: "distributed-id", "re-registering worker and acquiring new lease");
+            
+            let ttl_secs = match i64::try_from(options.lease_ttl.as_secs().max(1)) {
+                Ok(secs) => secs,
+                Err(_) => {
+                    log::error!(target: "distributed-id", "lease TTL too large");
+                    *reconnect_delay = (*reconnect_delay * 2).min(MAX_RECONNECT_DELAY);
+                    return ReconnectResult::Success;
+                }
+            };
+
+            match client.lease_grant(ttl_secs, None).await {
+                Ok(lease) => {
+                    let new_lease_id = lease.id();
+                    log::info!(target: "distributed-id", "acquired new lease: {}", new_lease_id);
+
+                    // Try to allocate the same worker ID or a new one
+                    match allocate_worker_id(client, app_name, options, new_lease_id).await {
+                        Ok((worker_id, new_key)) => {
+                            log::info!(target: "distributed-id", "re-registered worker with id: {}", worker_id);
+                            
+                            // Update the shared key and worker_id
+                            if let Ok(mut key_guard) = key_shared.write() {
+                                *key_guard = new_key;
+                            }
+                            worker_id_shared.store(worker_id, Ordering::SeqCst);
+                            
+                            // Establish keep-alive for the new lease
+                            match client.lease_keep_alive(new_lease_id).await {
+                                Ok((new_keeper, new_stream)) => {
+                                    *keeper = new_keeper;
+                                    *stream = new_stream;
+                                    *lease_id = new_lease_id;
+
+                                    log::info!(target: "distributed-id", "worker re-registration complete, new lease: {}", new_lease_id);
+                                    *reconnect_delay = INITIAL_RECONNECT_DELAY;
+                                    *consecutive_failures = 0;
+                                    ReconnectResult::Success
+                                }
+                                Err(err) => {
+                                    log::warn!(target: "distributed-id", "failed to establish keep-alive for new lease: {err:?}");
+                                    *reconnect_delay = (*reconnect_delay * 2).min(MAX_RECONNECT_DELAY);
+                                    ReconnectResult::Success
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            log::warn!(target: "distributed-id", "failed to re-allocate worker id: {err:?}");
+                            *reconnect_delay = (*reconnect_delay * 2).min(MAX_RECONNECT_DELAY);
+                            ReconnectResult::Success
+                        }
+                    }
+                }
+                Err(err) => {
+                    log::warn!(target: "distributed-id", "failed to acquire new lease: {err:?}");
+                    *reconnect_delay = (*reconnect_delay * 2).min(MAX_RECONNECT_DELAY);
+                    ReconnectResult::Success
+                }
+            }
+        }
+        Err(err) => {
+            log::warn!(target: "distributed-id", "failed to reconnect to etcd: {err:?}");
+            *reconnect_delay = (*reconnect_delay * 2).min(MAX_RECONNECT_DELAY);
+            ReconnectResult::Success // Continue trying
+        }
     }
 }
 
 impl fmt::Debug for WorkerLeaseGuard {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("WorkerLeaseGuard")
-            .field("key", &self.key)
-            .field("lease_id", &self.lease_id)
+            .field("app_name", &self.app_name)
             .finish()
     }
 }
@@ -242,16 +431,19 @@ impl Drop for WorkerLeaseGuard {
         });
 
         let mut client = self.client.clone();
-        let key = self.key.clone();
-        let lease_id = self.lease_id;
+        let key = Arc::clone(&self.key);
+        let lease_id = Arc::clone(&self.lease_id);
 
         tokio::spawn(async move {
-            if let Err(err) = client.delete(key.clone(), None).await {
-                log::debug!(target: "distributed-id", "failed to delete etcd worker key {key}: {err:?}");
+            let key_value = key.read().map(|k| k.clone()).unwrap_or_default();
+            let lease_id_value = lease_id.load(Ordering::SeqCst);
+
+            if let Err(err) = client.delete(key_value.clone(), None).await {
+                log::debug!(target: "distributed-id", "failed to delete etcd worker key {key_value}: {err:?}");
             }
 
-            if let Err(err) = client.lease_revoke(lease_id).await {
-                log::debug!(target: "distributed-id", "failed to revoke etcd lease {lease_id}: {err:?}");
+            if let Err(err) = client.lease_revoke(lease_id_value).await {
+                log::debug!(target: "distributed-id", "failed to revoke etcd lease {lease_id_value}: {err:?}");
             }
         });
     }
@@ -284,7 +476,16 @@ pub async fn register_worker(
 
     let (worker_id, key) = allocate_worker_id(&mut client, app_name, &options, lease_id).await?;
 
-    let guard = WorkerLeaseGuard::new(client.clone(), lease_id, key.clone(), options.keep_alive_interval()).await?;
+    let guard = WorkerLeaseGuard::new(
+        client.clone(), 
+        lease_id, 
+        key.clone(), 
+        worker_id,
+        options.keep_alive_interval(),
+        options.endpoints.clone(),
+        app_name.to_string(),
+        options.clone(),
+    ).await?;
 
     let worker = Worker {
         distributed_id: worker_id as u64,
