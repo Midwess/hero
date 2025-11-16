@@ -7,7 +7,7 @@ use n0_future::time::SystemTime;
 use tokio::fs::{self, OpenOptions};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::task::spawn_blocking;
-use walkdir::WalkDir;
+use jwalk::WalkDir;
 use crate::local_storage::entry::FileEntry;
 use crate::local_storage::stream::IOCursor;
 use crate::local_storage::zip::ZipStream;
@@ -144,7 +144,7 @@ impl Folder {
         let entry = FileEntry {
             is_dir: false,
             modified_at: SystemTime::now().into(),
-            size: self.size().await,
+            size: self.zip_store_size().await,
             path: self.path.clone(),
         };
 
@@ -176,13 +176,65 @@ impl Folder {
     pub async fn size(&self) -> u64 {
         let path = self.path.clone();
         spawn_blocking(move || {
-            WalkDir::new(&path)
+            let total: u64 = WalkDir::new(&path)
+                .parallelism(jwalk::Parallelism::RayonNewPool(10))
+                .process_read_dir(|_, _, _, _| {})
                 .into_iter()
-                .par_bridge()
-                .filter_map(|e| e.ok())
-                .filter(|e| e.path().is_file())
-                .filter_map(|e| e.metadata().map(|m| m.len()).ok())
-                .sum()
+                .filter_map(|entry| entry.ok())
+                .filter_map(|entry| {
+                    let meta = entry.metadata().ok()?;
+                    if meta.is_file() {
+                        Some(meta.len())
+                    } else {
+                        None
+                    }
+                })
+                .sum();
+            total
+        }).await.unwrap()
+    }
+
+    // Almost correct, not accurate for ZIP Store
+    #[cfg(feature = "zip")]
+    pub async fn zip_store_size(&self) -> u64 {
+        let path = self.path.clone();
+        spawn_blocking(move || {
+            const LOCAL_FILE_HEADER: u64 = 30;
+            const CENTRAL_DIR_HEADER: u64 = 46;
+            const END_OF_CENTRAL_DIR: u64 = 22;
+            const ZIP64_EXTRA_FIELD: u64 = 20;
+
+            let entries: Vec<_> = WalkDir::new(&path)
+                .parallelism(jwalk::Parallelism::RayonNewPool(10))
+                .process_read_dir(|_, _, _, _| {})
+                .into_iter()
+                .filter_map(|entry| entry.ok())
+                .filter_map(|entry| {
+                    let meta = entry.metadata().ok()?;
+                    if meta.is_file() {
+                        Some(meta.len())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            let file_data_size: u64 = entries.iter().sum();
+            let file_count = entries.len() as u64;
+
+            // Calculate overhead for store mode (uncompressed)
+            let local_headers = file_count * LOCAL_FILE_HEADER;
+            let central_dir_headers = file_count * CENTRAL_DIR_HEADER;
+
+            // Add ZIP64 fields if needed (file > 4GB or archive > 4GB)
+            let zip64_overhead = if file_data_size > u32::MAX as u64 {
+                file_count * ZIP64_EXTRA_FIELD + 56 // ZIP64 end of central directory
+            } else {
+                0
+            };
+
+            // Total = file data + local headers + central directory + end marker + ZIP64 overhead
+            file_data_size + local_headers + central_dir_headers + END_OF_CENTRAL_DIR + zip64_overhead
         }).await.unwrap()
     }
 }
