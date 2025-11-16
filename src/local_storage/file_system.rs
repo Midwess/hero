@@ -1,7 +1,6 @@
 use anyhow::Result;
 use bytes::BytesMut;
 use std::path::{Path, PathBuf};
-use rayon::prelude::*;
 use async_stream::stream;
 use n0_future::time::SystemTime;
 use tokio::fs::{self, OpenOptions};
