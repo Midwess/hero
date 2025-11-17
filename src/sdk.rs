@@ -43,7 +43,8 @@ impl DependenciesInjection for DevlogSdk {
         use aws_sdk_s3::config::{BehaviorVersion, Credentials, Region};
         use aws_sdk_s3::Client;
         use std::env;
-
+        use std::sync::Arc;
+        
         if let Some(s3_client) = self.s3_client.get() {
             return s3_client.clone();
         }
