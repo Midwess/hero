@@ -1,10 +1,10 @@
+use super::table::convert_large_numbers_to_strings;
 use crate::db::repository::abstraction::errors::RepositoryError;
 use crate::db::repository::abstraction::id::DbId;
-use std::fmt::Debug;
-use js_sys::Array;
-use wasm_bindgen::{JsCast, JsValue};
-use super::table::convert_large_numbers_to_strings;
 use crate::db::repository::abstraction::repository::SendSync;
+use js_sys::Array;
+use std::fmt::Debug;
+use wasm_bindgen::{JsCast, JsValue};
 
 pub trait IdbId: DbId + SendSync + Debug + serde::Serialize + for<'de> serde::Deserialize<'de> {
     // The default implementation will serialize your struct
@@ -56,7 +56,7 @@ pub trait IdbId: DbId + SendSync + Debug + serde::Serialize + for<'de> serde::De
     fn deserialize(value: JsValue) -> Result<Self, RepositoryError>;
 
     fn normalize_to_array(value: serde_json::Value) -> serde_json::Value {
-        let value  = convert_large_numbers_to_strings(value);
+        let value = convert_large_numbers_to_strings(value);
         match value {
             serde_json::Value::Array(arr) => serde_json::Value::Array(arr),
             serde_json::Value::Object(obj) => {
@@ -64,7 +64,7 @@ pub trait IdbId: DbId + SendSync + Debug + serde::Serialize + for<'de> serde::De
                 let values = entries.into_iter().map(|(_, v)| v).collect();
                 serde_json::Value::Array(values)
             }
-            other => serde_json::Value::Array(vec![other]),
+            other => serde_json::Value::Array(vec![other])
         }
     }
 }

@@ -1,9 +1,9 @@
-use std::sync::Arc;
-use std::time::Duration;
-use futures_timer::Delay;
-use futures_util::{select, FutureExt};
 use super::allocator::PoolAllocator;
 use super::reponse::PoolResponse;
+use futures_timer::Delay;
+use futures_util::{select, FutureExt};
+use std::sync::Arc;
+use std::time::Duration;
 
 pub struct PoolRequest<T>
 where
@@ -81,7 +81,7 @@ where
                     Some(Ok(value)) => Some(value),
                     _ => None
                 }
-            },
+            }
             _ => None
         }
     }

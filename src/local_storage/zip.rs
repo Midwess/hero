@@ -1,15 +1,15 @@
-use std::path::PathBuf;
-use std::pin::Pin;
-use async_stream::stream;
-use async_zip::{Compression, ZipEntry, ZipEntryBuilder};
-use async_zip::base::write::{EntryStreamWriter, ZipFileWriter};
-use futures::Stream;
-use anyhow::Result;
-use chrono::Utc;
-use n0_future::io::AsyncWriteExt;
 use crate::local_storage::entry::FileEntry;
 use crate::local_storage::stream::IOCursor;
+use anyhow::Result;
+use async_stream::stream;
+use async_zip::base::write::{EntryStreamWriter, ZipFileWriter};
+use async_zip::{Compression, ZipEntry, ZipEntryBuilder};
+use chrono::Utc;
+use futures::Stream;
+use n0_future::io::AsyncWriteExt;
 use n0_future::StreamExt;
+use std::path::PathBuf;
+use std::pin::Pin;
 
 impl FileEntry {
     pub fn zip_entry(&self, base_path: &PathBuf) -> ZipEntry {
@@ -27,12 +27,12 @@ pub type ZipInputStream = Pin<Box<dyn Stream<Item = Result<Box<dyn IOCursor>>> +
 enum WriterState {
     ProcessingEntry {
         writer: EntryStreamWriter<Vec<u8>>,
-        cursor: Box<dyn IOCursor>,
+        cursor: Box<dyn IOCursor>
     },
     Finalizing {
-        writer: Vec<u8>,
+        writer: Vec<u8>
     },
-    Completed,
+    Completed
 }
 
 pub struct ZipStream {
@@ -42,7 +42,7 @@ pub struct ZipStream {
     chunk_size: usize,
     buffer: Vec<u8>, // Use Vec<u8> instead of BytesMut for better control
     buffer_pos: usize,
-    buffer_len: usize,
+    buffer_len: usize
 }
 
 impl ZipStream {
@@ -69,7 +69,11 @@ impl ZipStream {
         Self::new_from_stream(Box::pin(inputs), zip_entry, max_chunk_size).await
     }
 
-    pub async fn new_from_stream(mut stream: ZipInputStream, zip_entry: FileEntry, max_chunk_size: usize) -> Result<Self> {
+    pub async fn new_from_stream(
+        mut stream: ZipInputStream,
+        zip_entry: FileEntry,
+        max_chunk_size: usize
+    ) -> Result<Self> {
         let chunk_size = max_chunk_size.min(zip_entry.size as usize);
 
         // Pre-allocate buffer to avoid frequent reallocations
@@ -94,8 +98,8 @@ impl ZipStream {
             buffer_len: 0,
             state: WriterState::ProcessingEntry {
                 writer: entry_writer,
-                cursor: first_cursor,
-            },
+                cursor: first_cursor
+            }
         })
     }
 
@@ -105,13 +109,9 @@ impl ZipStream {
 
     async fn fill_buffer_from_writer(&mut self, read_size: usize) -> Result<bool> {
         let writer_data = match &mut self.state {
-            WriterState::ProcessingEntry { writer, .. } => {
-                writer.most_inner_mut()
-            }
-            WriterState::Finalizing { writer } => {
-                Some(writer)
-            }
-            WriterState::Completed => return Ok(false),
+            WriterState::ProcessingEntry { writer, .. } => writer.most_inner_mut(),
+            WriterState::Finalizing { writer } => Some(writer),
+            WriterState::Completed => return Ok(false)
         };
 
         if let Some(data) = writer_data {
@@ -141,8 +141,8 @@ impl ZipStream {
     }
 
     async fn advance_to_next_entry(&mut self) -> Result<bool> {
-        let WriterState::ProcessingEntry { writer, .. } =
-            std::mem::replace(&mut self.state, WriterState::Completed) else {
+        let WriterState::ProcessingEntry { writer, .. } = std::mem::replace(&mut self.state, WriterState::Completed)
+        else {
             return Ok(false);
         };
 
@@ -155,7 +155,7 @@ impl ZipStream {
 
                 self.state = WriterState::ProcessingEntry {
                     writer: new_entry_writer,
-                    cursor: next_cursor,
+                    cursor: next_cursor
                 };
                 Ok(true)
             }

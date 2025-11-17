@@ -1,16 +1,16 @@
+use futures::channel::oneshot;
+use futures_timer::Delay;
 use futures_util::future::join_all;
+use futures_util::lock::Mutex;
 use log::*;
+use n0_future::task::{spawn, JoinHandle};
+use n0_future::time::Instant;
 use std::borrow::BorrowMut;
 use std::cmp::min;
-use n0_future::time::Instant;
 use std::collections::VecDeque;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use std::time::Duration;
-use futures::channel::oneshot;
-use futures_timer::Delay;
-use futures_util::lock::Mutex;
-use n0_future::task::{spawn, JoinHandle};
 
 use super::reponse::PoolResponse;
 

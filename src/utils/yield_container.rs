@@ -1,8 +1,8 @@
-use std::ops::{Deref, DerefMut};
-use std::sync::{Arc, Weak};
 use futures_util::lock::Mutex;
 use n0_future::future::block_on;
 use n0_future::task::spawn;
+use std::ops::{Deref, DerefMut};
+use std::sync::{Arc, Weak};
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -10,11 +10,11 @@ pub enum YieldError {
     #[error("The container is already empty")]
     AlreadyYielded,
     #[error("The container is empty")]
-    NotYielded,
+    NotYielded
 }
 
 pub struct YieldContainer<T: Send + 'static> {
-    pub value_container: Arc<Mutex<Option<Yieldable<T>>>>,
+    pub value_container: Arc<Mutex<Option<Yieldable<T>>>>
 }
 
 impl<T: Send + 'static> YieldContainer<T> {
@@ -22,7 +22,7 @@ impl<T: Send + 'static> YieldContainer<T> {
         let container = Arc::new(Mutex::new(None));
         let yieldable = Yieldable {
             value: Some(value),
-            container: Arc::downgrade(&container),
+            container: Arc::downgrade(&container)
         };
 
         {
@@ -31,7 +31,7 @@ impl<T: Send + 'static> YieldContainer<T> {
         }
 
         Self {
-            value_container: container,
+            value_container: container
         }
     }
 
@@ -40,14 +40,14 @@ impl<T: Send + 'static> YieldContainer<T> {
         let mut lock = self.value_container.lock().await;
         match lock.take() {
             Some(yieldable) => Ok(yieldable),
-            None => Err(YieldError::NotYielded),
+            None => Err(YieldError::NotYielded)
         }
     }
 }
 
 pub struct Yieldable<T: Send + 'static> {
     pub value: Option<T>,
-    container: Weak<Mutex<Option<Yieldable<T>>>>,
+    container: Weak<Mutex<Option<Yieldable<T>>>>
 }
 
 impl<T: Send + 'static> Deref for Yieldable<T> {
@@ -71,7 +71,7 @@ impl<T: Send + 'static> Drop for Yieldable<T> {
                 let mut lock = container.lock().await;
                 *lock = Some(Yieldable {
                     value: Some(value),
-                    container: Arc::downgrade(&container),
+                    container: Arc::downgrade(&container)
                 });
             });
         }

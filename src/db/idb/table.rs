@@ -1,14 +1,14 @@
-use wasm_bindgen::JsValue;
 use crate::db::idb::id::IdbId;
 use crate::db::repository::abstraction::errors::RepositoryError;
 use crate::db::repository::abstraction::table::Table;
 use serde_json::Value;
+use wasm_bindgen::JsValue;
 
 const MAX_SAFE_JS_INT: u64 = 9_007_199_254_740_991;
 
 pub trait IdbTable<T>: Table<T> + serde::Serialize + for<'de> serde::Deserialize<'de>
 where
-    T: IdbId,
+    T: IdbId
 {
     fn id(&self) -> T {
         Table::id(self)
@@ -45,17 +45,11 @@ pub fn convert_large_numbers_to_strings(value: Value) -> Value {
 
             Value::Number(n)
         }
-        Value::Array(arr) => {
-            Value::Array(arr.into_iter().map(convert_large_numbers_to_strings).collect())
-        }
+        Value::Array(arr) => Value::Array(arr.into_iter().map(convert_large_numbers_to_strings).collect()),
         Value::Object(map) => {
-            Value::Object(
-                map.into_iter()
-                    .map(|(k, v)| (k, convert_large_numbers_to_strings(v)))
-                    .collect(),
-            )
+            Value::Object(map.into_iter().map(|(k, v)| (k, convert_large_numbers_to_strings(v))).collect())
         }
-        other => other,
+        other => other
     }
 }
 
@@ -77,15 +71,13 @@ pub fn convert_strings_to_numbers(value: Value) -> Result<Value, RepositoryError
             Ok(Value::String(s))
         }
         Value::Array(arr) => Ok(Value::Array(
-            arr.into_iter()
-                .map(convert_strings_to_numbers)
-                .collect::<Result<_, _>>()?,
+            arr.into_iter().map(convert_strings_to_numbers).collect::<Result<_, _>>()?
         )),
         Value::Object(map) => Ok(Value::Object(
             map.into_iter()
                 .map(|(k, v)| Ok::<(std::string::String, Value), RepositoryError>((k, convert_strings_to_numbers(v)?)))
-                .collect::<Result<_, _>>()?,
+                .collect::<Result<_, _>>()?
         )),
-        other => Ok(other),
+        other => Ok(other)
     }
 }

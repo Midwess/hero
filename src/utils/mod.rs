@@ -1,9 +1,9 @@
+pub mod cancellation;
 pub mod finally;
+pub mod maybe;
+pub mod never_send;
 pub mod number;
 pub mod pool;
-pub mod throttle_future;
-pub mod never_send;
-pub mod maybe;
-pub mod cancellation;
 pub mod stream;
+pub mod throttle_future;
 pub mod yield_container;

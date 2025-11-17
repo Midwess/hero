@@ -1,15 +1,15 @@
-use anyhow::Result;
-use bytes::BytesMut;
-use std::path::{Path, PathBuf};
-use async_stream::stream;
-use n0_future::time::SystemTime;
-use tokio::fs::{self, OpenOptions};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::task::spawn_blocking;
-use jwalk::WalkDir;
 use crate::local_storage::entry::FileEntry;
 use crate::local_storage::stream::IOCursor;
 use crate::local_storage::zip::ZipStream;
+use anyhow::Result;
+use async_stream::stream;
+use bytes::BytesMut;
+use jwalk::WalkDir;
+use n0_future::time::SystemTime;
+use std::path::{Path, PathBuf};
+use tokio::fs::{self, OpenOptions};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::task::spawn_blocking;
 
 impl FileEntry {
     pub async fn existing(path: impl AsRef<Path>) -> Result<Self> {
@@ -22,13 +22,9 @@ impl FileEntry {
 
         Ok(Self {
             is_dir: path.is_dir(),
-            size: if path.is_dir() {
-                0
-            } else {
-                path.metadata()?.len()
-            },
+            size: if path.is_dir() { 0 } else { path.metadata()?.len() },
             modified_at,
-            path,
+            path
         })
     }
 
@@ -144,7 +140,7 @@ impl Folder {
             is_dir: false,
             modified_at: SystemTime::now().into(),
             size: self.zip_store_size().await,
-            path: self.path.clone(),
+            path: self.path.clone()
         };
 
         let path = self.path.clone();
@@ -190,7 +186,9 @@ impl Folder {
                 })
                 .sum();
             total
-        }).await.unwrap()
+        })
+        .await
+        .unwrap()
     }
 
     // Almost correct, not accurate for ZIP Store
@@ -234,7 +232,9 @@ impl Folder {
 
             // Total = file data + local headers + central directory + end marker + ZIP64 overhead
             file_data_size + local_headers + central_dir_headers + END_OF_CENTRAL_DIR + zip64_overhead
-        }).await.unwrap()
+        })
+        .await
+        .unwrap()
     }
 }
 

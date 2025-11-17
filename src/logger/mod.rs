@@ -1,10 +1,10 @@
+use futures_util::lock::Mutex;
+use log::info;
+use n0_future::task::{spawn, JoinHandle};
+use n0_future::time;
 use std::collections::HashMap;
 use std::sync::Arc;
-use log::info;
 use std::time::Duration;
-use futures_util::lock::Mutex;
-use n0_future::task::{JoinHandle, spawn};
-use n0_future::time;
 
 pub fn setup() {
     #[cfg(target_arch = "wasm32")]
@@ -21,15 +21,7 @@ pub fn setup() {
             fn log(&self, record: &Record) {
                 if self.enabled(record.metadata()) {
                     let now = js_sys::Date::new_0().to_iso_string();
-                    web_sys::console::log_1(
-                        &format!(
-                            "[{}] {} - {}",
-                            now,
-                            record.level(),
-                            record.args()
-                        )
-                            .into(),
-                    );
+                    web_sys::console::log_1(&format!("[{}] {} - {}", now, record.level(), record.args()).into());
                 }
             }
 

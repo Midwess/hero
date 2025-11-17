@@ -1,27 +1,24 @@
-use std::{
-    sync::{Arc, Weak, atomic::{AtomicBool, Ordering}},
-};
-use std::fmt::Debug;
-use n0_future::task::spawn;
 use futures::task::AtomicWaker;
+use n0_future::task::spawn;
 use parking_lot::Mutex;
+use std::fmt::Debug;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Weak};
 
 struct CancelState {
     cancelled: AtomicBool,
     waker: AtomicWaker,
-    children: Mutex<Vec<Weak<CancelState>>>,
+    children: Mutex<Vec<Weak<CancelState>>>
 }
 
 #[derive(Clone)]
 pub struct CancellationToken {
-    state: Arc<CancelState>,
+    state: Arc<CancelState>
 }
 
 impl Debug for CancellationToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CancellationToken")
-            .field("cancelled", &self.is_cancelled())
-            .finish()
+        f.debug_struct("CancellationToken").field("cancelled", &self.is_cancelled()).finish()
     }
 }
 
@@ -33,14 +30,20 @@ impl PartialEq for CancellationToken {
 
 impl Eq for CancellationToken {}
 
+impl Default for CancellationToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CancellationToken {
     pub fn new() -> Self {
         Self {
             state: Arc::new(CancelState {
                 cancelled: AtomicBool::new(false),
                 waker: AtomicWaker::new(),
-                children: Mutex::new(Vec::new()),
-            }),
+                children: Mutex::new(Vec::new())
+            })
         }
     }
 
@@ -48,7 +51,7 @@ impl CancellationToken {
     pub fn is_cancelled(&self) -> bool {
         self.state.cancelled.load(Ordering::Acquire) // Use Acquire for better memory ordering
     }
-    
+
     pub fn cancel_after(&self, duration: Duration) {
         let token = self.clone();
         spawn(async move {
@@ -109,7 +112,7 @@ impl CancellationToken {
     /// Returns a future that resolves when this token is cancelled.
     pub fn cancelled(&self) -> Cancelled {
         Cancelled {
-            state: Arc::downgrade(&self.state),
+            state: Arc::downgrade(&self.state)
         }
     }
 
@@ -119,7 +122,7 @@ impl CancellationToken {
 }
 
 pub struct DropGuard {
-    token: Option<CancellationToken>,
+    token: Option<CancellationToken>
 }
 
 impl DropGuard {
@@ -141,7 +144,7 @@ impl Drop for DropGuard {
 }
 
 pub struct Cancelled {
-    state: Weak<CancelState>,
+    state: Weak<CancelState>
 }
 
 impl Future for Cancelled {
@@ -166,11 +169,11 @@ impl Future for Cancelled {
     }
 }
 
-use std::future::Future;
-use std::time::Duration;
 use futures_timer::Delay;
 use futures_util::{select, FutureExt};
 use n0_future::pin;
+use std::future::Future;
+use std::time::Duration;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

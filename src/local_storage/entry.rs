@@ -1,13 +1,13 @@
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::SystemTime;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FileEntry {
     pub is_dir: bool,
     pub modified_at: SystemTime,
     pub size: u64,
-    pub path: PathBuf,
+    pub path: PathBuf
 }
 
 impl FileEntry {
@@ -16,6 +16,6 @@ impl FileEntry {
     }
 
     pub fn relative_path(&self, base_path: &PathBuf) -> Option<PathBuf> {
-        self.path.strip_prefix(&base_path).ok().map(|it| it.to_path_buf())
+        self.path.strip_prefix(base_path).ok().map(|it| it.to_path_buf())
     }
 }

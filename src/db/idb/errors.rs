@@ -1,5 +1,5 @@
-use serde_wasm_bindgen::Error;
 use crate::db::repository::abstraction::errors::RepositoryError;
+use serde_wasm_bindgen::Error;
 
 impl From<Error> for RepositoryError {
     fn from(value: Error) -> Self {

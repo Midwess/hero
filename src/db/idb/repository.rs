@@ -1,10 +1,10 @@
-use idb::{Database, KeyRange, Query, TransactionMode};
+use crate::db::idb::id::IdbId;
+use crate::db::idb::table::IdbTable;
 use crate::db::repository::abstraction::errors::{RepositoryError, Resolve};
 use crate::db::repository::abstraction::repository::Repository;
-use crate::db::idb::table::IdbTable;
-use crate::db::idb::id::IdbId;
 use crate::utils::never_send::NeverSend;
 use crate::utils::pool::reponse::PoolResponse;
+use idb::{Database, KeyRange, Query, TransactionMode};
 
 #[async_trait::async_trait(?Send)]
 pub trait IdbRepository<T, I>: Send + Sync + Repository<T, I>
@@ -44,10 +44,7 @@ where
             return Ok(None);
         }
 
-        let mut result = result
-            .into_iter()
-            .filter(|it| IdbId::equals(id, &it.0).unwrap_or(false))
-            .collect::<Vec<_>>();
+        let mut result = result.into_iter().filter(|it| IdbId::equals(id, &it.0).unwrap_or(false)).collect::<Vec<_>>();
 
         if result.is_empty() {
             return Ok(None);
@@ -62,7 +59,6 @@ where
         Ok(Some(value))
     }
 
-
     async fn find_all(&self, from: Option<&I>, to: Option<&I>, limit: Option<usize>) -> Resolve<Vec<T>> {
         let result = IdbRepository::find_all_with_keys(self, from, to, limit).await?;
         Ok(result.into_iter().map(|(_id, item)| item).collect())
@@ -76,7 +72,7 @@ where
             Some(id) => {
                 let id = IdbId::into_query_value(id)?;
                 Some(id)
-            },
+            }
             None => None
         };
 
@@ -84,27 +80,28 @@ where
             Some(to_id) => {
                 let to_id = IdbId::into_query_value(to_id)?;
                 Some(to_id)
-            },
+            }
             None => None
         };
 
-
         let range_query = match (from_id, to_id) {
-            (Some(from_id), Some(to_id)) => Some(Query::KeyRange(KeyRange::bound(&from_id, &to_id, Some(false), Some(false))?)),
+            (Some(from_id), Some(to_id)) => {
+                Some(Query::KeyRange(KeyRange::bound(&from_id, &to_id, Some(false), Some(false))?))
+            }
             (Some(from_id), None) => Some(Query::KeyRange(KeyRange::lower_bound(&from_id, Some(false))?)),
             (None, Some(to_id)) => Some(Query::KeyRange(KeyRange::upper_bound(&to_id, Some(false))?)),
             (None, None) => None
         };
 
-        let transaction = db
-            .transaction(&[table_name], TransactionMode::ReadOnly)?;
+        let transaction = db.transaction(&[table_name], TransactionMode::ReadOnly)?;
         let store = transaction.object_store(table_name)?;
         let values = store.get_all(range_query.clone(), limit.map(|it| it as u32))?.await?;
         let keys = store.get_all_keys(range_query, limit.map(|it| it as u32))?.await?;
         let result = keys.into_iter().zip(values).collect::<Vec<_>>();
 
-        Ok(result.into_iter().filter_map(|(key, value)| {
-            match (IdbId::deserialize(key), IdbTable::deserialize(value)) {
+        Ok(result
+            .into_iter()
+            .filter_map(|(key, value)| match (IdbId::deserialize(key), IdbTable::deserialize(value)) {
                 (Err(e), _) => {
                     log::error!("Error deserializing record: {:?}", e);
                     None
@@ -112,10 +109,10 @@ where
                 (_, Err(e)) => {
                     log::error!("Error deserializing record: {:?}", e);
                     None
-                },
+                }
                 (Ok(key), Ok(record)) => Some((key, record))
-            }
-        }).collect())
+            })
+            .collect())
     }
 
     async fn delete_one(&self, id: &I) -> Resolve<T> {
@@ -143,7 +140,10 @@ where
         let table_name = T::get_table();
 
         let Some(record) = IdbRepository::find_one(self, &id).await? else {
-            return Err(RepositoryError::NotFound(table_name.to_owned(), format!("{:?}", IdbTable::id(&item))))
+            return Err(RepositoryError::NotFound(
+                table_name.to_owned(),
+                format!("{:?}", IdbTable::id(&item))
+            ))
         };
 
         let db = self.get_db().await;
@@ -169,18 +169,18 @@ impl<X, T, I> Repository<T, I> for X
 where
     X: IdbRepository<T, I> + Send + Sync,
     T: Send + Sync + IdbTable<I> + Clone,
-    I: Send + Sync + IdbId + Clone,
+    I: Send + Sync + IdbId + Clone
 {
     async fn create(&self, data: T) -> Resolve<T>
     where
-        T: 'async_trait,
+        T: 'async_trait
     {
         IdbRepository::create(self, data).await
     }
 
     async fn update_one(&self, data: T) -> Resolve<T>
     where
-        T: 'async_trait,
+        T: 'async_trait
     {
         IdbRepository::update_one(self, data).await
     }

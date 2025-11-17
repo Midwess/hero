@@ -1,24 +1,32 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-use wasm_bindgen::JsCast;
-use web_sys::{Blob, XmlHttpRequest as WasmXmlHttpRequest, Event, ProgressEvent, AbortController};
-use js_sys::{Object, Reflect, Uint8Array};
+use crate::utils::never_send::NeverSend;
 use futures::channel::mpsc::{channel, Receiver};
 use futures::{AsyncRead, StreamExt};
 use futures_util::SinkExt;
+use js_sys::{Object, Reflect, Uint8Array};
 use serde::Serialize;
-use crate::utils::never_send::NeverSend;
+use std::collections::HashMap;
+use std::sync::Arc;
+use wasm_bindgen::prelude::{Closure, JsValue};
+use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
-use web_sys::{Request, RequestInit, Response, Headers};
-use wasm_bindgen::prelude::Closure;
-use wasm_bindgen::prelude::JsValue;
 use wasm_streams::ReadableStream;
+use web_sys::{
+    AbortController,
+    Blob,
+    Event,
+    Headers,
+    ProgressEvent,
+    Request,
+    RequestInit,
+    Response,
+    XmlHttpRequest as WasmXmlHttpRequest
+};
 
 pub struct HttpClient {
     method: String,
     url: Option<String>,
     headers: HashMap<String, String>,
-    body: Option<Body>,
+    body: Option<Body>
 }
 
 pub enum Body {
@@ -31,12 +39,12 @@ pub enum Body {
 
 pub struct XmlHttpRequest {
     xml_http: Arc<NeverSend<WasmXmlHttpRequest>>,
-    event_rx: Receiver<XhrEvent>,
+    event_rx: Receiver<XhrEvent>
 }
 
 pub struct FetchRequest {
     request: Request,
-    _abort_controller: Option<AbortController>,
+    _abort_controller: Option<AbortController>
 }
 
 impl HttpClient {
@@ -45,7 +53,7 @@ impl HttpClient {
             method: "GET".to_string(),
             url: None,
             headers: HashMap::new(),
-            body: None,
+            body: None
         }
     }
 
@@ -91,10 +99,9 @@ impl HttpClient {
 
     pub fn is_support_duplex_stream() -> bool {
         let global = js_sys::global();
-        let request_ctor = Reflect::get(&global, &JsValue::from_str("Request"))
-            .expect("Request ctor should exist");
-        let proto = Reflect::get(&request_ctor, &JsValue::from_str("prototype"))
-            .expect("Request.prototype should exist");
+        let request_ctor = Reflect::get(&global, &JsValue::from_str("Request")).expect("Request ctor should exist");
+        let proto =
+            Reflect::get(&request_ctor, &JsValue::from_str("prototype")).expect("Request.prototype should exist");
         Reflect::has(&proto, &JsValue::from_str("duplex")).unwrap_or(false)
     }
 
@@ -148,10 +155,12 @@ impl HttpClient {
             let body = xhr_clone.response().unwrap_or(JsValue::NULL);
             let mut tx2 = tx2.clone();
             spawn_local(async move {
-                let _ = tx2.send(XhrEvent::Complete {
-                    headers: headers_map,
-                    body,
-                }).await;
+                let _ = tx2
+                    .send(XhrEvent::Complete {
+                        headers: headers_map,
+                        body
+                    })
+                    .await;
             });
         }) as Box<dyn FnMut(_)>);
         xml_http.set_onload(Some(onload_closure.as_ref().unchecked_ref()));
@@ -186,10 +195,7 @@ impl HttpClient {
             None => xml_http.send()?
         };
 
-        Ok(XmlHttpRequest {
-            xml_http,
-            event_rx: rx,
-        })
+        Ok(XmlHttpRequest { xml_http, event_rx: rx })
     }
 
     pub fn fetch(self) -> Result<FetchRequest, JsValue> {
@@ -229,11 +235,7 @@ impl HttpClient {
                 Body::AsyncReader(reader) => {
                     let readable_stream = ReadableStream::from_async_read(reader, 1024 * 1024);
                     let init_obj: &Object = opts.as_ref();
-                    Reflect::set(
-                        init_obj,
-                        &JsValue::from_str("duplex"),
-                        &JsValue::from_str("half"),
-                    )?;
+                    Reflect::set(init_obj, &JsValue::from_str("duplex"), &JsValue::from_str("half"))?;
                     opts.set_body(readable_stream.as_raw());
                 }
             }
@@ -243,7 +245,7 @@ impl HttpClient {
 
         Ok(FetchRequest {
             request,
-            _abort_controller: abort_controller,
+            _abort_controller: abort_controller
         })
     }
 }
@@ -253,9 +255,9 @@ pub enum XhrEvent {
     InProgress(ProgressEvent),
     Complete {
         headers: HashMap<String, String>,
-        body: JsValue,
+        body: JsValue
     },
-    Error(JsValue),
+    Error(JsValue)
 }
 
 impl XmlHttpRequest {
@@ -266,10 +268,7 @@ impl XmlHttpRequest {
     pub async fn response(mut self) -> Result<(HashMap<String, String>, JsValue), JsValue> {
         while let Some(event) = self.next_event().await {
             match event {
-                XhrEvent::Complete {
-                    headers,
-                    body
-                } => return Ok((headers, body)),
+                XhrEvent::Complete { headers, body } => return Ok((headers, body)),
                 XhrEvent::Error(err) => return Err(err),
                 XhrEvent::InProgress(_) => {
                     // Ignore progress events here or handle if desired
@@ -289,11 +288,9 @@ impl Drop for XmlHttpRequest {
 
 impl FetchRequest {
     pub async fn response(self) -> Result<(HashMap<String, String>, JsValue), JsValue> {
-        let window = web_sys::window()
-            .ok_or_else(|| JsValue::from_str("No global window"))?;
+        let window = web_sys::window().ok_or_else(|| JsValue::from_str("No global window"))?;
         let resp_js = JsFuture::from(window.fetch_with_request(&self.request)).await?;
-        let resp: Response = resp_js.dyn_into()
-            .map_err(|_| JsValue::from_str("Failed to convert to Response"))?;
+        let resp: Response = resp_js.dyn_into().map_err(|_| JsValue::from_str("Failed to convert to Response"))?;
 
         // Check status code
         let status = resp.status();
@@ -303,11 +300,10 @@ impl FetchRequest {
 
         let headers_iter = resp.headers().entries();
         let mut headers_map = HashMap::new();
-        let mut entries = js_sys::try_iter(&headers_iter)?
-            .ok_or_else(|| JsValue::from_str("Failed to iterate headers"))?;
+        let mut entries =
+            js_sys::try_iter(&headers_iter)?.ok_or_else(|| JsValue::from_str("Failed to iterate headers"))?;
         while let Some(entry) = entries.next().transpose()? {
-            let pair: js_sys::Array = entry.dyn_into()
-                .map_err(|_| JsValue::from_str("Invalid header entry"))?;
+            let pair: js_sys::Array = entry.dyn_into().map_err(|_| JsValue::from_str("Invalid header entry"))?;
             let key = pair.get(0).as_string().unwrap_or_default();
             let value = pair.get(1).as_string().unwrap_or_default();
             headers_map.insert(key, value);

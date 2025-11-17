@@ -25,7 +25,7 @@ pub trait VecTableLookup<I: DbId> {
 
 impl<I> VecTableLookup<I> for Vec<I::Table>
 where
-    I: DbId,
+    I: DbId
 {
     fn lookup(&self, id: &I) -> Option<&I::Table> {
         self.iter().find(|t| id.is_represent(t))
@@ -35,11 +35,11 @@ where
         self.iter_mut().find(|t| id.is_represent(t))
     }
 
-    fn lookup_all<'a>(&'a self, id: &'a I) -> impl Iterator<Item=&'a I::Table> {
+    fn lookup_all<'a>(&'a self, id: &'a I) -> impl Iterator<Item = &'a I::Table> {
         self.iter().filter(move |t| id.is_represent(t))
     }
 
-    fn lookup_all_mut<'a>(&'a mut self, id: &'a I) -> impl Iterator<Item=&'a mut I::Table> {
+    fn lookup_all_mut<'a>(&'a mut self, id: &'a I) -> impl Iterator<Item = &'a mut I::Table> {
         self.iter_mut().filter(move |t| id.is_represent(t))
     }
 }

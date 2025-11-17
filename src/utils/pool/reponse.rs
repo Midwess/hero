@@ -1,6 +1,6 @@
+use n0_future::task::spawn;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use n0_future::task::spawn;
 
 use super::allocator::{PoolAllocator, PoolItem};
 

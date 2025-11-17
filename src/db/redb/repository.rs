@@ -1,5 +1,5 @@
-use std::fmt::Debug;
 use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition};
+use std::fmt::Debug;
 
 use crate::db::redb::id::RedbId;
 use crate::db::redb::table::RedbTable;
@@ -15,10 +15,7 @@ where
 {
     async fn get_db(&self) -> PoolResponse<Database>;
 
-    fn ensure_table_exists(
-        db: &Database,
-        def: TableDefinition<&[u8], &[u8]>,
-    ) -> Resolve<()> {
+    fn ensure_table_exists(db: &Database, def: TableDefinition<&[u8], &[u8]>) -> Resolve<()> {
         let txn = db.begin_write()?;
         {
             txn.open_table(def)?;
@@ -81,7 +78,7 @@ where
             Some(value) => {
                 let value = value?;
                 Some(RedbTable::deserialize(value.1.value().to_vec()).unwrap())
-            },
+            }
             None => {
                 // Full table scan
                 let none_bytes = bincode::serialize(&None::<T>).unwrap();
@@ -144,7 +141,7 @@ where
                 None => {
                     return Err(RepositoryError::NotFound(
                         format!("{:?}: {:?}", T::get_table(), id),
-                        T::get_table().to_string(),
+                        T::get_table().to_string()
                     ))
                 }
             };
