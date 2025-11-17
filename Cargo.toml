@@ -5,10 +5,9 @@ edition = "2021"
 
 [features]
 default = []
-backend = ["grpc-client", "grpc-server", "db-remote", "gateway", "s3"]
+backend = ["grpc-client", "grpc-server", "gateway", "s3"]
 grpc-client = ["tonic/transport"]
 grpc-server = ["tonic", "tonic-middleware", "core-services/grpc-server", "gateway", "tcp"]
-db-remote = ["surrealdb/protocol-ws", "surreal_devl", "surreal_derive_plus", "core-services/retry", "core-services/db-remote", "futures-util"]
 gateway = ["reqwest", "reqwest/json"]
 tcp = []
 smtp = ["core-services/smtp", "lettre"]
@@ -31,9 +30,6 @@ etcd-client = { version = "0.17.0", optional = true }
 
 lettre = { version = "0.11.7", optional = true }
 futures-util = { version = "0.3.31", optional = true }
-surrealdb = { version = "2.3.10", default-features = false, optional = true }
-surreal_devl = { version = "2.2.4", optional = true }
-surreal_derive_plus = { version = "2.2.5", optional = true }
 tonic-middleware = { version = "0.1.4", optional = true }
 tonic = { version = "0.13.1", optional = true }
 aws-sdk-s3 = { version = "1.76.0", optional = true }

@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GatewayService {
@@ -29,15 +29,15 @@ pub struct GatewayServiceBuilder {
     pub connect_timeout: Option<u32>,
     pub write_timeout: Option<u32>,
     pub read_timeout: Option<u32>,
-    pub enable_cors: bool,
+    pub enable_cors: bool
 }
 
 #[derive(Debug, Clone)]
 pub struct GatewayRouteExpression(String);
 
-impl Into<String> for GatewayRouteExpression {
-    fn into(self) -> String {
-        self.0
+impl From<GatewayRouteExpression> for String {
+    fn from(val: GatewayRouteExpression) -> Self {
+        val.0
     }
 }
 
@@ -64,7 +64,7 @@ pub struct GatewayRoute {
     pub strip_path: bool,
     pub preserve_host: bool,
     pub headers: HashMap<String, Vec<String>>,
-    pub enable_grpc_web: bool,
+    pub enable_grpc_web: bool
 }
 
 impl GatewayRoute {
@@ -145,7 +145,7 @@ pub struct GatewayRouteBuilder {
     pub is_public: Option<bool>,
     pub is_grpc: bool,
     pub enable_grpc_web: bool,
-    pub enable_web_cors: bool,
+    pub enable_web_cors: bool
 }
 impl GatewayRouteBuilder {
     pub fn new() -> Self {
@@ -254,7 +254,7 @@ impl GatewayRouteBuilder {
             strip_path: self.strip_path.unwrap_or(false),
             preserve_host: self.preserve_host.unwrap_or(true),
             headers,
-            enable_grpc_web: self.enable_grpc_web,
+            enable_grpc_web: self.enable_grpc_web
         }
     }
 }

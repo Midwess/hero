@@ -56,8 +56,7 @@ impl KongGatewayAdminClient {
                     resp.text().await.unwrap()
                 )));
             }
-        }
-        else {
+        } else {
             // Get the plugin ID first, then delete it
             let plugins_resp = client
                 .get(format!("{kong_url}/services/{}/plugins", service_name))
@@ -66,8 +65,9 @@ impl KongGatewayAdminClient {
                 .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to get plugins: {it}")))?;
 
             if plugins_resp.status().is_success() {
-                let plugins: serde_json::Value = plugins_resp.json().await
-                    .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to parse plugins response: {it}")))?;
+                let plugins: serde_json::Value = plugins_resp.json().await.map_err(|it| {
+                    Errors::UnnableToRegisterApiGateway(format!("Unable to parse plugins response: {it}"))
+                })?;
 
                 if let Some(plugins_array) = plugins.get("data").and_then(|d| d.as_array()) {
                     for plugin in plugins_array {
@@ -78,9 +78,12 @@ impl KongGatewayAdminClient {
                                         .delete(format!("{kong_url}/plugins/{}", plugin_id))
                                         .send()
                                         .await
-                                        .map_err(|it| Errors::UnnableToRegisterApiGateway(format!(
-                                            "Failed to delete CORS plugin {}: {it}", plugin_id
-                                        )))?;
+                                        .map_err(|it| {
+                                            Errors::UnnableToRegisterApiGateway(format!(
+                                                "Failed to delete CORS plugin {}: {it}",
+                                                plugin_id
+                                            ))
+                                        })?;
                                 }
                             }
                         }
@@ -99,29 +102,40 @@ impl KongGatewayAdminClient {
             options_route.methods = Some(vec!["OPTIONS".to_owned()]);
             options_route.protocols = Some(vec![
                 "http".to_owned(),
-                "https".to_owned()
+                "https".to_owned(),
             ]);
             options_route.headers = Default::default();
             options_route.priority += 1;
 
             // Create route for OPTIONS requests
             self.create_or_update_route(service_name, &options_route).await?;
-        }
-        else {
+        } else {
             let kong_url = self.url.clone();
             let client = reqwest::Client::new();
 
             // Delete the OPTIONS route
             let options_route_name = format!("{}_-_option", route.name);
-            let _ = client.delete(format!("{kong_url}/services/{service_name}/routes/{}", options_route_name)).send().await.map_err(|it| {
-                Errors::UnnableToRegisterApiGateway(format!("Failed to delete OPTIONS route {}: {it}", options_route_name))
-            })?;
+            let _ = client
+                .delete(format!("{kong_url}/services/{service_name}/routes/{}", options_route_name))
+                .send()
+                .await
+                .map_err(|it| {
+                    Errors::UnnableToRegisterApiGateway(format!(
+                        "Failed to delete OPTIONS route {}: {it}",
+                        options_route_name
+                    ))
+                })?;
         }
 
         Ok(())
     }
 
-    async fn handle_grpc_web_plugin(&self, service_name: String, route: &GatewayRoute, enable_web: bool) -> Resolve<()> {
+    async fn handle_grpc_web_plugin(
+        &self,
+        service_name: String,
+        route: &GatewayRoute,
+        enable_web: bool
+    ) -> Resolve<()> {
         let kong_url = self.url.clone();
         let client = reqwest::Client::new();
 
@@ -130,7 +144,7 @@ impl KongGatewayAdminClient {
         web_route.priority += 1;
         web_route.protocols = Some(vec![
             "http".to_owned(),
-            "https".to_owned()
+            "https".to_owned(),
         ]);
 
         web_route.headers.remove("content-type");
@@ -156,12 +170,18 @@ impl KongGatewayAdminClient {
                     resp.text().await.unwrap()
                 )));
             }
-        }
-        else {
+        } else {
             // Delete the web route
-            let _ = client.delete(format!("{kong_url}/services/{service_name}/routes/{}", web_route.name)).send().await.map_err(|it| {
-                Errors::UnnableToRegisterApiGateway(format!("Failed to delete web grpc route {}: {it}", web_route.name))
-            })?;
+            let _ = client
+                .delete(format!("{kong_url}/services/{service_name}/routes/{}", web_route.name))
+                .send()
+                .await
+                .map_err(|it| {
+                    Errors::UnnableToRegisterApiGateway(format!(
+                        "Failed to delete web grpc route {}: {it}",
+                        web_route.name
+                    ))
+                })?;
         }
 
         self.handle_options_route(service_name, &web_route, enable_web).await?;

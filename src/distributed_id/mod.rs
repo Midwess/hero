@@ -31,7 +31,10 @@ pub fn id_to_unix_timestamp(id: u64) -> u64 {
 }
 
 #[cfg(any(feature = "distributed_id"))]
-pub async fn init_id_generator(app_name: String, options: EtcdWorkerOptions) -> Result<(), generator::DistributedIdError> {
+pub async fn init_id_generator(
+    app_name: String,
+    options: EtcdWorkerOptions
+) -> Result<(), generator::DistributedIdError> {
     if DISTRIBUTED_ID_GENERATOR.get().is_some() {
         return Ok(());
     }
@@ -41,9 +44,9 @@ pub async fn init_id_generator(app_name: String, options: EtcdWorkerOptions) -> 
     let generator = DistributedIdGenerator::from_worker(worker);
     let generator_arc = Arc::new(Mutex::new(generator));
 
-    DISTRIBUTED_ID_GENERATOR
-        .set(generator_arc.clone())
-        .map_err(|_| generator::DistributedIdError::Coordinator("distributed id generator already initialized".into()))?;
+    DISTRIBUTED_ID_GENERATOR.set(generator_arc.clone()).map_err(|_| {
+        generator::DistributedIdError::Coordinator("distributed id generator already initialized".into())
+    })?;
 
     // Spawn a task to sync worker_id from guard to generator
     let guard_clone = guard.clone();
@@ -54,7 +57,11 @@ pub async fn init_id_generator(app_name: String, options: EtcdWorkerOptions) -> 
             let current_worker_id = guard_clone.worker_id().await;
             let mut gen = generator_arc.lock().await;
             if gen.worker.distributed_id != current_worker_id as u64 {
-                log::info!(target: "distributed-id", "updating generator worker_id from {} to {}", gen.worker.distributed_id, current_worker_id);
+                log::info!(
+                    target: "distributed-id",
+                    "updating generator worker_id from {} to {}",
+                    gen.worker.distributed_id, current_worker_id
+                );
                 gen.worker.distributed_id = current_worker_id as u64;
             }
         }
