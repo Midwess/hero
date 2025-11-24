@@ -1,57 +1,61 @@
+use std::sync::Arc;
+use std::time::Duration;
 use crate::config::CONFIGS;
 use crate::services::base::Resolve;
 use crate::services::errors::Errors;
-use crate::utils::pool::allocator::PoolResourceProvider;
-use crate::utils::pool::request::PoolRequest;
 use lettre::message::header::ContentType;
 use lettre::transport::smtp::authentication::Credentials;
-use lettre::{SmtpTransport, Transport};
-use log::info;
+use lettre::{AsyncSmtpTransport, AsyncTransport, Tokio1Executor, Transport};
+use lettre::message::{MultiPart, SinglePart};
 use prost::Message;
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use reqwest::StatusCode;
 use schema::crafter::email_template::Template;
 use schema::crafter::EmailTemplate;
-
-pub struct SmtpPoolResourceProvider;
-
-#[async_trait::async_trait]
-impl PoolResourceProvider<SmtpTransport> for SmtpPoolResourceProvider {
-    async fn new(&self) -> SmtpTransport {
-        let creds = Credentials::new(CONFIGS.smtp.username.clone(), CONFIGS.smtp.password.clone());
-        let connection_string = CONFIGS.smtp.host.to_string();
-        SmtpTransport::relay(&connection_string).unwrap().credentials(creds).build()
-    }
-}
+use crate::utils::cancellation::{CancellationToken, CancellationTokenExt, FutureExtension};
 
 #[derive(Clone)]
 pub struct SmtpClient {
-    pub transport: PoolRequest<SmtpTransport>,
+    pub transport: Arc<AsyncSmtpTransport<Tokio1Executor>>,
     pub crafter_url: String
 }
 
 impl SmtpClient {
-    pub async fn send(&self, template: EmailTemplate, receiver: String) -> Resolve<()> {
+    pub async fn new(user_name: &str, password: &str, host: &str, port: u16) -> Resolve<Self> {
+        let creds = Credentials::new(user_name.to_owned(), password.to_owned());
+        let transport = Arc::new(AsyncSmtpTransport::<Tokio1Executor>::relay(host)?.port(port).credentials(creds).build());
+        Ok(SmtpClient {
+            transport,
+            crafter_url: CONFIGS.crafter.url.clone()
+        })
+    }
+
+    pub async fn send(&self, template: EmailTemplate, from: String, receiver: String) -> Resolve<()> {
         let subject = match &template.template {
             Some(Template::Otp(_)) => "OTP verification".to_owned(),
-            Some(Template::Welcome(_)) => "Welcome to Westrise".to_owned(),
+            Some(Template::Welcome(_)) => "Welcome to Midwess".to_owned(),
             Some(Template::SendFile(_)) => "Files received".to_owned(),
-            None => "Westrise".to_owned()
+            Some(Template::Feedback(_)) => "Feedback received".to_owned(),
+            None => "Midwess".to_owned()
         };
 
         let html = self.get_html_template(&template).await?;
         let message = lettre::Message::builder()
-            .from(format!("Westrise <{}>", CONFIGS.smtp.username).parse().unwrap())
+            .from(from.parse().unwrap())
             .to(receiver.parse().unwrap())
             .subject(subject)
-            .header(ContentType::TEXT_HTML)
-            .body(html)
-            .unwrap();
-
-        let transport = self.transport.retrieve().await.unwrap();
-        transport
-            .send(&message)
-            .map_err(|e| Errors::FailedToSendEmail(format!("Failed to send email, error={e:?}")))?;
+            .multipart(
+                MultiPart::alternative()
+                    .singlepart(
+                        SinglePart::builder()
+                            .header(ContentType::TEXT_HTML)
+                            .body(html)
+                    )
+            )?;
+        self.transport
+            .send(message)
+            .with_cancel(&CancellationToken::timeout(Duration::from_secs(10))).await
+            .map_err(|e| Errors::FailedToSendEmail(format!("Failed to send email, error={e:?}")))??;
 
         Ok(())
     }
@@ -84,10 +88,6 @@ impl SmtpClient {
         let crafter_response = String::from_utf8(bytes.to_vec())
             .map_err(|e| Errors::FailedToSendEmail(format!("Failed to parse crafter response as UTF-8: {e}")))?;
 
-        info!(
-            target: "smtp-client",
-            "Received generated content for template={:?} from crafter, html={} chars",
-            &template, crafter_response.len());
         Ok(crafter_response)
     }
 }

@@ -46,7 +46,13 @@ pub enum Errors {
     #[error("Invalid s3 path format {}", .0)]
     InvalidS3Path(String),
     #[error("Json error {}", .0)]
-    JsonError(#[from] serde_json::Error)
+    JsonError(#[from] serde_json::Error),
+    #[cfg(feature = "smtp")]
+    #[error("Failed to send email {}", .0)]
+    SmtpError(#[from] lettre::transport::smtp::Error),
+    #[cfg(feature = "smtp")]
+    #[error("Smtp syntax error {}", .0)]
+    SmtpSyntax(#[from] lettre::error::Error)
 }
 
 #[cfg(feature = "s3")]
@@ -99,7 +105,11 @@ impl From<Errors> for Status {
             Errors::TcpFailure(_) => Self::internal("Service failed to start"),
             Errors::FailedToDownloadFile(_) => Self::internal("Failed to download file"),
             Errors::InvalidS3Path(_) => Self::invalid_argument("Invalid s3 path"),
-            Errors::JsonError(_) => Self::internal("Internal error, contact support")
+            Errors::JsonError(_) => Self::internal("Internal error, contact support"),
+            #[cfg(feature = "smtp")]
+            Errors::SmtpError(_) => Self::internal("Failed to send email"),
+            #[cfg(feature = "smtp")]
+            Errors::SmtpSyntax(_) => Self::internal("Failed to send email")
         }
     }
 }
