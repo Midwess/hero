@@ -1,4 +1,6 @@
 #[cfg(feature = "s3")]
+use tokio::sync::OnceCell;
+#[cfg(feature = "s3")]
 use core_services::s3::S3Client;
 
 #[async_trait::async_trait]
