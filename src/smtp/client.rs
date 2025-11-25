@@ -17,7 +17,6 @@ use crate::utils::cancellation::{CancellationToken, CancellationTokenExt, Future
 #[derive(Clone)]
 pub struct SmtpClient {
     pub transport: Arc<AsyncSmtpTransport<Tokio1Executor>>,
-    pub crafter_url: String
 }
 
 impl SmtpClient {
@@ -26,7 +25,6 @@ impl SmtpClient {
         let transport = Arc::new(AsyncSmtpTransport::<Tokio1Executor>::relay(host)?.port(port).credentials(creds).build());
         Ok(SmtpClient {
             transport,
-            crafter_url: CONFIGS.crafter.url.clone()
         })
     }
 
