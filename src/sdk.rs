@@ -1,22 +1,17 @@
 #[cfg(feature = "s3")]
-use core_services::s3::S3Client;
-#[cfg(feature = "smtp")]
-use core_services::smtp::client::SmtpClient;
 use tokio::sync::OnceCell;
+#[cfg(feature = "s3")]
+use core_services::s3::S3Client;
 
 #[async_trait::async_trait]
 pub trait DependenciesInjection {
     #[cfg(feature = "s3")]
     fn s3_client(&self) -> S3Client;
-    #[cfg(feature = "smtp")]
-    async fn smtp_client(&self) -> SmtpClient;
 }
 
 pub struct DevlogSdk {
     #[cfg(feature = "s3")]
-    s3_client: OnceCell<S3Client>,
-    #[cfg(feature = "smtp")]
-    smtp_client: OnceCell<SmtpClient>
+    s3_client: OnceCell<S3Client>
 }
 
 impl Default for DevlogSdk {
@@ -29,9 +24,7 @@ impl DevlogSdk {
     pub fn new() -> Self {
         Self {
             #[cfg(feature = "s3")]
-            s3_client: OnceCell::new(),
-            #[cfg(feature = "smtp")]
-            smtp_client: OnceCell::new()
+            s3_client: OnceCell::new()
         }
     }
 }
@@ -44,7 +37,7 @@ impl DependenciesInjection for DevlogSdk {
         use aws_sdk_s3::Client;
         use std::env;
         use std::sync::Arc;
-        
+
         if let Some(s3_client) = self.s3_client.get() {
             return s3_client.clone();
         }
@@ -72,38 +65,5 @@ impl DependenciesInjection for DevlogSdk {
         let _ = self.s3_client.set(s3_client.clone());
 
         s3_client
-    }
-
-    #[cfg(feature = "smtp")]
-    async fn smtp_client(&self) -> SmtpClient {
-        use core_services::smtp::client::SmtpPoolResourceProvider;
-        use core_services::utils::pool::allocator::{PoolAllocator, PoolBuilder};
-
-        use core_services::utils::pool::allocator::PoolResourceProvider;
-        use core_services::utils::pool::request::PoolRequestBuilder;
-        use lettre::SmtpTransport;
-        use std::sync::Arc;
-
-        use crate::config::CONFIGS;
-
-        if let Some(smtp_client) = self.smtp_client.get() {
-            return smtp_client.clone();
-        }
-
-        let smtp_provider: Box<dyn PoolResourceProvider<SmtpTransport>> = Box::new(SmtpPoolResourceProvider);
-
-        let smtp_allocator: Arc<PoolAllocator<SmtpTransport>> =
-            PoolBuilder::new(smtp_provider).min_pool_size(1).max_pool_size(10).build().await;
-
-        let transport = PoolRequestBuilder::new().pool(smtp_allocator).build();
-
-        let smtp_client = SmtpClient {
-            transport,
-            crafter_url: format!("http://{}:{}/crafter", CONFIGS.kong.host, CONFIGS.kong.port)
-        };
-
-        let _ = self.smtp_client.set(smtp_client.clone());
-
-        smtp_client
     }
 }
