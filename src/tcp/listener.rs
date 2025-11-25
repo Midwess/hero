@@ -39,8 +39,8 @@ pub async fn find_grpc_listener() -> Resolve<GrpcConnection> {
     Ok(GrpcConnection {
         listener,
         port,
-        public_host: env::var("DEVLOG_SERVICE_HOST")
-            .map(|it| it.parse().expect("DEVLOG_SERVICE_HOST must be string"))
+        public_host: env::var("SERVICE_HOST")
+            .map(|it| it.parse().expect("SERVICE_HOST must be string"))
             .unwrap_or("host.docker.internal".to_owned())
     })
 }
@@ -80,6 +80,6 @@ pub async fn find_tcp_listener() -> Resolve<TcpConnection> {
     Ok(TcpConnection {
         listener,
         port,
-        public_host: env::var("DEVLOG_SERVICE_HOST").unwrap_or_else(|_| "host.docker.internal".to_owned())
+        public_host: env::var("SERVICE_HOST").unwrap_or_else(|_| "host.docker.internal".to_owned())
     })
 }
