@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use generator::{DistributedIdGenerator, EPOCH_SINCE};
+use generator::DistributedIdGenerator;
 use n0_future::future::block_on;
 use std::sync::Arc;
 use tokio::sync::{Mutex, OnceCell};
@@ -10,6 +10,8 @@ pub mod generator;
 
 #[cfg(feature = "distributed_id")]
 pub use etcd::EtcdWorkerOptions;
+
+pub use generator::EPOCH_SINCE;
 
 pub static DISTRIBUTED_ID_GENERATOR: OnceCell<Arc<Mutex<DistributedIdGenerator>>> = OnceCell::const_new();
 #[cfg(feature = "distributed_id")]
