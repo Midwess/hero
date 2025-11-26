@@ -22,6 +22,7 @@ pub struct SmtpClient {
 impl SmtpClient {
     pub async fn new(user_name: &str, password: &str, host: &str, port: u16) -> Resolve<Self> {
         let creds = Credentials::new(user_name.to_owned(), password.to_owned());
+        log::info!("Using {host}:{port} as SMTP server");
         let transport = Arc::new(AsyncSmtpTransport::<Tokio1Executor>::relay(host)?.port(port).credentials(creds).build());
         Ok(SmtpClient {
             transport,
@@ -52,7 +53,7 @@ impl SmtpClient {
             )?;
         self.transport
             .send(message)
-            .with_cancel(&CancellationToken::timeout(Duration::from_secs(10))).await
+            .with_cancel(&CancellationToken::timeout(Duration::from_secs(20))).await
             .map_err(|e| Errors::FailedToSendEmail(format!("Failed to send email, error={e:?}")))??;
 
         Ok(())
