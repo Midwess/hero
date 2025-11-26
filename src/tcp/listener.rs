@@ -12,8 +12,8 @@ pub struct GrpcConnection {
     pub public_host: String // The host of this service that is available for others to connect
 }
 
-pub async fn find_grpc_listener() -> Resolve<GrpcConnection> {
-    let base_port: u16 = 3000; // Starting port
+pub async fn find_grpc_listener(from: Option<u16>) -> Resolve<GrpcConnection> {
+    let base_port: u16 = from.unwrap_or(3000); // Starting port
     let max_port: u16 = 50100; // Maximum port to try
     let mut port = base_port;
 
@@ -51,8 +51,8 @@ pub struct TcpConnection {
     pub public_host: String // The host of this service that is available for others to connect
 }
 
-pub async fn find_tcp_listener() -> Resolve<TcpConnection> {
-    let base_port: u16 = 3000; // Starting port
+pub async fn find_tcp_listener(from: Option<u16>) -> Resolve<TcpConnection> {
+    let base_port: u16 = from.unwrap_or(3000); // Starting port
     let max_port: u16 = 50100; // Maximum port to try
     let mut port = base_port;
 
