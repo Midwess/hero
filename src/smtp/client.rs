@@ -1,6 +1,6 @@
+use std::env;
 use std::sync::Arc;
 use std::time::Duration;
-use crate::config::CONFIGS;
 use crate::services::base::Resolve;
 use crate::services::errors::Errors;
 use lettre::message::header::ContentType;
@@ -22,6 +22,7 @@ pub struct SmtpClient {
 impl SmtpClient {
     pub async fn new(user_name: &str, password: &str, host: &str, port: u16) -> Resolve<Self> {
         let creds = Credentials::new(user_name.to_owned(), password.to_owned());
+        log::info!("Using {host}:{port} as SMTP server");
         let transport = Arc::new(AsyncSmtpTransport::<Tokio1Executor>::relay(host)?.port(port).credentials(creds).build());
         Ok(SmtpClient {
             transport,
@@ -52,7 +53,7 @@ impl SmtpClient {
             )?;
         self.transport
             .send(message)
-            .with_cancel(&CancellationToken::timeout(Duration::from_secs(10))).await
+            .with_cancel(&CancellationToken::timeout(Duration::from_secs(20))).await
             .map_err(|e| Errors::FailedToSendEmail(format!("Failed to send email, error={e:?}")))??;
 
         Ok(())
@@ -64,9 +65,12 @@ impl SmtpClient {
         template.encode(&mut buffer).expect("Not able to serialize crafter request to a buffer");
 
         let mut headers = HeaderMap::new();
+        let crafter_url = format!("http://{}:{}/crafter",
+            env::var("KONG_GATEWAY_HOST").unwrap_or_default(),
+            env::var("KONG_GATEWAY_PORT").unwrap_or("80".to_owned()));
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/octet-stream"));
         let res = client
-            .post(format!("{}/email", self.crafter_url))
+            .post(format!("{crafter_url}/email"))
             .body(buffer)
             .headers(headers)
             .send()
