@@ -38,6 +38,7 @@ lazy_static = "1.5.0"
 anyhow = "1.0.98"
 futures-timer = "3.0.3"
 futures = "0.3.31"
+validator = "0.20.0"
 chrono = "0.4.42"
 n0-future = "0.2.0"
 
