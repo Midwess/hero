@@ -1,8 +1,11 @@
 use futures_util::lock::Mutex;
+use futures_timer::Delay;
 use n0_future::future::block_on;
 use n0_future::task::spawn;
+use n0_future::time::Instant;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Weak};
+use std::time::Duration;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -41,6 +44,24 @@ impl<T: Send + 'static> YieldContainer<T> {
         match lock.take() {
             Some(yieldable) => Ok(yieldable),
             None => Err(YieldError::NotYielded)
+        }
+    }
+
+    pub async fn retrieve_timed(&self, timeout: Duration) -> Result<Yieldable<T>, YieldError> {
+        let start = Instant::now();
+        loop {
+            {
+                let mut lock = self.value_container.lock().await;
+                if let Some(yieldable) = lock.take() {
+                    return Ok(yieldable);
+                }
+            }
+
+            if start.elapsed() > timeout {
+                return Err(YieldError::NotYielded);
+            }
+
+            Delay::new(Duration::from_millis(10)).await;
         }
     }
 }
