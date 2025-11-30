@@ -5,14 +5,16 @@ use std::fmt::Debug;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
+#[derive(Debug, Default)]
 struct CancelState {
     cancelled: AtomicBool,
     waker: AtomicWaker,
     children: Mutex<Vec<Weak<CancelState>>>
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct CancellationToken {
+    #[serde(skip)]
     state: Arc<CancelState>
 }
 
@@ -174,6 +176,7 @@ use futures_util::{select, FutureExt};
 use n0_future::pin;
 use std::future::Future;
 use std::time::Duration;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
