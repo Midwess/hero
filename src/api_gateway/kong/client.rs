@@ -17,40 +17,80 @@ impl KongGatewayAdminClient {
 
         log::info!(target: "kong-admin", "Enabling CORS plugin for service {:?}", service_name);
         if enable_cors {
+            let cors_config = json!({
+                "name": "cors",
+                "config": {
+                    "origins": ["*"], // Allow all origins
+                    "methods": [
+                        "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"
+                    ],
+                    "headers": [
+                        "Accept",
+                        "Accept-Encoding",
+                        "Authorization",
+                        "Content-Type",
+                        "X-Grpc-Web",
+                        "Grpc-Timeout",
+                        "Grpc-Encoding",
+                        "Grpc-Accept-Encoding",
+                        "User-Agent",
+                        "Referer",
+                        "Origin"
+                    ],
+                    "exposed_headers": [
+                        "*"
+                    ],
+                    "max_age": 86400 // 24 hours - maximum reasonable cache time for preflight requests
+                }
+            });
+
             // Add the CORS plugin to the service
             let resp = client
                 .post(format!("{kong_url}/services/{}/plugins", service_name))
-                .json(&json!({
-                    "name": "cors",
-                    "config": {
-                        "origins": ["*"], // Allow all origins
-                        "methods": [
-                            "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"
-                        ],
-                        "headers": [
-                            "Accept",
-                            "Accept-Encoding",
-                            "Authorization",
-                            "Content-Type",
-                            "X-Grpc-Web",
-                            "Grpc-Timeout",
-                            "Grpc-Encoding",
-                            "Grpc-Accept-Encoding",
-                            "User-Agent",
-                            "Referer",
-                            "Origin"
-                        ],
-                        "exposed_headers": [
-                            "*"
-                        ],
-                        "max_age": 86400 // 24 hours - maximum reasonable cache time for preflight requests
-                    }
-                }))
+                .json(&cors_config)
                 .send()
                 .await
                 .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to enable CORS plugin: {it}")))?;
 
-            if !resp.status().is_success() && StatusCode::CONFLICT != resp.status() {
+            let resp = match resp.status() {
+                StatusCode::CONFLICT => {
+                    log::info!(target: "kong-admin", "CORS plugin already exists, updating it");
+                    
+                    // Get the existing CORS plugin ID
+                    let plugins_resp = client
+                        .get(format!("{kong_url}/services/{}/plugins", service_name))
+                        .send()
+                        .await
+                        .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to get plugins: {it}")))?;
+
+                    let plugins: serde_json::Value = plugins_resp.json().await.map_err(|it| {
+                        Errors::UnnableToRegisterApiGateway(format!("Unable to parse plugins response: {it}"))
+                    })?;
+
+                    let plugin_id = plugins
+                        .get("data")
+                        .and_then(|d| d.as_array())
+                        .and_then(|arr| {
+                            arr.iter()
+                                .find(|p| p.get("name").and_then(|n| n.as_str()) == Some("cors"))
+                                .and_then(|p| p.get("id").and_then(|id| id.as_str()))
+                        })
+                        .ok_or_else(|| {
+                            Errors::UnnableToRegisterApiGateway("CORS plugin exists but ID not found".to_owned())
+                        })?;
+
+                    // Update the existing plugin
+                    client
+                        .patch(format!("{kong_url}/plugins/{}", plugin_id))
+                        .json(&cors_config)
+                        .send()
+                        .await
+                        .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to update CORS plugin: {it}")))?
+                }
+                _ => resp
+            };
+
+            if !resp.status().is_success() {
                 return Err(Errors::UnnableToRegisterApiGateway(format!(
                     "Failed to enable CORS plugin: {} {:?}",
                     resp.status(),
