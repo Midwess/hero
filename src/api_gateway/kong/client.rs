@@ -42,7 +42,8 @@ impl KongGatewayAdminClient {
                         ],
                         "exposed_headers": [
                             "*"
-                        ]
+                        ],
+                        "max_age": 86400 // 24 hours - maximum reasonable cache time for preflight requests
                     }
                 }))
                 .send()
