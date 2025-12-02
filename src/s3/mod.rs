@@ -74,6 +74,17 @@ impl S3Client {
         Ok(())
     }
 
+    pub async fn head_object(&self, path: S3Path) -> Resolve<()> {
+        self.client
+            .head_object()
+            .bucket(path.bucket())
+            .key(path.prefix())
+            .send()
+            .await?;
+
+        Ok(())
+    }
+
     pub async fn download(&self, path: S3Path) -> Resolve<Option<Vec<u8>>> {
         // Get the object, handle the case where it might not exist
         let download_result = self.client.get_object().bucket(path.bucket()).key(path.prefix()).send().await;
