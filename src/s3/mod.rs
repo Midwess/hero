@@ -63,6 +63,17 @@ impl S3Client {
         Ok(())
     }
 
+    pub async fn delete_object(&self, path: S3Path) -> Resolve<()> {
+        self.client
+            .delete_object()
+            .bucket(path.bucket())
+            .key(path.prefix())
+            .send()
+            .await?;
+
+        Ok(())
+    }
+
     pub async fn download(&self, path: S3Path) -> Resolve<Option<Vec<u8>>> {
         // Get the object, handle the case where it might not exist
         let download_result = self.client.get_object().bucket(path.bucket()).key(path.prefix()).send().await;
@@ -204,6 +215,32 @@ impl S3Client {
             .await?;
 
         log::info!("Completed multipart upload");
+        Ok(())
+    }
+
+    pub async fn abort_incomplete_multipart_uploads(&self, path: S3Path) -> Resolve<()> {
+        let list_result = self.client
+            .list_multipart_uploads()
+            .bucket(path.bucket())
+            .prefix(path.prefix())
+            .send()
+            .await?;
+
+        for upload in list_result.uploads() {
+            if let (Some(key), Some(upload_id)) = (upload.key(), upload.upload_id()) {
+                if let Err(e) = self.client
+                    .abort_multipart_upload()
+                    .bucket(path.bucket())
+                    .key(key)
+                    .upload_id(upload_id)
+                    .send()
+                    .await
+                {
+                    log::error!("Failed to abort multipart upload: {:?}", e);
+                }
+            }
+        }
+
         Ok(())
     }
 }
