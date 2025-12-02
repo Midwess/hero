@@ -4,6 +4,8 @@ use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use aws_sdk_s3::Client;
+use aws_sdk_s3::error::SdkError;
+use aws_sdk_s3::operation::head_object::HeadObjectError;
 use schema::value::static_resource::static_resource::Source;
 use schema::value::static_resource::{S3Path, StaticResource};
 use serde::{Deserialize, Serialize};
@@ -75,14 +77,20 @@ impl S3Client {
     }
 
     pub async fn head_object(&self, path: S3Path) -> Resolve<()> {
-        self.client
+        let result = self.client
             .head_object()
             .bucket(path.bucket())
             .key(path.prefix())
             .send()
-            .await?;
+            .await;
 
-        Ok(())
+        match result {
+            Ok(_) => Ok(()),
+            Err(SdkError::ServiceError(e)) if matches!(e.err(), HeadObjectError::NotFound(_)) => {
+                Err(Errors::S3NotFound(format!("S3 object not found: {:?}", path)))
+            }
+            Err(e) => Err(e.into())
+        }
     }
 
     pub async fn download(&self, path: S3Path) -> Resolve<Option<Vec<u8>>> {

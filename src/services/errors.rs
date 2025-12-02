@@ -27,6 +27,8 @@ pub enum Errors {
     UnexpectedDataFormat(String),
     #[error("Resource not found {}", .0)]
     ResourceNotFound(String),
+    #[error("S3 Resource not found {}", .0)]
+    S3NotFound(String),
     #[error("Failed to send email {}", .0)]
     FailedToSendEmail(String),
     #[error("IO Error, {}", .0)]
@@ -96,6 +98,7 @@ impl From<Errors> for Status {
             Errors::UnexpectedDataFormat(_) => Self::aborted("Internal error, contact support"),
             Errors::AlreadyExist(message) => Self::already_exists(format!("Already exist {message}")),
             Errors::ResourceNotFound(message) => Self::not_found(message.to_owned()),
+            Errors::S3NotFound(message) => Self::not_found(message.to_owned()),
             Errors::FailedToSendEmail(_) => Self::internal("Failed to send email"),
             Errors::IoError(_) => Self::internal("Internal error"),
             Errors::ResourceBusy() => Self::internal("Not resource left, please try again later"),
