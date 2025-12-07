@@ -42,4 +42,8 @@ pub trait IOCursor: Send + Sync {
     async fn end(&mut self) -> anyhow::Result<()> {
         Ok(())
     }
+
+    fn buffer_size(&self) -> Option<usize> {
+        None
+    }
 }

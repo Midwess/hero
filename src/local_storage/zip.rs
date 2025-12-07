@@ -197,4 +197,8 @@ impl IOCursor for ZipStream {
     async fn entry(&self) -> Result<FileEntry> {
         Ok(self.zip_entry.clone())
     }
+
+    fn buffer_size(&self) -> Option<usize> {
+        Some(self.chunk_size)
+    }
 }

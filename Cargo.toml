@@ -23,6 +23,7 @@ db-idb = ["idb", "wasm-bindgen", "serde-wasm-bindgen"]
 wasm = ["web-sys", "js-sys", "wasm-logger", "wasm-bindgen", "wasm-bindgen-futures", "wasm-streams"]
 wasm-logger = ["console_log", "console_error_panic_hook", "web-sys", "js-sys"]
 token = ["jsonwebtoken"]
+zstd = ["async_zip/zstd"]
 
 [dependencies]
 serde = { version = "1.0.219", features = ["derive"] }

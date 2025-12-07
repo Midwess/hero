@@ -288,4 +288,8 @@ impl IOCursor for FileCursor {
     async fn entry(&self) -> Result<FileEntry> {
         FileEntry::existing(self.path.clone()).await
     }
+
+    fn buffer_size(&self) -> Option<usize> {
+        Some(self.buffer.capacity())
+    }
 }
