@@ -12,7 +12,7 @@ use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use reqwest::StatusCode;
 use schema::crafter::email_template::Template;
 use schema::crafter::EmailTemplate;
-use crate::utils::cancellation::{CancellationToken, CancellationTokenExt, FutureExtension};
+use crate::utils::cancellation::{CancellationToken, FutureExtension};
 
 #[derive(Clone)]
 pub struct SmtpClient {

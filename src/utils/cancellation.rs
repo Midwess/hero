@@ -1,5 +1,5 @@
 use futures::task::AtomicWaker;
-use n0_future::task::spawn;
+use n0_future::task::{spawn, JoinHandle};
 use parking_lot::Mutex;
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -12,10 +12,21 @@ struct CancelState {
     children: Mutex<Vec<Weak<CancelState>>>
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct CancellationToken {
     #[serde(skip)]
-    state: Arc<CancelState>
+    state: Arc<CancelState>,
+    #[serde(skip)]
+    timeout_handle: Option<JoinHandle<()>>
+}
+
+impl Clone for CancellationToken {
+    fn clone(&self) -> Self {
+        Self {
+            state: self.state.clone(),
+            timeout_handle: None
+        }
+    }
 }
 
 impl Debug for CancellationToken {
@@ -38,6 +49,12 @@ impl Default for CancellationToken {
     }
 }
 
+impl Drop for CancellationToken {
+    fn drop(&mut self) {
+        self.timeout_handle.take().map(|handle| handle.abort());
+    }
+}
+
 impl CancellationToken {
     pub fn new() -> Self {
         Self {
@@ -45,8 +62,21 @@ impl CancellationToken {
                 cancelled: AtomicBool::new(false),
                 waker: AtomicWaker::new(),
                 children: Mutex::new(Vec::new())
-            })
+            }),
+            timeout_handle: None
         }
+    }
+
+    pub fn timeout(duration: Duration) -> Self {
+        let mut token = CancellationToken::new();
+        let child = token.clone();
+        let handle = spawn(async move {
+            Delay::new(duration).await;
+            child.cancel();
+        });
+
+        token.timeout_handle = Some(handle);
+        token
     }
 
     /// Returns true if this token or its parent was cancelled.
@@ -206,24 +236,6 @@ impl<T: Future> FutureExtension for T {
                 Err(TaskErrors::Cancelled)
             }
         }
-    }
-}
-
-pub trait CancellationTokenExt {
-    fn timeout(duration: Duration) -> CancellationToken;
-}
-
-impl CancellationTokenExt for CancellationToken {
-    fn timeout(duration: Duration) -> CancellationToken {
-        let token = CancellationToken::new();
-        let child = token.clone();
-
-        spawn(async move {
-            Delay::new(duration).await;
-            child.cancel();
-        });
-
-        token
     }
 }
 
