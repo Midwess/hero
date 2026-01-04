@@ -42,6 +42,13 @@ impl AsyncWrite for SyncAccessHandleWriter {
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
-        self.poll_flush(cx)
+        let this = self.get_mut();
+        match this.handle.flush() {
+            Ok(_) => {
+                this.handle.close();
+                Poll::Ready(Ok(()))
+            }
+            Err(e) => Poll::Ready(Err(Error::other(format!("{:?}", e))))
+        }
     }
 }
