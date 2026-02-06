@@ -35,7 +35,8 @@ impl KongGatewayAdminClient {
                         "Grpc-Accept-Encoding",
                         "User-Agent",
                         "Referer",
-                        "Origin"
+                        "Origin",
+                        "x-user-agent"
                     ],
                     "exposed_headers": [
                         "*"
