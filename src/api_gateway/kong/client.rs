@@ -151,6 +151,31 @@ impl KongGatewayAdminClient {
 
             // Create route for OPTIONS requests
             self.create_or_update_route(service_name, &options_route).await?;
+
+            // Add Access-Control-Allow-Private-Network header to OPTIONS responses
+            let kong_url = self.url.clone();
+            let client = reqwest::Client::new();
+            let resp = client
+                .post(format!("{kong_url}/routes/{}/plugins", options_route.name))
+                .json(&json!({
+                    "name": "response-transformer",
+                    "config": {
+                        "add": {
+                            "headers": ["Access-Control-Allow-Private-Network:true"]
+                        }
+                    }
+                }))
+                .send()
+                .await
+                .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to enable response-transformer plugin: {it}")))?;
+
+            if !resp.status().is_success() && StatusCode::CONFLICT != resp.status() {
+                return Err(Errors::UnnableToRegisterApiGateway(format!(
+                    "Failed to enable response-transformer plugin: {} {:?}",
+                    resp.status(),
+                    resp.text().await.unwrap()
+                )));
+            }
         } else {
             let kong_url = self.url.clone();
             let client = reqwest::Client::new();
