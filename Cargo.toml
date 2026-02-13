@@ -17,7 +17,7 @@ distributed_id = ["etcd-client"]
 [dependencies]
 core-services = { path="../core-services", default-features = false }
 log = "0.4.27"
-chrono = "0.4.41"
+chrono = "0.4.39"
 serde = { version = "1.0.219", features = ["derive"], default-features = false }
 serde_json = { version = "1.0.117"}
 lazy_static = "1.5.0"

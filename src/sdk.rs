@@ -1,7 +1,7 @@
 #[cfg(feature = "s3")]
-use tokio::sync::OnceCell;
-#[cfg(feature = "s3")]
 use core_services::s3::S3Client;
+#[cfg(feature = "s3")]
+use tokio::sync::OnceCell;
 
 #[async_trait::async_trait]
 pub trait DependenciesInjection {

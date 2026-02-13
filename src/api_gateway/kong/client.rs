@@ -56,13 +56,12 @@ impl KongGatewayAdminClient {
             let resp = match resp.status() {
                 StatusCode::CONFLICT => {
                     log::info!(target: "kong-admin", "CORS plugin already exists, updating it");
-                    
+
                     // Get the existing CORS plugin ID
-                    let plugins_resp = client
-                        .get(format!("{kong_url}/services/{}/plugins", service_name))
-                        .send()
-                        .await
-                        .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to get plugins: {it}")))?;
+                    let plugins_resp =
+                        client.get(format!("{kong_url}/services/{}/plugins", service_name)).send().await.map_err(
+                            |it| Errors::UnnableToRegisterApiGateway(format!("Unable to get plugins: {it}"))
+                        )?;
 
                     let plugins: serde_json::Value = plugins_resp.json().await.map_err(|it| {
                         Errors::UnnableToRegisterApiGateway(format!("Unable to parse plugins response: {it}"))
@@ -81,12 +80,9 @@ impl KongGatewayAdminClient {
                         })?;
 
                     // Update the existing plugin
-                    client
-                        .patch(format!("{kong_url}/plugins/{}", plugin_id))
-                        .json(&cors_config)
-                        .send()
-                        .await
-                        .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to update CORS plugin: {it}")))?
+                    client.patch(format!("{kong_url}/plugins/{}", plugin_id)).json(&cors_config).send().await.map_err(
+                        |it| Errors::UnnableToRegisterApiGateway(format!("Unable to update CORS plugin: {it}"))
+                    )?
                 }
                 _ => resp
             };
@@ -167,7 +163,9 @@ impl KongGatewayAdminClient {
                 }))
                 .send()
                 .await
-                .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to enable response-transformer plugin: {it}")))?;
+                .map_err(|it| {
+                    Errors::UnnableToRegisterApiGateway(format!("Unable to enable response-transformer plugin: {it}"))
+                })?;
 
             if !resp.status().is_success() && StatusCode::CONFLICT != resp.status() {
                 return Err(Errors::UnnableToRegisterApiGateway(format!(

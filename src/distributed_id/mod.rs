@@ -81,6 +81,11 @@ pub fn init_scoped_id_generator(app_name: String) {
     let _ = DISTRIBUTED_ID_GENERATOR.set(Arc::new(Mutex::new(distributed_id_generator)));
 }
 
+pub fn init_scoped_id_generator_with_id(id: u32, name: String) {
+    let distributed_id_generator = DistributedIdGenerator::init_scoped_with_id(id, name);
+    let _ = DISTRIBUTED_ID_GENERATOR.set(Arc::new(Mutex::new(distributed_id_generator)));
+}
+
 pub fn id_to_datetime(id: u64) -> DateTime<Utc> {
     let timestamp = id >> 23;
     let epoch_since_ms = EPOCH_SINCE;

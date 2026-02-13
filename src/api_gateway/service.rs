@@ -218,6 +218,8 @@ impl GatewayRouteBuilder {
         self.protocols = Some(vec![
             "http".to_string(),
             "https".to_string(),
+            "http2".to_string(),
+            "https+http2".to_string(),
         ]);
 
         self.methods = Some(

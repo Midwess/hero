@@ -25,7 +25,7 @@ pub struct EtcdWorkerOptions {
 impl Default for EtcdWorkerOptions {
     fn default() -> Self {
         Self {
-            endpoints: Vec::new(),
+            endpoints: vec!["http://localhost:2379".to_string()],
             namespace: "snowflake".to_string(),
             lease_ttl: Duration::from_secs(30)
         }
