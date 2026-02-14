@@ -18,11 +18,11 @@ pub mod retry;
 #[cfg(feature = "s3")]
 pub mod s3;
 
-
 pub mod local_storage;
 
 pub mod db;
 pub mod logger;
+pub mod region;
 pub mod services;
 pub mod utils;
 

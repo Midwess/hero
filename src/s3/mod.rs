@@ -1,11 +1,11 @@
 use crate::services::base::Resolve;
 use crate::services::errors::Errors;
+use aws_sdk_s3::error::SdkError;
+use aws_sdk_s3::operation::head_object::HeadObjectError;
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 use aws_sdk_s3::Client;
-use aws_sdk_s3::error::SdkError;
-use aws_sdk_s3::operation::head_object::HeadObjectError;
 use schema::value::static_resource::static_resource::Source;
 use schema::value::static_resource::{S3Path, StaticResource};
 use serde::{Deserialize, Serialize};
@@ -66,23 +66,13 @@ impl S3Client {
     }
 
     pub async fn delete_object(&self, path: S3Path) -> Resolve<()> {
-        self.client
-            .delete_object()
-            .bucket(path.bucket())
-            .key(path.prefix())
-            .send()
-            .await?;
+        self.client.delete_object().bucket(path.bucket()).key(path.prefix()).send().await?;
 
         Ok(())
     }
 
     pub async fn head_object(&self, path: S3Path) -> Resolve<()> {
-        let result = self.client
-            .head_object()
-            .bucket(path.bucket())
-            .key(path.prefix())
-            .send()
-            .await;
+        let result = self.client.head_object().bucket(path.bucket()).key(path.prefix()).send().await;
 
         match result {
             Ok(_) => Ok(()),
@@ -238,16 +228,13 @@ impl S3Client {
     }
 
     pub async fn abort_incomplete_multipart_uploads(&self, path: S3Path) -> Resolve<()> {
-        let list_result = self.client
-            .list_multipart_uploads()
-            .bucket(path.bucket())
-            .prefix(path.prefix())
-            .send()
-            .await?;
+        let list_result =
+            self.client.list_multipart_uploads().bucket(path.bucket()).prefix(path.prefix()).send().await?;
 
         for upload in list_result.uploads() {
             if let (Some(key), Some(upload_id)) = (upload.key(), upload.upload_id()) {
-                if let Err(e) = self.client
+                if let Err(e) = self
+                    .client
                     .abort_multipart_upload()
                     .bucket(path.bucket())
                     .key(key)

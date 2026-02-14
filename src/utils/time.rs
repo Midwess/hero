@@ -35,13 +35,13 @@ pub fn epoch_micro() -> u64 {
     // Get window
     let window = match web_sys::window() {
         Some(w) => w,
-        None => return epoch_from_js_fallback(),
+        None => return epoch_from_js_fallback()
     };
 
     // Get performance
     let perf = match window.performance() {
         Some(p) => p,
-        None => return epoch_from_js_fallback(),
+        None => return epoch_from_js_fallback()
     };
 
     // High-resolution timer
@@ -58,10 +58,7 @@ pub fn epoch_micro() -> u64 {
 pub fn epoch_micro() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    let dur = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap();
+    let dur = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
 
-    (dur.as_secs()) * 1_000_000
-        + (dur.subsec_nanos() as u64) / 1_000
+    (dur.as_secs()) * 1_000_000 + (dur.subsec_nanos() as u64) / 1_000
 }

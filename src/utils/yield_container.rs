@@ -1,5 +1,5 @@
-use futures_util::lock::Mutex;
 use futures_timer::Delay;
+use futures_util::lock::Mutex;
 use n0_future::future::block_on;
 use n0_future::task::spawn;
 use n0_future::time::Instant;

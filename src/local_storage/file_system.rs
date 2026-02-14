@@ -138,7 +138,7 @@ impl Folder {
     pub async fn cursor(&self, chunk_size: usize) -> Result<Box<dyn IOCursor>> {
         let entry = FileEntry {
             is_dir: false,
-            modified_at: SystemTime::now().into(),
+            modified_at: SystemTime::now(),
             size: self.zip_store_size().await,
             path: self.path.clone()
         };

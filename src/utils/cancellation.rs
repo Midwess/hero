@@ -51,7 +51,9 @@ impl Default for CancellationToken {
 
 impl Drop for CancellationToken {
     fn drop(&mut self) {
-        self.timeout_handle.take().map(|handle| handle.abort());
+        if let Some(handle) = self.timeout_handle.take() {
+            handle.abort()
+        }
     }
 }
 
@@ -204,9 +206,9 @@ impl Future for Cancelled {
 use futures_timer::Delay;
 use futures_util::{select, FutureExt};
 use n0_future::pin;
+use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::time::Duration;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
