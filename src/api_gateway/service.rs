@@ -228,7 +228,8 @@ impl GatewayRouteBuilder {
 
     pub fn grpc_web(mut self) -> Self {
         self.enable_grpc_web = true;
-
+        self.request_buffering = true;
+        self.response_buffering = true;
         self
     }
 
