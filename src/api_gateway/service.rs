@@ -64,7 +64,9 @@ pub struct GatewayRoute {
     pub strip_path: bool,
     pub preserve_host: bool,
     pub headers: HashMap<String, Vec<String>>,
-    pub enable_grpc_web: bool
+    pub enable_grpc_web: bool,
+    pub request_buffering: bool,
+    pub response_buffering: bool,
 }
 
 impl GatewayRoute {
@@ -75,7 +77,9 @@ impl GatewayRoute {
             "strip_path": self.strip_path,
             "protocols": self.protocols,
             "preserve_host": self.preserve_host,
-            "expression": self.build_expression()
+            "expression": self.build_expression(),
+            "request_buffering": self.request_buffering,
+            "response_buffering": self.response_buffering,
         })
     }
 
@@ -145,7 +149,9 @@ pub struct GatewayRouteBuilder {
     pub is_public: Option<bool>,
     pub is_grpc: bool,
     pub enable_grpc_web: bool,
-    pub enable_web_cors: bool
+    pub enable_web_cors: bool,
+    pub request_buffering: bool,
+    pub response_buffering: bool,
 }
 impl GatewayRouteBuilder {
     pub fn new() -> Self {
@@ -154,6 +160,16 @@ impl GatewayRouteBuilder {
 
     pub fn name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
+        self
+    }
+
+    pub fn request_buffering(mut self, v: bool) -> Self {
+        self.request_buffering = v;
+        self
+    }
+
+    pub fn response_buffering(mut self, v: bool) -> Self {
+        self.response_buffering = v;
         self
     }
 
@@ -203,6 +219,8 @@ impl GatewayRouteBuilder {
             "grpcs".to_string(),
         ]);
 
+        self.request_buffering = false;
+        self.response_buffering = false;
         self.is_grpc = true;
 
         self
@@ -256,7 +274,9 @@ impl GatewayRouteBuilder {
             strip_path: self.strip_path.unwrap_or(false),
             preserve_host: self.preserve_host.unwrap_or(true),
             headers,
-            enable_grpc_web: self.enable_grpc_web
+            enable_grpc_web: self.enable_grpc_web,
+            response_buffering: self.response_buffering,
+            request_buffering: self.request_buffering,
         }
     }
 }

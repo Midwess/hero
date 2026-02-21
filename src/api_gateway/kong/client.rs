@@ -138,6 +138,8 @@ impl KongGatewayAdminClient {
             let mut options_route = route.clone();
             options_route.name = format!("{}_-_option", route.name);
             options_route.methods = Some(vec!["OPTIONS".to_owned()]);
+            options_route.request_buffering = false;
+            options_route.response_buffering = false;
             options_route.protocols = Some(vec![
                 "http".to_owned(),
                 "https".to_owned(),
