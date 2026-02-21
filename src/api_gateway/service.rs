@@ -66,7 +66,7 @@ pub struct GatewayRoute {
     pub headers: HashMap<String, Vec<String>>,
     pub enable_grpc_web: bool,
     pub request_buffering: bool,
-    pub response_buffering: bool,
+    pub response_buffering: bool
 }
 
 impl GatewayRoute {
@@ -151,7 +151,7 @@ pub struct GatewayRouteBuilder {
     pub enable_grpc_web: bool,
     pub enable_web_cors: bool,
     pub request_buffering: bool,
-    pub response_buffering: bool,
+    pub response_buffering: bool
 }
 impl GatewayRouteBuilder {
     pub fn new() -> Self {
@@ -262,7 +262,14 @@ impl GatewayRouteBuilder {
         }
 
         if self.is_grpc {
-            headers.insert("content-type".to_owned(), vec!["application/grpc".to_owned()]);
+            headers.insert(
+                "content-type".to_owned(),
+                vec![
+                    "application/grpc".to_owned(),
+                    "application/grpc+proto".to_owned(),
+                    "application/grpc+json".to_owned(),
+                ]
+            );
         }
 
         GatewayRoute {
@@ -277,7 +284,7 @@ impl GatewayRouteBuilder {
             headers,
             enable_grpc_web: self.enable_grpc_web,
             response_buffering: self.response_buffering,
-            request_buffering: self.request_buffering,
+            request_buffering: self.request_buffering
         }
     }
 }
