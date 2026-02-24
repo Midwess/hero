@@ -43,7 +43,12 @@ impl From<GatewayRouteExpression> for String {
 
 impl GatewayRouteExpression {
     pub fn proto_namespace(proto_namespace: &str) -> Self {
-        let expr = format!(r#"^/{proto_namespace}"#,);
+        let expr = format!(r#"^/{proto_namespace}"#);
+        Self(expr)
+    }
+
+    pub fn proto_namespace_capture(prefix: &str, proto_namespace: &str) -> Self {
+        let expr = format!(r#"^/{prefix}/({proto_namespace}/.*)"#);
         Self(expr)
     }
 
@@ -151,7 +156,8 @@ pub struct GatewayRouteBuilder {
     pub enable_grpc_web: bool,
     pub enable_web_cors: bool,
     pub request_buffering: bool,
-    pub response_buffering: bool
+    pub response_buffering: bool,
+    pub headers: HashMap<String, Vec<String>>
 }
 impl GatewayRouteBuilder {
     pub fn new() -> Self {
@@ -213,6 +219,13 @@ impl GatewayRouteBuilder {
         self
     }
 
+    pub fn header(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        let key = key.into();
+        let value = value.into();
+        self.headers.entry(key).or_default().push(value);
+        self
+    }
+
     pub fn grpc(mut self) -> Self {
         self.protocols = Some(vec![
             "grpc".to_string(),
@@ -270,6 +283,10 @@ impl GatewayRouteBuilder {
                     "application/grpc+json".to_owned(),
                 ]
             );
+        }
+
+        for (key, values) in self.headers {
+            headers.entry(key).or_default().extend(values);
         }
 
         GatewayRoute {
@@ -337,6 +354,11 @@ impl GatewayServiceBuilder {
 
     pub fn http(mut self, http_host: String, http_port: u16) -> Self {
         self.url = Some(format!("http://{http_host}:{http_port}"));
+        self
+    }
+
+    pub fn url(mut self, url: String) -> Self {
+        self.url = Some(url);
         self
     }
 
