@@ -17,7 +17,9 @@ pub struct GatewayService {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub read_timeout: Option<u32>,
     #[serde(skip_serializing, skip_deserializing)]
-    pub enable_cors: bool
+    pub enable_cors: bool,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub request_headers: HashMap<String, String>
 }
 
 #[derive(Debug, Default)]
@@ -29,7 +31,8 @@ pub struct GatewayServiceBuilder {
     pub connect_timeout: Option<u32>,
     pub write_timeout: Option<u32>,
     pub read_timeout: Option<u32>,
-    pub enable_cors: bool
+    pub enable_cors: bool,
+    pub request_headers: HashMap<String, String>
 }
 
 #[derive(Debug, Clone)]
@@ -159,6 +162,7 @@ pub struct GatewayRouteBuilder {
     pub response_buffering: bool,
     pub headers: HashMap<String, Vec<String>>
 }
+
 impl GatewayRouteBuilder {
     pub fn new() -> Self {
         Self::default()
@@ -321,6 +325,11 @@ impl GatewayServiceBuilder {
         self
     }
 
+    pub fn request_header(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.request_headers.insert(key.into(), value.into());
+        self
+    }
+
     pub fn routes(mut self, routes: Vec<GatewayRoute>) -> Self {
         self.routes = Some(routes);
         self
@@ -348,7 +357,7 @@ impl GatewayServiceBuilder {
 
     // Add gRPC support by setting a default gRPC service URL
     pub fn grpc(mut self, grpc_host: String, grpc_port: u16) -> Self {
-        self.url = Some(format!("grpc://{grpc_host}:{grpc_port}"));
+        self.url = Some(format!("http://{grpc_host}:{grpc_port}"));
         self
     }
 
@@ -371,7 +380,8 @@ impl GatewayServiceBuilder {
             connect_timeout: self.connect_timeout,
             write_timeout: self.write_timeout,
             read_timeout: self.read_timeout,
-            enable_cors: self.enable_cors
+            enable_cors: self.enable_cors,
+            request_headers: self.request_headers
         }
     }
 }

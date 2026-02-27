@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use core_services::services::base::Resolve;
 use core_services::services::errors::Errors;
 use reqwest::StatusCode;
@@ -258,6 +260,116 @@ impl KongGatewayAdminClient {
         Ok(())
     }
 
+    async fn handle_request_transformer_plugin(
+        &self,
+        service_name: String,
+        request_headers: &HashMap<String, String>
+    ) -> Resolve<()> {
+        let kong_url = self.url.clone();
+        let client = reqwest::Client::new();
+
+        if !request_headers.is_empty() {
+            let headers_list: Vec<String> = request_headers.iter().map(|(k, v)| format!("{k}:{v}")).collect();
+
+            let plugin_config = json!({
+                "name": "request-transformer",
+                "config": {
+                    "add": {
+                        "headers": headers_list
+                    }
+                }
+            });
+
+            let resp = client
+                .post(format!("{kong_url}/services/{}/plugins", service_name))
+                .json(&plugin_config)
+                .send()
+                .await
+                .map_err(|it| {
+                    Errors::UnnableToRegisterApiGateway(format!("Unable to enable request-transformer plugin: {it}"))
+                })?;
+
+            let resp = match resp.status() {
+                StatusCode::CONFLICT => {
+                    let plugins_resp =
+                        client.get(format!("{kong_url}/services/{}/plugins", service_name)).send().await.map_err(
+                            |it| Errors::UnnableToRegisterApiGateway(format!("Unable to get plugins: {it}"))
+                        )?;
+
+                    let plugins: serde_json::Value = plugins_resp.json().await.map_err(|it| {
+                        Errors::UnnableToRegisterApiGateway(format!("Unable to parse plugins response: {it}"))
+                    })?;
+
+                    let plugin_id = plugins
+                        .get("data")
+                        .and_then(|d| d.as_array())
+                        .and_then(|arr| {
+                            arr.iter()
+                                .find(|p| p.get("name").and_then(|n| n.as_str()) == Some("request-transformer"))
+                                .and_then(|p| p.get("id").and_then(|id| id.as_str()))
+                        })
+                        .ok_or_else(|| {
+                            Errors::UnnableToRegisterApiGateway(
+                                "request-transformer plugin exists but ID not found".to_owned()
+                            )
+                        })?;
+
+                    client
+                        .patch(format!("{kong_url}/plugins/{}", plugin_id))
+                        .json(&plugin_config)
+                        .send()
+                        .await
+                        .map_err(|it| {
+                            Errors::UnnableToRegisterApiGateway(format!(
+                                "Unable to update request-transformer plugin: {it}"
+                            ))
+                        })?
+                }
+                _ => resp
+            };
+
+            if !resp.status().is_success() {
+                return Err(Errors::UnnableToRegisterApiGateway(format!(
+                    "Failed to enable request-transformer plugin: {} {:?}",
+                    resp.status(),
+                    resp.text().await.unwrap()
+                )));
+            }
+        } else {
+            let plugins_resp = client
+                .get(format!("{kong_url}/services/{}/plugins", service_name))
+                .send()
+                .await
+                .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to get plugins: {it}")))?;
+
+            if plugins_resp.status().is_success() {
+                let plugins: serde_json::Value = plugins_resp.json().await.map_err(|it| {
+                    Errors::UnnableToRegisterApiGateway(format!("Unable to parse plugins response: {it}"))
+                })?;
+
+                if let Some(plugins_array) = plugins.get("data").and_then(|d| d.as_array()) {
+                    for plugin in plugins_array {
+                        if plugin.get("name").and_then(|n| n.as_str()) == Some("request-transformer") {
+                            if let Some(plugin_id) = plugin.get("id").and_then(|id| id.as_str()) {
+                                let _ =
+                                    client.delete(format!("{kong_url}/plugins/{}", plugin_id)).send().await.map_err(
+                                        |it| {
+                                            Errors::UnnableToRegisterApiGateway(format!(
+                                                "Failed to delete request-transformer plugin {}: {it}",
+                                                plugin_id
+                                            ))
+                                        }
+                                    )?;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     async fn create_or_update_route(&self, service_name: String, route: &GatewayRoute) -> Resolve<()> {
         log::info!(target: "kong-admin", "Creating route {:?}", json!({"body": route.as_request_body()}));
         let kong_url = self.url.clone();
@@ -300,6 +412,7 @@ impl KongGatewayAdminClient {
 impl ApiGatewayClient for KongGatewayAdminClient {
     async fn route_to(&self, service: GatewayService) -> Resolve<()> {
         self.handle_cors_plugin(service.name.clone(), service.enable_cors).await?;
+        self.handle_request_transformer_plugin(service.name.clone(), &service.request_headers).await?;
         for route in service.routes {
             self.create_or_update_route(service.name.clone(), &route).await?;
 

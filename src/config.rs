@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use std::env;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct KongGatewayConfig {
     pub admin_url: String,
     pub url: String,
