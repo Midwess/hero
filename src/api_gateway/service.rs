@@ -316,7 +316,12 @@ impl GatewayServiceBuilder {
     }
 
     pub fn name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
+        let name = name.into();
+        let name: String = name
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | '~') { c } else { '-' })
+            .collect();
+        self.name = Some(name);
         self
     }
 
