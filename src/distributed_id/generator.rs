@@ -46,7 +46,7 @@ impl DistributedIdGenerator {
     pub fn init_scoped(app_name: String) -> Self {
         Self {
             worker: Worker {
-                distributed_id: 0,
+                distributed_id: (MAX_WORKER_ID - 1) as u64,
                 name: app_name.clone(),
                 created_at: Utc::now()
             },

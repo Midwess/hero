@@ -254,8 +254,6 @@ impl GatewayRouteBuilder {
         self.protocols = Some(vec![
             "http".to_string(),
             "https".to_string(),
-            "http2".to_string(),
-            "https+http2".to_string(),
         ]);
 
         self.methods = Some(
@@ -319,7 +317,13 @@ impl GatewayServiceBuilder {
         let name = name.into();
         let name: String = name
             .chars()
-            .map(|c| if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | '~') { c } else { '-' })
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | '~') {
+                    c
+                } else {
+                    '-'
+                }
+            })
             .collect();
         self.name = Some(name);
         self

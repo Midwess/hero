@@ -422,6 +422,50 @@ impl ApiGatewayClient for KongGatewayAdminClient {
         Ok(())
     }
 
+    async fn delete_service(&self, service_name: &str) -> Resolve<()> {
+        let kong_url = self.url.as_str();
+        let client = reqwest::Client::new();
+
+        let routes_resp = client.get(format!("{kong_url}/services/{service_name}/routes")).send().await;
+
+        if let Ok(routes_resp) = routes_resp {
+            if routes_resp.status().is_success() {
+                if let Ok(routes_data) = routes_resp.json::<serde_json::Value>().await {
+                    if let Some(routes) = routes_data.get("data").and_then(|v| v.as_array()) {
+                        for route in routes {
+                            if let Some(route_name) = route.get("name").and_then(|v| v.as_str()) {
+                                let _ = client
+                                    .delete(format!("{kong_url}/services/{service_name}/routes/{route_name}"))
+                                    .send()
+                                    .await;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let resp = client.delete(format!("{kong_url}/services/{service_name}")).send().await.map_err(|it| {
+            Errors::UnnableToRegisterApiGateway(format!("Unable to delete service {}: {it}", service_name))
+        })?;
+
+        if resp.status() == StatusCode::NOT_FOUND {
+            log::info!(target: "kong-admin", "Service {} not found, skipping deletion", service_name);
+            return Ok(());
+        }
+
+        if !resp.status().is_success() {
+            return Err(Errors::UnnableToRegisterApiGateway(format!(
+                "Failed to delete service {}: {} {:?}",
+                service_name,
+                resp.status(),
+                resp.text().await.unwrap_or_default()
+            )));
+        }
+
+        Ok(())
+    }
+
     async fn register(&self, service: GatewayService) -> Resolve<()> {
         let kong_url = self.url.as_str();
         let client = reqwest::Client::new();
