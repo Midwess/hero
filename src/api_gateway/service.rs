@@ -245,8 +245,8 @@ impl GatewayRouteBuilder {
 
     pub fn grpc_web(mut self) -> Self {
         self.enable_grpc_web = true;
-        self.request_buffering = true;
-        self.response_buffering = true;
+        self.request_buffering = false;
+        self.response_buffering = false;
         self
     }
 
@@ -365,8 +365,9 @@ impl GatewayServiceBuilder {
     }
 
     // Add gRPC support by setting a default gRPC service URL
+    // Kong requires `grpc://` scheme to proxy via HTTP/2 (h2c) to gRPC upstreams
     pub fn grpc(mut self, grpc_host: String, grpc_port: u16) -> Self {
-        self.url = Some(format!("http://{grpc_host}:{grpc_port}"));
+        self.url = Some(format!("grpc://{grpc_host}:{grpc_port}"));
         self
     }
 
