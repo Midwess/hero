@@ -9,10 +9,18 @@ use crate::api_gateway::client::ApiGatewayClient;
 use crate::api_gateway::service::{GatewayRoute, GatewayService};
 
 pub struct KongGatewayAdminClient {
-    pub url: String
+    url: String
 }
 
 impl KongGatewayAdminClient {
+    pub fn new(url: String) -> Self {
+        Self { url }
+    }
+
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+
     async fn handle_cors_plugin(&self, service_name: String, enable_cors: bool) -> Resolve<()> {
         let kong_url = self.url.clone();
         let client = reqwest::Client::new();
@@ -406,6 +414,209 @@ impl KongGatewayAdminClient {
 
         Ok(())
     }
+
+    pub async fn register_port_aware(service_name: String, upstream_url: String, kong_admin_url: &str) -> Resolve<()> {
+        let client = Self::new(kong_admin_url.to_string());
+        client.register_port_aware_route(service_name, upstream_url).await
+    }
+
+    async fn register_port_aware_route(&self, service_name: String, upstream_url: String) -> Resolve<()> {
+        let kong_url = self.url.clone();
+        let client = reqwest::Client::new();
+
+        let service = GatewayService {
+            name: service_name.clone(),
+            url: upstream_url,
+            routes: vec![],
+            retries: None,
+            connect_timeout: None,
+            write_timeout: None,
+            read_timeout: None,
+            enable_cors: false,
+            request_headers: Default::default()
+        };
+
+        let resp = client
+            .post(format!("{kong_url}/services"))
+            .json(&service)
+            .send()
+            .await
+            .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to register service: {it}")))?;
+
+        let resp = match resp.status() {
+            StatusCode::CONFLICT => client
+                .patch(format!("{kong_url}/services/{}", &service_name))
+                .json(&service)
+                .send()
+                .await
+                .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to update service: {it}")))?,
+            _ => resp
+        };
+
+        if !resp.status().is_success() {
+            return Err(Errors::UnnableToRegisterApiGateway(format!(
+                "Failed to create/update service: {} {:?}",
+                resp.status(),
+                resp.text().await.unwrap()
+            )));
+        }
+
+        let internal_route = GatewayRoute {
+            name: format!("{}-_-_internal", service_name),
+            paths: vec!["/".to_owned()],
+            hosts: vec![],
+            priority: 100,
+            methods: None,
+            protocols: Some(vec![
+                "http".to_owned(),
+                "https".to_owned(),
+            ]),
+            strip_path: false,
+            preserve_host: true,
+            headers: Default::default(),
+            is_public: false,
+            enable_grpc_web: false,
+            request_buffering: true,
+            response_buffering: true
+        };
+
+        let internal_route_body = json!({
+            "name": internal_route.name,
+            "priority": internal_route.priority,
+            "strip_path": internal_route.strip_path,
+            "protocols": internal_route.protocols,
+            "preserve_host": internal_route.preserve_host,
+            "expression": "net.dst.port == 8000 && http.path ~ r#\"^/\"#",
+            "request_buffering": internal_route.request_buffering,
+            "response_buffering": internal_route.response_buffering,
+        });
+
+        let resp = client
+            .post(format!("{kong_url}/services/{}/routes", service_name))
+            .json(&internal_route_body)
+            .send()
+            .await
+            .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to create internal route: {it}")))?;
+
+        let resp = match resp.status() {
+            StatusCode::CONFLICT => client
+                .patch(format!("{kong_url}/services/{}/routes/{}", service_name, internal_route.name))
+                .json(&internal_route_body)
+                .send()
+                .await
+                .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to update internal route: {it}")))?,
+            _ => resp
+        };
+
+        if !resp.status().is_success() {
+            return Err(Errors::UnnableToRegisterApiGateway(format!(
+                "Failed to create internal route: {} {:?}",
+                resp.status(),
+                resp.text().await.unwrap()
+            )));
+        }
+
+        let internal_plugin = json!({
+            "name": "request-transformer",
+            "config": {
+                "add": { "headers": ["xinternal:true"] }
+            }
+        });
+
+        let resp = client
+            .post(format!("{kong_url}/routes/{}/plugins", internal_route.name))
+            .json(&internal_plugin)
+            .send()
+            .await
+            .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to add internal route plugin: {it}")))?;
+
+        if !resp.status().is_success() && StatusCode::CONFLICT != resp.status() {
+            return Err(Errors::UnnableToRegisterApiGateway(format!(
+                "Failed to add internal route plugin: {} {:?}",
+                resp.status(),
+                resp.text().await.unwrap()
+            )));
+        }
+
+        let external_route = GatewayRoute {
+            name: format!("{}-_-_external", service_name),
+            paths: vec!["/".to_owned()],
+            hosts: vec![],
+            priority: 100,
+            methods: None,
+            protocols: Some(vec![
+                "http".to_owned(),
+                "https".to_owned(),
+            ]),
+            strip_path: false,
+            preserve_host: true,
+            headers: Default::default(),
+            is_public: true,
+            enable_grpc_web: false,
+            request_buffering: true,
+            response_buffering: true
+        };
+
+        let external_route_body = json!({
+            "name": external_route.name,
+            "priority": external_route.priority,
+            "strip_path": external_route.strip_path,
+            "protocols": external_route.protocols,
+            "preserve_host": external_route.preserve_host,
+            "expression": "(net.dst.port == 8100 || net.dst.port == 8443) && http.path ~ r#\"^/\"#",
+            "request_buffering": external_route.request_buffering,
+            "response_buffering": external_route.response_buffering,
+        });
+
+        let resp = client
+            .post(format!("{kong_url}/services/{}/routes", service_name))
+            .json(&external_route_body)
+            .send()
+            .await
+            .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to create external route: {it}")))?;
+
+        let resp = match resp.status() {
+            StatusCode::CONFLICT => client
+                .patch(format!("{kong_url}/services/{}/routes/{}", service_name, external_route.name))
+                .json(&external_route_body)
+                .send()
+                .await
+                .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to update external route: {it}")))?,
+            _ => resp
+        };
+
+        if !resp.status().is_success() {
+            return Err(Errors::UnnableToRegisterApiGateway(format!(
+                "Failed to create external route: {} {:?}",
+                resp.status(),
+                resp.text().await.unwrap()
+            )));
+        }
+
+        let external_plugin = json!({
+            "name": "request-transformer",
+            "config": {
+                "remove": { "headers": ["xinternal"] }
+            }
+        });
+
+        let resp = client
+            .post(format!("{kong_url}/routes/{}/plugins", external_route.name))
+            .json(&external_plugin)
+            .send()
+            .await
+            .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to add external route plugin: {it}")))?;
+
+        if !resp.status().is_success() && StatusCode::CONFLICT != resp.status() {
+            return Err(Errors::UnnableToRegisterApiGateway(format!(
+                "Failed to add external route plugin: {} {:?}",
+                resp.status(),
+                resp.text().await.unwrap()
+            )));
+        }
+
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]
@@ -476,14 +687,16 @@ impl ApiGatewayClient for KongGatewayAdminClient {
         })?;
 
         let resp = match resp.status() {
-            StatusCode::CONFLICT => client
-                .patch(format!("{kong_url}/services/{}", &service.name))
-                .json(&service)
-                .send()
-                .await
-                .map_err(|it| {
-                    Errors::UnnableToRegisterApiGateway(format!("Unable to register service, failed to update {it}"))
-                })?,
+            StatusCode::CONFLICT => {
+                log::info!(target: "kong-admin", "Service already exist, change to update");
+                client.patch(format!("{kong_url}/services/{}", &service.name)).json(&service).send().await.map_err(
+                    |it| {
+                        Errors::UnnableToRegisterApiGateway(format!(
+                            "Unable to register service, failed to update {it}"
+                        ))
+                    }
+                )?
+            }
             _ => resp
         };
 

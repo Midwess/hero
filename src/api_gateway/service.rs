@@ -72,6 +72,7 @@ pub struct GatewayRoute {
     pub strip_path: bool,
     pub preserve_host: bool,
     pub headers: HashMap<String, Vec<String>>,
+    pub is_public: bool,
     pub enable_grpc_web: bool,
     pub request_buffering: bool,
     pub response_buffering: bool
@@ -79,6 +80,8 @@ pub struct GatewayRoute {
 
 impl GatewayRoute {
     pub fn as_request_body(&self) -> serde_json::Value {
+        // When using Kong expression router, headers are included in the expression
+        // via build_expression() - do NOT add separate "headers" field
         json! ({
             "name": self.name,
             "priority": self.priority,
@@ -138,6 +141,12 @@ impl GatewayRoute {
                     values.iter().map(|v| format!(r##"http.headers.{key} == "{v}""##)).collect::<Vec<_>>().join(" || ");
                 parts.push(format!("({})", header_expr));
             }
+        }
+
+        // Port-based routing for internal routes
+        // When is_public=false, require net.dst.port == 8000 (internal port)
+        if !self.is_public {
+            parts.push("net.dst.port == 8000".to_string());
         }
 
         parts.join(" && ")
@@ -270,11 +279,6 @@ impl GatewayRouteBuilder {
 
     pub fn build(self) -> GatewayRoute {
         let mut headers: HashMap<String, Vec<String>> = HashMap::new();
-        let is_public = self.is_public.unwrap_or(false);
-
-        if !is_public {
-            headers.insert("xinternal".to_owned(), vec!["true".to_owned()]);
-        }
 
         if self.is_grpc {
             headers.insert(
@@ -291,6 +295,7 @@ impl GatewayRouteBuilder {
             headers.entry(key).or_default().extend(values);
         }
 
+        log::info!("Register route with headers: {:?}", headers);
         GatewayRoute {
             name: self.name.expect("Route name is required"),
             paths: self.paths,
@@ -301,6 +306,7 @@ impl GatewayRouteBuilder {
             strip_path: self.strip_path.unwrap_or(false),
             preserve_host: self.preserve_host.unwrap_or(true),
             headers,
+            is_public: self.is_public.unwrap_or(true),
             enable_grpc_web: self.enable_grpc_web,
             response_buffering: self.response_buffering,
             request_buffering: self.request_buffering
