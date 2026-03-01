@@ -1,9 +1,10 @@
 use std::env;
-use std::net::{SocketAddr, TcpListener};
+use std::net::SocketAddr;
 
 use core_services::services::base::Resolve;
 use core_services::services::errors::Errors;
 use log::error;
+use tokio::net::TcpListener as TokioTcpListener;
 use tonic::transport::server::TcpIncoming;
 
 pub struct GrpcConnection {
@@ -46,7 +47,7 @@ pub async fn find_grpc_listener(from: Option<u16>) -> Resolve<GrpcConnection> {
 }
 
 pub struct TcpConnection {
-    pub listener: TcpListener,
+    pub listener: TokioTcpListener,
     pub port: u16,
     pub public_host: String // The host of this service that is available for others to connect
 }
@@ -59,8 +60,9 @@ pub async fn find_tcp_listener(from: Option<u16>) -> Resolve<TcpConnection> {
     let listener = loop {
         let addr: SocketAddr = format!("[::]:{port}").parse().expect("Invalid address");
 
-        match TcpListener::bind(addr) {
+        match TokioTcpListener::bind(addr).await {
             Ok(listener) => {
+                println!("Server successfully bound to {addr}");
                 break listener;
             }
             Err(_) => {
@@ -76,6 +78,25 @@ pub async fn find_tcp_listener(from: Option<u16>) -> Resolve<TcpConnection> {
             }
         }
     };
+
+    Ok(TcpConnection {
+        listener,
+        port,
+        public_host: env::var("SERVICE_HOST").unwrap_or_else(|_| "host.docker.internal".to_owned())
+    })
+}
+
+/// Bind to a specific port (not finding next available)
+/// Returns error if the port is already in use
+pub async fn bind_tcp_listener(port: u16) -> Resolve<TcpConnection> {
+    let addr: SocketAddr = format!("[::]:{port}").parse().expect("Invalid address");
+
+    let listener = TokioTcpListener::bind(addr).await.map_err(|e| {
+        error!(target: "tcp-listener", "Failed to bind to port {}: {}", port, e);
+        Errors::TcpFailure(format!("Port {} already in use", port))
+    })?;
+
+    println!("Server successfully bound to {addr}");
 
     Ok(TcpConnection {
         listener,
