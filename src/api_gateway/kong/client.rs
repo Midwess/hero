@@ -65,8 +65,6 @@ impl KongGatewayAdminClient {
 
             let resp = match resp.status() {
                 StatusCode::CONFLICT => {
-                    log::info!(target: "kong-admin", "CORS plugin already exists, updating it");
-
                     // Get the existing CORS plugin ID
                     let plugins_resp =
                         client.get(format!("{kong_url}/services/{}/plugins", service_name)).send().await.map_err(
@@ -379,7 +377,7 @@ impl KongGatewayAdminClient {
     }
 
     async fn create_or_update_route(&self, service_name: String, route: &GatewayRoute) -> Resolve<()> {
-        log::info!(target: "kong-admin", "Creating route {:?}", json!({"body": route.as_request_body()}));
+        log::info!(target: "kong-admin", "Creating {}", route.log_summary());
         let kong_url = self.url.clone();
         let client = reqwest::Client::new();
 
@@ -391,16 +389,12 @@ impl KongGatewayAdminClient {
             .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to register route {it}")))?;
 
         let resp = match resp.status() {
-            StatusCode::CONFLICT => {
-                log::info!(target: "kong-admin", "Route already exist, change to update {:?}", route.as_request_body());
-
-                client
-                    .patch(format!("{kong_url}/services/{service_name}/routes/{}", &route.name))
-                    .json(&route.as_request_body())
-                    .send()
-                    .await
-                    .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to register route {it}")))?
-            }
+            StatusCode::CONFLICT => client
+                .patch(format!("{kong_url}/services/{service_name}/routes/{}", &route.name))
+                .json(&route.as_request_body())
+                .send()
+                .await
+                .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to register route {it}")))?,
             _ => resp
         };
 
@@ -681,22 +675,20 @@ impl ApiGatewayClient for KongGatewayAdminClient {
         let kong_url = self.url.as_str();
         let client = reqwest::Client::new();
 
-        log::info!(target: "kong-admin", "Creating service {}", json!({"body": service}));
+        log::info!(target: "kong-admin", "Creating {}", service.log_summary());
         let resp = client.post(format!("{kong_url}/services")).json(&service).send().await.map_err(|it| {
             Errors::UnnableToRegisterApiGateway(format!("Unable to register service, failed to create {it}"))
         })?;
 
         let resp = match resp.status() {
-            StatusCode::CONFLICT => {
-                log::info!(target: "kong-admin", "Service already exist, change to update");
-                client.patch(format!("{kong_url}/services/{}", &service.name)).json(&service).send().await.map_err(
-                    |it| {
-                        Errors::UnnableToRegisterApiGateway(format!(
-                            "Unable to register service, failed to update {it}"
-                        ))
-                    }
-                )?
-            }
+            StatusCode::CONFLICT => client
+                .patch(format!("{kong_url}/services/{}", &service.name))
+                .json(&service)
+                .send()
+                .await
+                .map_err(|it| {
+                    Errors::UnnableToRegisterApiGateway(format!("Unable to register service, failed to update {it}"))
+                })?,
             _ => resp
         };
 

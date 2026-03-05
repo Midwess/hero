@@ -22,6 +22,12 @@ pub struct GatewayService {
     pub request_headers: HashMap<String, String>
 }
 
+impl GatewayService {
+    pub fn log_summary(&self) -> String {
+        format!("Service {} with {} route(s)", self.name, self.routes.len())
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct GatewayServiceBuilder {
     pub name: Option<String>,
@@ -150,6 +156,18 @@ impl GatewayRoute {
         }
 
         parts.join(" && ")
+    }
+
+    pub fn log_summary(&self) -> String {
+        let path_count = self.paths.len();
+        let host_count = self.hosts.len();
+        let method_count = self.methods.as_ref().map(|m| m.len()).unwrap_or(0);
+        let header_count = self.headers.len();
+
+        format!(
+            "Route {} ({} paths, {} hosts, {} methods, {} headers)",
+            self.name, path_count, host_count, method_count, header_count
+        )
     }
 }
 
@@ -295,7 +313,11 @@ impl GatewayRouteBuilder {
             headers.entry(key).or_default().extend(values);
         }
 
-        log::info!("Register route with headers: {:?}", headers);
+        log::debug!(
+            "Registering route {} with {} header(s)",
+            self.name.as_deref().unwrap_or("unnamed"),
+            headers.len()
+        );
         GatewayRoute {
             name: self.name.expect("Route name is required"),
             paths: self.paths,
