@@ -30,7 +30,7 @@ where
 
         let inserted_key = store.add(&value, Some(&key))?.await?;
         let Some(inserted_value) = store.get(inserted_key)?.await? else {
-            return Err(RepositoryError::NotFound(table_name.to_owned(), format!("{:?}", id)))
+            return Err(RepositoryError::NotFound(table_name.to_owned(), format!("{:?}", id)));
         };
 
         let inserted_item: T = IdbTable::deserialize(inserted_value)?;
@@ -53,7 +53,7 @@ where
         let (key, value) = result.remove(0);
 
         if !IdbId::equals(id, &key)? {
-            return Ok(None)
+            return Ok(None);
         }
 
         Ok(Some(value))
@@ -119,7 +119,7 @@ where
         let table_name = T::get_table();
 
         let Some(record) = IdbRepository::find_one(self, id).await? else {
-            return Err(RepositoryError::NotFound(table_name.to_string(), format!("{:?}", id)))
+            return Err(RepositoryError::NotFound(table_name.to_string(), format!("{:?}", id)));
         };
 
         let db = self.get_db().await;
@@ -143,7 +143,7 @@ where
             return Err(RepositoryError::NotFound(
                 table_name.to_owned(),
                 format!("{:?}", IdbTable::id(&item))
-            ))
+            ));
         };
 
         let db = self.get_db().await;
@@ -155,7 +155,7 @@ where
         let value = IdbTable::serialize(&item)?;
         let updated_key = store.put(&value, Some(&key))?.await?;
         let Some(updated_value) = store.get(updated_key)?.await? else {
-            return Err(RepositoryError::NotFound(table_name.to_owned(), format!("{:?}", id)))
+            return Err(RepositoryError::NotFound(table_name.to_owned(), format!("{:?}", id)));
         };
 
         Ok(IdbTable::deserialize(updated_value)?)

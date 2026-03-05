@@ -71,7 +71,7 @@ where
 
         if *counter < self.max_size {
             *counter += 1;
-            return Ok(*counter)
+            return Ok(*counter);
         }
 
         Err(*counter)
@@ -91,12 +91,12 @@ where
         let mut items = self.items.lock().await;
         let item = items.get(index);
         if item.is_none() {
-            return Ok(())
+            return Ok(());
         }
 
         let timeleft = item.as_ref().unwrap().timeleft();
         if !timeleft.is_zero() {
-            return Err(timeleft)
+            return Err(timeleft);
         }
 
         if let Some(removed_item) = items.swap_remove_back(index) {
@@ -161,12 +161,12 @@ where
 
     async fn request_cleanup_loop(&self) {
         if !self.pool.is_exceed_min_size().await {
-            return
+            return;
         }
 
         let mut background_handle = self.background_handle.lock().await;
         if background_handle.is_some() {
-            return
+            return;
         }
 
         let pool = self.pool.clone();
@@ -332,7 +332,7 @@ where
     pub fn timeleft(&self) -> Duration {
         let elapsed = self.start_time.elapsed();
         if elapsed.gt(&self.max_idling_timeout) {
-            return Duration::ZERO
+            return Duration::ZERO;
         }
 
         self.max_idling_timeout - elapsed
@@ -405,7 +405,7 @@ where
             let new_resource = self.resource_provider.new().await;
             let borrowed_item = PoolItem::new(Box::new(new_resource), self.resource_idle_timeout);
 
-            return Ok(PoolResponse::new(borrowed_item, self.clone()))
+            return Ok(PoolResponse::new(borrowed_item, self.clone()));
         }
 
         // If the pool still not have enough available resources
@@ -430,7 +430,7 @@ where
                     .map(|it| it.try_into().unwrap());
 
                 if resource.is_none() {
-                    break 'serve_waiter_first None
+                    break 'serve_waiter_first None;
                 }
             }
 

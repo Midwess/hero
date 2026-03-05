@@ -224,7 +224,7 @@ pub trait FutureExtension: Future + Sized {
 impl<T: Future> FutureExtension for T {
     async fn with_cancel(self, cancellation: &CancellationToken) -> Result<Self::Output, TaskErrors> {
         if cancellation.is_cancelled() {
-            return Err(TaskErrors::Cancelled)
+            return Err(TaskErrors::Cancelled);
         }
 
         let self_ = self.fuse();

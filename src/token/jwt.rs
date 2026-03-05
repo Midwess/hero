@@ -57,3 +57,17 @@ where
     let token_data = decode::<Claims<T>>(token, &decoding_key, &validation)?;
     Ok(token_data.claims.data)
 }
+
+pub fn decode_jwt_token_without_validation<T: Clone>(token: &str) -> Result<T, JwtErrors>
+where
+    T: for<'de> Deserialize<'de>
+{
+    let mut validation = Validation::new(Algorithm::HS256);
+    validation.insecure_disable_signature_validation();
+    validation.validate_exp = false;
+
+    let decoding_key = DecodingKey::from_secret(&[]);
+
+    let token_data = decode::<Claims<T>>(token, &decoding_key, &validation)?;
+    Ok(token_data.claims.data)
+}

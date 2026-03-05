@@ -81,7 +81,7 @@ impl SmtpClient {
             return Err(Errors::FailedToSendEmail(format!(
                 "The crafter service response with error {:?}",
                 res.error_for_status()
-            )))
+            )));
         }
 
         let bytes = res.bytes().await.expect("The response must be in binary format");

@@ -310,11 +310,11 @@ impl FetchRequest {
         }
 
         let Ok(json_promise) = resp.json().map(JsFuture::from) else {
-            return Ok((headers_map, JsValue::NULL))
+            return Ok((headers_map, JsValue::NULL));
         };
 
         let Ok(json_js) = json_promise.await else {
-            return Ok((headers_map, JsValue::NULL))
+            return Ok((headers_map, JsValue::NULL));
         };
 
         Ok((headers_map, json_js))

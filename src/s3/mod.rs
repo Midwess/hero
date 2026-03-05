@@ -163,7 +163,7 @@ impl S3Client {
         let upload_req = self.client.create_multipart_upload().bucket(path.bucket()).key(path.prefix()).send().await?;
 
         let Some(upload_id) = upload_req.upload_id else {
-            return Err(Errors::BadRequest("Cannot generate upload id".to_owned()))
+            return Err(Errors::BadRequest("Cannot generate upload id".to_owned()));
         };
 
         Ok(upload_id)

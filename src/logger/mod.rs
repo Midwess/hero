@@ -45,7 +45,7 @@ pub fn setup() {
             log_builder.filter(None, log::LevelFilter::Info);
         }
 
-        log_builder.init();
+        let _ = log_builder.try_init();
     }
 }
 
