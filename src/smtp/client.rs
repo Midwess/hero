@@ -4,7 +4,7 @@ use crate::utils::cancellation::{CancellationToken, FutureExtension};
 use lettre::message::header::ContentType;
 use lettre::message::{MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::Credentials;
-use lettre::{AsyncSmtpTransport, AsyncTransport, Tokio1Executor, Transport};
+use lettre::{AsyncSmtpTransport, AsyncTransport, Tokio1Executor};
 use prost::Message;
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use reqwest::StatusCode;

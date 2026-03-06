@@ -1,8 +1,11 @@
 use std::sync::atomic::AtomicU64;
 use std::sync::Once;
 
+#[allow(dead_code)]
 static INIT: Once = Once::new();
+#[allow(dead_code)]
 static EPOCH_OFFSET_MICRO: AtomicU64 = AtomicU64::new(0);
+#[allow(dead_code)]
 static PERF_START_MICRO: AtomicU64 = AtomicU64::new(0);
 
 #[cfg(target_arch = "wasm32")]

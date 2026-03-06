@@ -63,6 +63,7 @@ where
     T: for<'de> Deserialize<'de>
 {
     let mut validation = Validation::new(Algorithm::HS256);
+    #[allow(deprecated)]
     validation.insecure_disable_signature_validation();
     validation.validate_exp = false;
 
