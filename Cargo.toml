@@ -21,12 +21,15 @@ chrono = "0.4.39"
 serde = { version = "1.0.219", features = ["derive"], default-features = false }
 serde_json = { version = "1.0.117"}
 lazy_static = "1.5.0"
-tokio = { version = "1.46.1", default-features = false, features = ["sync", "macros", "time", "net"] }
+tokio = { version = "1.46.1", default-features = false, features = ["sync", "macros", "time"] }
 async-trait = "0.1.88"
 thiserror = "2.0.12"
 futures-timer = "3.0.3"
 n0-future = "0.2.0"
 etcd-client = { version = "0.17.0", optional = true }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+tokio = { version = "1.46.1", default-features = false, features = ["net", "sync", "macros", "time"] }
 
 lettre = { version = "0.11.7", optional = true }
 futures-util = { version = "0.3.31", optional = true }
