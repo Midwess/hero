@@ -125,6 +125,7 @@ impl S3Client {
             .get_object()
             .bucket(path.bucket())
             .key(path.prefix())
+            .response_content_disposition("attachment")
             .presigned(presigning_config)
             .await?;
 
