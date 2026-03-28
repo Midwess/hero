@@ -16,6 +16,7 @@ pub enum YieldError {
     NotYielded
 }
 
+#[derive(Clone)]
 pub struct YieldContainer<T: Send + 'static> {
     pub value_container: Arc<Mutex<Option<Yieldable<T>>>>
 }

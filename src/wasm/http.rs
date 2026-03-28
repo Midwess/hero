@@ -287,6 +287,12 @@ impl Drop for XmlHttpRequest {
 }
 
 impl FetchRequest {
+    pub async fn send(self) -> Result<Response, JsValue> {
+        let window = web_sys::window().ok_or_else(|| JsValue::from_str("No global window"))?;
+        let resp_js = JsFuture::from(window.fetch_with_request(&self.request)).await?;
+        resp_js.dyn_into().map_err(|_| JsValue::from_str("Failed to convert to Response"))
+    }
+
     pub async fn response(self) -> Result<(HashMap<String, String>, JsValue), JsValue> {
         let window = web_sys::window().ok_or_else(|| JsValue::from_str("No global window"))?;
         let resp_js = JsFuture::from(window.fetch_with_request(&self.request)).await?;
