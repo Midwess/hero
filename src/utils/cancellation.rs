@@ -83,7 +83,7 @@ impl CancellationToken {
 
     /// Returns true if this token or its parent was cancelled.
     pub fn is_cancelled(&self) -> bool {
-        self.state.cancelled.load(Ordering::Acquire) // Use Acquire for better memory ordering
+        self.state.cancelled.load(Ordering::Acquire)
     }
 
     pub fn cancel_after(&self, duration: Duration) {
@@ -111,11 +111,11 @@ impl CancellationToken {
                         valid_children.push(child);
                         true
                     } else {
-                        false // Remove dead weak references
+                        false
                     }
                 });
                 valid_children
-            }; // Lock is dropped here
+            };
 
             // Cancel children without holding the lock
             for child in children {

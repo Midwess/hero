@@ -40,7 +40,7 @@ pub struct ZipStream {
     zip_entry: FileEntry,
     state: WriterState,
     chunk_size: usize,
-    buffer: Vec<u8>, // Use Vec<u8> instead of BytesMut for better control
+    buffer: Vec<u8>,
     buffer_pos: usize,
     buffer_len: usize
 }
@@ -184,12 +184,12 @@ impl IOCursor for ZipStream {
 
             // Try to process current cursor
             if self.process_current_cursor(max_read).await? {
-                continue; // Loop back to try filling buffer again
+                continue;
             }
 
             // Need to advance to next entry or finalize
             if !self.advance_to_next_entry().await? {
-                return Ok(None); // No more data
+                return Ok(None);
             }
         }
     }

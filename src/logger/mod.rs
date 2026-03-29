@@ -62,7 +62,7 @@ impl ThrottleLogger {
 
         let join_handle = spawn(async move {
             let mut interval = time::interval(delay);
-            interval.tick().await; // initial delay
+            interval.tick().await;
 
             loop {
                 interval.tick().await;

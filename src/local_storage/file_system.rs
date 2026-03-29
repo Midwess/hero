@@ -225,7 +225,7 @@ impl Folder {
 
             // Add ZIP64 fields if needed (file > 4GB or archive > 4GB)
             let zip64_overhead = if file_data_size > u32::MAX as u64 {
-                file_count * ZIP64_EXTRA_FIELD + 56 // ZIP64 end of central directory
+                file_count * ZIP64_EXTRA_FIELD + 56
             } else {
                 0
             };

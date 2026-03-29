@@ -60,7 +60,7 @@ impl BufferState {
         let bytes_to_read = std::cmp::min(buf.len(), self.buffer.len());
         if bytes_to_read == 0 {
             if self.is_closed {
-                return Ok(0); // EOF
+                return Ok(0);
             } else {
                 return Err(Error::new(ErrorKind::WouldBlock, "no data available"));
             }
@@ -90,7 +90,7 @@ pub struct DuplexWriter {
     // Buffer where we write data that will be read by the paired reader
     write_buffer: Arc<Mutex<BufferState>>,
     config: DuplexConfig,
-    local_buffer: Vec<u8> // Local buffer to batch writes
+    local_buffer: Vec<u8>
 }
 
 pub struct DuplexReader {
@@ -214,7 +214,7 @@ impl AsyncWrite for DuplexWriter {
 
         // If local buffer is getting large, try to flush
         if self.local_buffer.len() >= self.config.buffer_size / 2 {
-            self.flush_local_buffer().ok(); // Best effort, ignore errors
+            self.flush_local_buffer().ok();
         }
 
         Poll::Ready(Ok(bytes_to_buffer))
