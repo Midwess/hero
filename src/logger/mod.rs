@@ -44,6 +44,12 @@ pub fn setup() {
         } else {
             log_builder.filter(None, log::LevelFilter::Info);
         }
+        // Suppress noisy third-party log targets
+        log_builder.filter_module("rig::completions", log::LevelFilter::Off);
+        log_builder.filter_module("rig::agent_chat", log::LevelFilter::Off);
+        log_builder.filter_module("sqlx::query", log::LevelFilter::Off);
+        // Enable raw LLM response logging for debugging
+        log_builder.filter_module("llm::raw", log::LevelFilter::Debug);
 
         let _ = log_builder.try_init();
     }
