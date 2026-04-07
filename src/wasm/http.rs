@@ -250,6 +250,19 @@ impl HttpClient {
     }
 }
 
+fn parse_headers(headers: web_sys::Headers) -> Result<HashMap<String, String>, JsValue> {
+    let entries = js_sys::try_iter(&headers.entries())?.ok_or_else(|| JsValue::from_str("Failed to iterate headers"))?;
+    let mut headers_map = HashMap::new();
+    for entry in entries {
+        let entry = entry?;
+        let pair: js_sys::Array = entry.dyn_into().map_err(|_| JsValue::from_str("Invalid header entry"))?;
+        let key = pair.get(0).as_string().unwrap_or_default();
+        let value = pair.get(1).as_string().unwrap_or_default();
+        headers_map.insert(key, value);
+    }
+    Ok(headers_map)
+}
+
 #[derive(Debug)]
 pub enum XhrEvent {
     InProgress(ProgressEvent),
@@ -293,6 +306,22 @@ impl FetchRequest {
         resp_js.dyn_into().map_err(|_| JsValue::from_str("Failed to convert to Response"))
     }
 
+    pub async fn bytes(self) -> Result<(u16, HashMap<String, String>, Vec<u8>), JsValue> {
+        let window = web_sys::window().ok_or_else(|| JsValue::from_str("No global window"))?;
+        let resp_js = JsFuture::from(window.fetch_with_request(&self.request)).await?;
+        let resp: Response = resp_js.dyn_into().map_err(|_| JsValue::from_str("Failed to convert to Response"))?;
+
+        let status = resp.status();
+        let headers_map = parse_headers(resp.headers())?;
+
+        let array_buffer_promise = resp.array_buffer()?;
+        let array_buffer_js = JsFuture::from(array_buffer_promise).await?;
+        let array_buffer: js_sys::ArrayBuffer = array_buffer_js.dyn_into().map_err(|_| JsValue::from_str("Failed to convert to ArrayBuffer"))?;
+        let bytes = Uint8Array::new(&array_buffer).to_vec();
+
+        Ok((status, headers_map, bytes))
+    }
+
     pub async fn response(self) -> Result<(HashMap<String, String>, JsValue), JsValue> {
         let window = web_sys::window().ok_or_else(|| JsValue::from_str("No global window"))?;
         let resp_js = JsFuture::from(window.fetch_with_request(&self.request)).await?;
@@ -304,16 +333,7 @@ impl FetchRequest {
             return Err(JsValue::from_str(&format!("HTTP error: status {}", status)));
         }
 
-        let headers_iter = resp.headers().entries();
-        let mut headers_map = HashMap::new();
-        let mut entries =
-            js_sys::try_iter(&headers_iter)?.ok_or_else(|| JsValue::from_str("Failed to iterate headers"))?;
-        while let Some(entry) = entries.next().transpose()? {
-            let pair: js_sys::Array = entry.dyn_into().map_err(|_| JsValue::from_str("Invalid header entry"))?;
-            let key = pair.get(0).as_string().unwrap_or_default();
-            let value = pair.get(1).as_string().unwrap_or_default();
-            headers_map.insert(key, value);
-        }
+        let headers_map = parse_headers(resp.headers())?;
 
         let Ok(json_promise) = resp.json().map(JsFuture::from) else {
             return Ok((headers_map, JsValue::NULL));

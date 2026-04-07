@@ -10,7 +10,7 @@ static PERF_START_MICRO: AtomicU64 = AtomicU64::new(0);
 
 #[cfg(target_arch = "wasm32")]
 fn init_epoch() {
-    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::atomic::Ordering;
     INIT.call_once(|| {
         let js_epoch_ms = js_sys::Date::now();
         let perf_ms = web_sys::window().unwrap().performance().unwrap().now();
@@ -32,7 +32,7 @@ fn epoch_from_js_fallback() -> u64 {
 
 #[cfg(target_arch = "wasm32")]
 pub fn epoch_micro() -> u64 {
-    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::atomic::Ordering;
     init_epoch();
 
     // Get window

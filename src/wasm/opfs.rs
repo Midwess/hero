@@ -41,7 +41,7 @@ impl AsyncWrite for SyncAccessHandleWriter {
         }
     }
 
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
         let this = self.get_mut();
         match this.handle.flush() {
             Ok(_) => {

@@ -8,7 +8,7 @@ use jwalk::WalkDir;
 use n0_future::time::SystemTime;
 use std::path::{Path, PathBuf};
 use tokio::fs::{self, OpenOptions};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio::task::spawn_blocking;
 
 impl FileEntry {
@@ -73,6 +73,18 @@ impl FileEntry {
     pub async fn write(&mut self, content: Vec<u8>) -> Result<()> {
         let mut file = OpenOptions::new().create(true).append(true).open(&self.path).await?;
 
+        file.write_all(&content).await?;
+        Ok(())
+    }
+
+    pub async fn write_at(&mut self, content: Vec<u8>, offset: u64) -> Result<()> {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(&self.path)
+            .await?;
+
+        file.seek(tokio::io::SeekFrom::Start(offset)).await?;
         file.write_all(&content).await?;
         Ok(())
     }

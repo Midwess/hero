@@ -39,6 +39,25 @@ impl<T: Send + 'static> YieldContainer<T> {
         }
     }
 
+    pub fn empty() -> Self {
+        Self {
+            value_container: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    pub async fn deposit(&self, value: T) -> Result<(), YieldError> {
+        let mut lock = self.value_container.lock().await;
+        if lock.is_some() {
+            return Err(YieldError::AlreadyYielded);
+        }
+        let container = Arc::downgrade(&self.value_container);
+        *lock = Some(Yieldable {
+            value: Some(value),
+            container,
+        });
+        Ok(())
+    }
+
     /// Retrieve ownership of Yieldable, removing it from container.
     pub async fn retrieve(&self) -> Result<Yieldable<T>, YieldError> {
         let mut lock = self.value_container.lock().await;
