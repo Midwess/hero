@@ -5,6 +5,7 @@ use core_services::services::base::Resolve;
 use core_services::services::errors::Errors;
 use log::error;
 use tokio::net::TcpListener as TokioTcpListener;
+use tokio::net::UdpSocket;
 use tonic::transport::server::TcpIncoming;
 
 pub struct GrpcConnection {
@@ -102,5 +103,44 @@ pub async fn bind_tcp_listener(port: u16) -> Resolve<TcpConnection> {
         listener,
         port,
         public_host: env::var("SERVICE_HOST").unwrap_or_else(|_| "host.docker.internal".to_owned())
+    })
+}
+
+pub struct UdpConnection {
+    pub socket: UdpSocket,
+    pub port: u16,
+    pub public_host: String // The host of this service that is available for others to connect
+}
+
+pub async fn find_udp_socket(from: Option<u16>) -> Resolve<UdpConnection> {
+    let base_port: u16 = from.unwrap_or(3000); // Starting port
+    let max_port: u16 = 50100; // Maximum port to try
+    let mut port = base_port;
+
+    let socket = loop {
+        let addr: SocketAddr = format!("[::]:{port}").parse().expect("Invalid address");
+
+        match UdpSocket::bind(addr).await {
+            Ok(socket) => {
+                println!("UDP successfully bound to {addr}");
+                break socket;
+            }
+            Err(_) => {
+                port += 1;
+
+                if port > max_port {
+                    error!(target: "udp-listener", "No available ports in range {base_port}-{max_port}");
+                    return Err(Errors::TcpFailure("No port available".to_owned()));
+                }
+            }
+        }
+    };
+
+    Ok(UdpConnection {
+        socket,
+        port,
+        public_host: env::var("SERVICE_HOST")
+            .map(|it| it.parse().expect("SERVICE_HOST must be string"))
+            .unwrap_or("host.docker.internal".to_owned())
     })
 }
