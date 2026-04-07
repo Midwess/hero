@@ -18,7 +18,7 @@ macro_rules! retry {
             }.await;
 
             match result {
-                Ok(val) => break Ok(val), // Exit early on success
+                Ok(val) => break Ok(val),
                 Err(e) => {
                     let should_retry = {
                         $(

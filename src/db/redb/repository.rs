@@ -137,7 +137,7 @@ where
             let removed = table.remove(&key[..])?;
 
             let bytes = match removed {
-                Some(v) => v.value().to_vec(), // clone now
+                Some(v) => v.value().to_vec(),
                 None => {
                     return Err(RepositoryError::NotFound(
                         format!("{:?}: {:?}", T::get_table(), id),
