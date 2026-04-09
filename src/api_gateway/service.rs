@@ -65,6 +65,11 @@ impl GatewayRouteExpression {
         let expr = format!(r#"^{}"#, regex::escape(path));
         Self(expr)
     }
+
+    pub fn exact_or_subpath(path: &str) -> Self {
+        let expr = format!(r#"^{}(?:/|$)"#, regex::escape(path));
+        Self(expr)
+    }
 }
 
 #[derive(Debug, Clone)]
