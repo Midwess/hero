@@ -1,5 +1,5 @@
 use std::env;
-use std::net::SocketAddr;
+use std::net::{SocketAddr, TcpListener as StdTcpListener};
 
 use core_services::services::base::Resolve;
 use core_services::services::errors::Errors;
@@ -47,14 +47,16 @@ pub async fn find_grpc_listener(from: Option<u16>) -> Resolve<GrpcConnection> {
                     error!(target: "tcp-listener", "Failed to listen on TCP socket: {}", error);
                     return Err(Errors::TcpFailure(format!("Failed to listen on TCP socket: {error}")));
                 }
-                match TcpIncoming::from_socket(socket.into()) {
-                    Ok(listener) => {
+                // Convert socket2::Socket -> StdTcpListener -> TokioTcpListener -> TcpIncoming
+                let std_listener: StdTcpListener = socket.into();
+                match TokioTcpListener::from_std(std_listener) {
+                    Ok(tokio_listener) => {
                         println!("gRPC server successfully bound to {addr}");
-                        break listener;
+                        break TcpIncoming::from(tokio_listener);
                     }
                     Err(error) => {
-                        error!(target: "tcp-listener", "Failed to create TcpIncoming: {}", error);
-                        return Err(Errors::TcpFailure(format!("Failed to create TcpIncoming: {error}")));
+                        error!(target: "tcp-listener", "Failed to create TokioTcpListener: {}", error);
+                        return Err(Errors::TcpFailure(format!("Failed to create TokioTcpListener: {error}")));
                     }
                 }
             }
@@ -112,6 +114,10 @@ pub async fn find_tcp_listener(from: Option<u16>) -> Resolve<TcpConnection> {
 
         match socket.bind(&addr.into()) {
             Ok(()) => {
+                if let Err(error) = socket.listen(512) {
+                    error!(target: "tcp-listener", "Failed to listen on TCP socket: {}", error);
+                    return Err(Errors::TcpFailure(format!("Failed to listen on TCP socket: {error}")));
+                }
                 match TokioTcpListener::from_std(socket.into()) {
                     Ok(listener) => {
                         println!("TCP server successfully bound to {addr}");
@@ -164,6 +170,11 @@ pub async fn bind_tcp_listener(port: u16) -> Resolve<TcpConnection> {
         error!(target: "tcp-listener", "Failed to bind to port {}: {}", port, e);
         Errors::TcpFailure(format!("Port {} already in use", port))
     })?;
+
+    if let Err(error) = socket.listen(512) {
+        error!(target: "tcp-listener", "Failed to listen on TCP socket: {}", error);
+        return Err(Errors::TcpFailure(format!("Failed to listen on TCP socket: {error}")));
+    }
 
     let listener = TokioTcpListener::from_std(socket.into()).map_err(|e| {
         error!(target: "tcp-listener", "Failed to wrap TCP socket: {}", e);
