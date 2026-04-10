@@ -4,6 +4,7 @@ use std::net::SocketAddr;
 use core_services::services::base::Resolve;
 use core_services::services::errors::Errors;
 use log::error;
+use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::TcpListener as TokioTcpListener;
 use tokio::net::UdpSocket;
 use tonic::transport::server::TcpIncoming;
@@ -120,10 +121,34 @@ pub async fn find_udp_socket(from: Option<u16>) -> Resolve<UdpConnection> {
     let socket = loop {
         let addr: SocketAddr = format!("[::]:{port}").parse().expect("Invalid address");
 
-        match UdpSocket::bind(addr).await {
-            Ok(socket) => {
+        let socket = match Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP)) {
+            Ok(socket) => socket,
+            Err(error) => {
+                error!(target: "udp-listener", "Failed to create UDP socket: {}", error);
+                return Err(Errors::TcpFailure(format!("Failed to create UDP socket: {error}")));
+            }
+        };
+
+        if let Err(error) = socket.set_only_v6(false) {
+            error!(target: "udp-listener", "Failed to enable dual-stack UDP socket: {}", error);
+            return Err(Errors::TcpFailure(format!("Failed to enable dual-stack UDP socket: {error}")));
+        }
+
+        if let Err(error) = socket.set_nonblocking(true) {
+            error!(target: "udp-listener", "Failed to set UDP socket nonblocking: {}", error);
+            return Err(Errors::TcpFailure(format!("Failed to set UDP socket nonblocking: {error}")));
+        }
+
+        match socket.bind(&addr.into()) {
+            Ok(()) => {
                 println!("UDP successfully bound to {addr}");
-                break socket;
+                match UdpSocket::from_std(socket.into()) {
+                    Ok(socket) => break socket,
+                    Err(error) => {
+                        error!(target: "udp-listener", "Failed to wrap UDP socket: {}", error);
+                        return Err(Errors::TcpFailure(format!("Failed to wrap UDP socket: {error}")));
+                    }
+                }
             }
             Err(_) => {
                 port += 1;

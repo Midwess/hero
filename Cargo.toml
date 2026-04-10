@@ -30,6 +30,7 @@ etcd-client = { version = "0.17.0", optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 tokio = { version = "1.46.1", default-features = false, features = ["net", "sync", "macros", "time"] }
+socket2 = { workspace = true }
 
 lettre = { version = "0.11.7", optional = true }
 futures-util = { version = "0.3.31", optional = true }
