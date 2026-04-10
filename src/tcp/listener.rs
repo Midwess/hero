@@ -23,10 +23,40 @@ pub async fn find_grpc_listener(from: Option<u16>) -> Resolve<GrpcConnection> {
     let listener = loop {
         let addr: SocketAddr = format!("[::]:{port}").parse().expect("Invalid address");
 
-        match TcpIncoming::bind(addr) {
-            Ok(listener) => {
-                println!("Server successfully bound to {addr}");
-                break listener;
+        let socket = match Socket::new(Domain::IPV6, Type::STREAM, Some(Protocol::TCP)) {
+            Ok(socket) => socket,
+            Err(error) => {
+                error!(target: "tcp-listener", "Failed to create TCP socket: {}", error);
+                return Err(Errors::TcpFailure(format!("Failed to create TCP socket: {error}")));
+            }
+        };
+
+        if let Err(error) = socket.set_only_v6(false) {
+            error!(target: "tcp-listener", "Failed to enable dual-stack TCP socket: {}", error);
+            return Err(Errors::TcpFailure(format!("Failed to enable dual-stack TCP socket: {error}")));
+        }
+
+        if let Err(error) = socket.set_nonblocking(true) {
+            error!(target: "tcp-listener", "Failed to set TCP socket nonblocking: {}", error);
+            return Err(Errors::TcpFailure(format!("Failed to set TCP socket nonblocking: {error}")));
+        }
+
+        match socket.bind(&addr.into()) {
+            Ok(()) => {
+                if let Err(error) = socket.listen(512) {
+                    error!(target: "tcp-listener", "Failed to listen on TCP socket: {}", error);
+                    return Err(Errors::TcpFailure(format!("Failed to listen on TCP socket: {error}")));
+                }
+                match TcpIncoming::from_socket(socket.into()) {
+                    Ok(listener) => {
+                        println!("gRPC server successfully bound to {addr}");
+                        break listener;
+                    }
+                    Err(error) => {
+                        error!(target: "tcp-listener", "Failed to create TcpIncoming: {}", error);
+                        return Err(Errors::TcpFailure(format!("Failed to create TcpIncoming: {error}")));
+                    }
+                }
             }
             Err(_) => {
                 port += 1;
@@ -62,10 +92,36 @@ pub async fn find_tcp_listener(from: Option<u16>) -> Resolve<TcpConnection> {
     let listener = loop {
         let addr: SocketAddr = format!("[::]:{port}").parse().expect("Invalid address");
 
-        match TokioTcpListener::bind(addr).await {
-            Ok(listener) => {
-                println!("Server successfully bound to {addr}");
-                break listener;
+        let socket = match Socket::new(Domain::IPV6, Type::STREAM, Some(Protocol::TCP)) {
+            Ok(socket) => socket,
+            Err(error) => {
+                error!(target: "tcp-listener", "Failed to create TCP socket: {}", error);
+                return Err(Errors::TcpFailure(format!("Failed to create TCP socket: {error}")));
+            }
+        };
+
+        if let Err(error) = socket.set_only_v6(false) {
+            error!(target: "tcp-listener", "Failed to enable dual-stack TCP socket: {}", error);
+            return Err(Errors::TcpFailure(format!("Failed to enable dual-stack TCP socket: {error}")));
+        }
+
+        if let Err(error) = socket.set_nonblocking(true) {
+            error!(target: "tcp-listener", "Failed to set TCP socket nonblocking: {}", error);
+            return Err(Errors::TcpFailure(format!("Failed to set TCP socket nonblocking: {error}")));
+        }
+
+        match socket.bind(&addr.into()) {
+            Ok(()) => {
+                match TokioTcpListener::from_std(socket.into()) {
+                    Ok(listener) => {
+                        println!("TCP server successfully bound to {addr}");
+                        break listener;
+                    }
+                    Err(error) => {
+                        error!(target: "tcp-listener", "Failed to create TokioTcpListener: {}", error);
+                        return Err(Errors::TcpFailure(format!("Failed to create TokioTcpListener: {error}")));
+                    }
+                }
             }
             Err(_) => {
                 port += 1;
@@ -93,12 +149,28 @@ pub async fn find_tcp_listener(from: Option<u16>) -> Resolve<TcpConnection> {
 pub async fn bind_tcp_listener(port: u16) -> Resolve<TcpConnection> {
     let addr: SocketAddr = format!("[::]:{port}").parse().expect("Invalid address");
 
-    let listener = TokioTcpListener::bind(addr).await.map_err(|e| {
+    let socket = Socket::new(Domain::IPV6, Type::STREAM, Some(Protocol::TCP))
+        .map_err(|e| {
+            error!(target: "tcp-listener", "Failed to create TCP socket: {}", e);
+            Errors::TcpFailure(format!("Failed to create TCP socket: {e}"))
+        })?;
+
+    if let Err(error) = socket.set_only_v6(false) {
+        error!(target: "tcp-listener", "Failed to enable dual-stack TCP socket: {}", error);
+        return Err(Errors::TcpFailure(format!("Failed to enable dual-stack TCP socket: {error}")));
+    }
+
+    socket.bind(&addr.into()).map_err(|e| {
         error!(target: "tcp-listener", "Failed to bind to port {}: {}", port, e);
         Errors::TcpFailure(format!("Port {} already in use", port))
     })?;
 
-    println!("Server successfully bound to {addr}");
+    let listener = TokioTcpListener::from_std(socket.into()).map_err(|e| {
+        error!(target: "tcp-listener", "Failed to wrap TCP socket: {}", e);
+        Errors::TcpFailure(format!("Failed to wrap TCP socket: {e}"))
+    })?;
+
+    println!("TCP server successfully bound to {addr}");
 
     Ok(TcpConnection {
         listener,
