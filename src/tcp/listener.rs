@@ -5,8 +5,7 @@ use core_services::services::base::Resolve;
 use core_services::services::errors::Errors;
 use log::error;
 use socket2::{Domain, Protocol, Socket, Type};
-use tokio::net::TcpListener as TokioTcpListener;
-use tokio::net::UdpSocket;
+use tokio::net::{TcpListener as TokioTcpListener, UdpSocket};
 use tonic::transport::server::TcpIncoming;
 
 pub struct GrpcConnection {
@@ -155,11 +154,10 @@ pub async fn find_tcp_listener(from: Option<u16>) -> Resolve<TcpConnection> {
 pub async fn bind_tcp_listener(port: u16) -> Resolve<TcpConnection> {
     let addr: SocketAddr = format!("[::]:{port}").parse().expect("Invalid address");
 
-    let socket = Socket::new(Domain::IPV6, Type::STREAM, Some(Protocol::TCP))
-        .map_err(|e| {
-            error!(target: "tcp-listener", "Failed to create TCP socket: {}", e);
-            Errors::TcpFailure(format!("Failed to create TCP socket: {e}"))
-        })?;
+    let socket = Socket::new(Domain::IPV6, Type::STREAM, Some(Protocol::TCP)).map_err(|e| {
+        error!(target: "tcp-listener", "Failed to create TCP socket: {}", e);
+        Errors::TcpFailure(format!("Failed to create TCP socket: {e}"))
+    })?;
 
     if let Err(error) = socket.set_only_v6(false) {
         error!(target: "tcp-listener", "Failed to enable dual-stack TCP socket: {}", error);
