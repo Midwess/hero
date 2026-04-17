@@ -251,7 +251,8 @@ impl HttpClient {
 }
 
 fn parse_headers(headers: web_sys::Headers) -> Result<HashMap<String, String>, JsValue> {
-    let entries = js_sys::try_iter(&headers.entries())?.ok_or_else(|| JsValue::from_str("Failed to iterate headers"))?;
+    let entries =
+        js_sys::try_iter(&headers.entries())?.ok_or_else(|| JsValue::from_str("Failed to iterate headers"))?;
     let mut headers_map = HashMap::new();
     for entry in entries {
         let entry = entry?;
@@ -316,7 +317,8 @@ impl FetchRequest {
 
         let array_buffer_promise = resp.array_buffer()?;
         let array_buffer_js = JsFuture::from(array_buffer_promise).await?;
-        let array_buffer: js_sys::ArrayBuffer = array_buffer_js.dyn_into().map_err(|_| JsValue::from_str("Failed to convert to ArrayBuffer"))?;
+        let array_buffer: js_sys::ArrayBuffer =
+            array_buffer_js.dyn_into().map_err(|_| JsValue::from_str("Failed to convert to ArrayBuffer"))?;
         let bytes = Uint8Array::new(&array_buffer).to_vec();
 
         Ok((status, headers_map, bytes))

@@ -78,11 +78,7 @@ impl FileEntry {
     }
 
     pub async fn write_at(&mut self, content: Vec<u8>, offset: u64) -> Result<()> {
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(&self.path)
-            .await?;
+        let mut file = OpenOptions::new().write(true).create(true).open(&self.path).await?;
 
         file.seek(tokio::io::SeekFrom::Start(offset)).await?;
         file.write_all(&content).await?;

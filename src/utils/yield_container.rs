@@ -41,7 +41,7 @@ impl<T: Send + 'static> YieldContainer<T> {
 
     pub fn empty() -> Self {
         Self {
-            value_container: Arc::new(Mutex::new(None)),
+            value_container: Arc::new(Mutex::new(None))
         }
     }
 
@@ -53,7 +53,7 @@ impl<T: Send + 'static> YieldContainer<T> {
         let container = Arc::downgrade(&self.value_container);
         *lock = Some(Yieldable {
             value: Some(value),
-            container,
+            container
         });
         Ok(())
     }
