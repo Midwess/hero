@@ -426,6 +426,8 @@ impl ApiGatewayClient for KongGatewayAdminClient {
         let kong_url = self.url.as_str();
         let client = reqwest::Client::new();
 
+        delete_plugins_under(&client, &format!("{kong_url}/services/{service_name}/plugins")).await;
+
         let routes_resp = client.get(format!("{kong_url}/services/{service_name}/routes")).send().await;
 
         if let Ok(routes_resp) = routes_resp {
@@ -434,6 +436,8 @@ impl ApiGatewayClient for KongGatewayAdminClient {
                     if let Some(routes) = routes_data.get("data").and_then(|v| v.as_array()) {
                         for route in routes {
                             if let Some(route_name) = route.get("name").and_then(|v| v.as_str()) {
+                                delete_plugins_under(&client, &format!("{kong_url}/routes/{route_name}/plugins")).await;
+
                                 let _ = client
                                     .delete(format!("{kong_url}/services/{service_name}/routes/{route_name}"))
                                     .send()
@@ -463,6 +467,7 @@ impl ApiGatewayClient for KongGatewayAdminClient {
             )));
         }
 
+        log::info!(target: "kong-admin", "Deleted service {}", service_name);
         Ok(())
     }
 
@@ -514,5 +519,36 @@ impl ApiGatewayClient for KongGatewayAdminClient {
         let service: GatewayService = resp.json().await.map_err(|it| Errors::GatewayOperationFailed(it.to_string()))?;
 
         Ok(Some(service))
+    }
+}
+
+async fn delete_plugins_under(client: &reqwest::Client, plugins_url: &str) {
+    let Ok(resp) = client.get(plugins_url).send().await else {
+        return;
+    };
+
+    if !resp.status().is_success() {
+        return;
+    }
+
+    let Ok(body) = resp.json::<serde_json::Value>().await else {
+        return;
+    };
+
+    let Some(items) = body.get("data").and_then(|v| v.as_array()) else {
+        return;
+    };
+
+    let base = plugins_url.split("/services/").next().or_else(|| plugins_url.split("/routes/").next());
+
+    let base = match base {
+        Some(b) => b,
+        None => return
+    };
+
+    for plugin in items {
+        if let Some(id) = plugin.get("id").and_then(|v| v.as_str()) {
+            let _ = client.delete(format!("{base}/plugins/{id}")).send().await;
+        }
     }
 }
