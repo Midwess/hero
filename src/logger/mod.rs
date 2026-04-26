@@ -9,12 +9,26 @@ use std::time::Duration;
 pub fn setup() {
     #[cfg(target_arch = "wasm32")]
     {
+        use js_sys::Reflect;
         use log::{Level, LevelFilter, Log, Metadata, Record};
+        use wasm_bindgen::JsValue;
+
+        fn log_flag_enabled() -> bool {
+            let global = js_sys::global();
+            match Reflect::get(&global, &JsValue::from_str("__midwess_log")) {
+                Ok(v) if v.is_undefined() => cfg!(debug_assertions),
+                Ok(v) => v.is_truthy(),
+                Err(_) => cfg!(debug_assertions),
+            }
+        }
 
         struct WasmLogger;
 
         impl Log for WasmLogger {
             fn enabled(&self, metadata: &Metadata) -> bool {
+                if !log_flag_enabled() {
+                    return false;
+                }
                 metadata.level() <= Level::Info
             }
 
