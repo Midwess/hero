@@ -6,5 +6,10 @@ pub mod grpc_gateway;
 #[cfg(feature = "tcp")]
 pub mod tcp;
 
+#[cfg(not(target_family = "wasm"))]
+pub mod retry;
+#[cfg(not(target_family = "wasm"))]
+pub mod task;
+
 pub mod config;
 pub mod sdk;

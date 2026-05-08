@@ -7,11 +7,20 @@ use tokio::sync::{Mutex, OnceCell};
 #[cfg(feature = "distributed_id")]
 pub mod etcd;
 pub mod generator;
+pub mod scoped;
 
 #[cfg(feature = "distributed_id")]
 pub use etcd::EtcdWorkerOptions;
 
 pub use generator::EPOCH_SINCE;
+pub use scoped::{
+    format_phone_number,
+    generate_phone_number,
+    RegionCodeError,
+    REGION_CODE_MAX,
+    REGION_CODE_MIN,
+    SUBSCRIBER_MOD
+};
 
 pub static DISTRIBUTED_ID_GENERATOR: OnceCell<Arc<Mutex<DistributedIdGenerator>>> = OnceCell::const_new();
 #[cfg(feature = "distributed_id")]
