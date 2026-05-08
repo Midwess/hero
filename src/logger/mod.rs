@@ -18,7 +18,7 @@ pub fn setup() {
             match Reflect::get(&global, &JsValue::from_str("__midwess_log")) {
                 Ok(v) if v.is_undefined() => cfg!(debug_assertions),
                 Ok(v) => v.is_truthy(),
-                Err(_) => cfg!(debug_assertions),
+                Err(_) => cfg!(debug_assertions)
             }
         }
 
