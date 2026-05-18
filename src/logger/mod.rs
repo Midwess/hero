@@ -62,6 +62,8 @@ pub fn setup() {
         log_builder.filter_module("rig::completions", log::LevelFilter::Off);
         log_builder.filter_module("rig::agent_chat", log::LevelFilter::Off);
         log_builder.filter_module("sqlx::query", log::LevelFilter::Off);
+        log_builder.filter_module("chromiumoxide::conn", log::LevelFilter::Off);
+        log_builder.filter_module("chromiumoxide::handler", log::LevelFilter::Off);
         // Enable raw LLM response logging for debugging
         log_builder.filter_module("llm::raw", log::LevelFilter::Debug);
 
