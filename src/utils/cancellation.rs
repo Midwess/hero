@@ -94,35 +94,33 @@ impl CancellationToken {
         });
     }
 
-    /// Cancel this token and recursively cancel all child tokens.
+    /// Cancel this token and recursively cancel all descendant tokens.
     pub fn cancel(&self) {
         if !self.state.cancelled.swap(true, Ordering::AcqRel) {
-            // Wake up any pending futures
             self.state.waker.wake();
-
-            // Cancel all children
-            // Use a block to limit the lock scope (best practice)
-            let children = {
-                let mut children_lock = self.state.children.lock();
-                // Collect valid children and clean up weak references
-                let mut valid_children = Vec::new();
-                children_lock.retain(|weak_ref| {
-                    if let Some(child) = weak_ref.upgrade() {
-                        valid_children.push(child);
-                        true
-                    } else {
-                        false
-                    }
-                });
-                valid_children
-            };
-
-            // Cancel children without holding the lock
-            for child in children {
-                child.cancelled.store(true, Ordering::Release);
-                child.waker.wake();
+            let mut stack: Vec<Arc<CancelState>> = Vec::new();
+            stack.extend(Self::collect_children(&self.state));
+            while let Some(node) = stack.pop() {
+                if !node.cancelled.swap(true, Ordering::AcqRel) {
+                    node.waker.wake();
+                    stack.extend(Self::collect_children(&node));
+                }
             }
         }
+    }
+
+    fn collect_children(state: &Arc<CancelState>) -> Vec<Arc<CancelState>> {
+        let mut children_lock = state.children.lock();
+        let mut valid_children = Vec::new();
+        children_lock.retain(|weak_ref| {
+            if let Some(child) = weak_ref.upgrade() {
+                valid_children.push(child);
+                true
+            } else {
+                false
+            }
+        });
+        valid_children
     }
 
     /// Creates a new child token that is linked to this token.
