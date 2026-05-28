@@ -77,6 +77,7 @@ pub struct GatewayRoute {
     pub name: String,
     pub paths: Vec<String>,
     pub hosts: Vec<String>,
+    pub host_regex: Option<String>,
     pub priority: u32,
     pub methods: Option<Vec<String>>,
     pub protocols: Option<Vec<String>>,
@@ -108,8 +109,9 @@ impl GatewayRoute {
     pub fn build_expression(&self) -> String {
         let mut parts = vec![];
 
-        // Hosts
-        if !self.hosts.is_empty() {
+        if let Some(regex) = &self.host_regex {
+            parts.push(format!(r##"http.host ~ r#"{regex}"#"##));
+        } else if !self.hosts.is_empty() {
             if self.hosts.len() == 1 {
                 parts.push(format!("http.host == \"{}\"", self.hosts[0]));
             } else {
@@ -181,6 +183,7 @@ pub struct GatewayRouteBuilder {
     pub name: Option<String>,
     pub paths: Vec<String>,
     pub hosts: Vec<String>,
+    pub host_regex: Option<String>,
     pub priority: Option<u32>,
     pub methods: Option<Vec<String>>,
     pub protocols: Option<Vec<String>>,
@@ -227,6 +230,11 @@ impl GatewayRouteBuilder {
 
     pub fn hosts(mut self, hosts: Vec<String>) -> Self {
         self.hosts = hosts;
+        self
+    }
+
+    pub fn host_regex(mut self, regex: impl Into<String>) -> Self {
+        self.host_regex = Some(regex.into());
         self
     }
 
@@ -328,6 +336,7 @@ impl GatewayRouteBuilder {
             paths: self.paths,
             methods: self.methods,
             hosts: self.hosts.clone(),
+            host_regex: self.host_regex,
             priority: self.priority.unwrap_or(0),
             protocols: Some(self.protocols.expect("Protocols is required")),
             strip_path: self.strip_path.unwrap_or(false),
