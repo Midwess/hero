@@ -53,8 +53,12 @@ pub fn setup() {
     {
         use pretty_env_logger::formatted_timed_builder;
         let mut log_builder = formatted_timed_builder();
+
+        let file_log = std::env::var("FILE_LOG").ok().filter(|v| !v.is_empty());
         if let Ok(filter_env) = std::env::var("RUST_LOG") {
             log_builder.parse_filters(&filter_env);
+        } else if let Some(level) = file_log.as_deref() {
+            log_builder.parse_filters(level);
         } else {
             log_builder.filter(None, log::LevelFilter::Info);
         }
@@ -65,7 +69,69 @@ pub fn setup() {
         // Enable raw LLM response logging for debugging
         log_builder.filter_module("llm::raw", log::LevelFilter::Debug);
 
+        // FILE_LOG=<level> tees the (uncolored) stream to a file at FILE_LOG_PATH
+        // (default: <binary>.log in the cwd) so live runs have a grep-able log.
+        if file_log.is_some() {
+            if let Some(target) = file_log_target() {
+                log_builder.target(target);
+                log_builder.write_style(env_logger::WriteStyle::Never);
+            }
+        }
+
         let _ = log_builder.try_init();
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn file_log_target() -> Option<env_logger::Target> {
+    let path = std::env::var("FILE_LOG_PATH").ok().filter(|p| !p.is_empty()).unwrap_or_else(default_file_log_path);
+    if let Some(parent) = std::path::Path::new(&path).parent() {
+        if !parent.as_os_str().is_empty() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+    }
+    match std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+        Ok(file) => Some(env_logger::Target::Pipe(Box::new(FileTee { file }))),
+        Err(e) => {
+            eprintln!("FILE_LOG: cannot open log file '{path}': {e}; file logging disabled");
+            None
+        }
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn default_file_log_path() -> String {
+    // Mirror the launcher's builder layout (logs/sandbox-<id>.log): keyed by SANDBOX_ID
+    // when present, else the binary name.
+    let stem = std::env::var("SANDBOX_ID")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .map(|id| format!("sandbox-{id}"))
+        .unwrap_or_else(|| {
+            std::env::current_exe()
+                .ok()
+                .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+                .unwrap_or_else(|| "app".to_string())
+        });
+    format!("logs/{stem}.log")
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct FileTee {
+    file: std::fs::File
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl std::io::Write for FileTee {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let _ = std::io::stderr().write_all(buf);
+        self.file.write_all(buf)?;
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        let _ = std::io::stderr().flush();
+        self.file.flush()
     }
 }
 
