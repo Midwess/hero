@@ -18,7 +18,7 @@ pub fn setup() {
             match Reflect::get(&global, &JsValue::from_str("__midwess_log")) {
                 Ok(v) if v.is_undefined() => cfg!(debug_assertions),
                 Ok(v) => v.is_truthy(),
-                Err(_) => cfg!(debug_assertions)
+                Err(_) => cfg!(debug_assertions),
             }
         }
 
@@ -66,8 +66,10 @@ pub fn setup() {
         log_builder.filter_module("rig::completions", log::LevelFilter::Off);
         log_builder.filter_module("rig::agent_chat", log::LevelFilter::Off);
         log_builder.filter_module("sqlx::query", log::LevelFilter::Off);
-        // Enable raw LLM response logging for debugging
-        log_builder.filter_module("llm::raw", log::LevelFilter::Debug);
+        // Keep exact provider payload tracing available without a separate feature flag.
+        log_builder.filter_module("llm::request", log::LevelFilter::Debug);
+        log_builder.filter_module("llm::raw_request", log::LevelFilter::Debug);
+        log_builder.filter_module("llm::raw_response", log::LevelFilter::Debug);
 
         // FILE_LOG=<level> tees the (uncolored) stream to a file at FILE_LOG_PATH
         // (default: <binary>.log in the cwd) so live runs have a grep-able log.
@@ -118,7 +120,7 @@ fn default_file_log_path() -> String {
 
 #[cfg(not(target_arch = "wasm32"))]
 struct FileTee {
-    file: std::fs::File
+    file: std::fs::File,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -137,7 +139,7 @@ impl std::io::Write for FileTee {
 
 pub struct ThrottleLogger {
     messages: Arc<Mutex<HashMap<String, usize>>>,
-    join_handle: JoinHandle<()>
+    join_handle: JoinHandle<()>,
 }
 
 impl ThrottleLogger {
