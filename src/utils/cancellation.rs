@@ -1,4 +1,4 @@
-use futures::task::AtomicWaker;
+use event_listener::{Event, EventListener};
 use n0_future::task::{spawn, JoinHandle};
 use parking_lot::Mutex;
 use std::fmt::Debug;
@@ -8,7 +8,7 @@ use std::sync::{Arc, Weak};
 #[derive(Debug, Default)]
 struct CancelState {
     cancelled: AtomicBool,
-    waker: AtomicWaker,
+    event: Event,
     children: Mutex<Vec<Weak<CancelState>>>
 }
 
@@ -62,7 +62,7 @@ impl CancellationToken {
         Self {
             state: Arc::new(CancelState {
                 cancelled: AtomicBool::new(false),
-                waker: AtomicWaker::new(),
+                event: Event::new(),
                 children: Mutex::new(Vec::new())
             }),
             timeout_handle: None
@@ -97,12 +97,12 @@ impl CancellationToken {
     /// Cancel this token and recursively cancel all descendant tokens.
     pub fn cancel(&self) {
         if !self.state.cancelled.swap(true, Ordering::AcqRel) {
-            self.state.waker.wake();
+            self.state.event.notify(usize::MAX);
             let mut stack: Vec<Arc<CancelState>> = Vec::new();
             stack.extend(Self::collect_children(&self.state));
             while let Some(node) = stack.pop() {
                 if !node.cancelled.swap(true, Ordering::AcqRel) {
-                    node.waker.wake();
+                    node.event.notify(usize::MAX);
                     stack.extend(Self::collect_children(&node));
                 }
             }
@@ -130,6 +130,7 @@ impl CancellationToken {
         // Add child to parent's list within a limited scope
         {
             let mut children = self.state.children.lock();
+            children.retain(|child| child.strong_count() > 0);
             children.push(Arc::downgrade(&child.state));
         }
 
@@ -144,7 +145,8 @@ impl CancellationToken {
     /// Returns a future that resolves when this token is cancelled.
     pub fn cancelled(&self) -> Cancelled {
         Cancelled {
-            state: Arc::downgrade(&self.state)
+            state: Arc::downgrade(&self.state),
+            listener: None
         }
     }
 
@@ -176,27 +178,27 @@ impl Drop for DropGuard {
 }
 
 pub struct Cancelled {
-    state: Weak<CancelState>
+    state: Weak<CancelState>,
+    listener: Option<EventListener>
 }
 
 impl Future for Cancelled {
     type Output = ();
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
-        if let Some(state) = self.state.upgrade() {
-            if state.cancelled.load(Ordering::Acquire) {
-                std::task::Poll::Ready(())
-            } else {
-                state.waker.register(cx.waker());
-                if state.cancelled.load(Ordering::Acquire) {
-                    std::task::Poll::Ready(())
-                } else {
-                    std::task::Poll::Pending
-                }
-            }
-        } else {
+        let this = self.get_mut();
+        let Some(state) = this.state.upgrade() else {
             // Parent is dropped, consider it cancelled
+            return std::task::Poll::Ready(());
+        };
+        if state.cancelled.load(Ordering::Acquire) {
+            return std::task::Poll::Ready(());
+        }
+        let listener = this.listener.get_or_insert_with(|| state.event.listen());
+        if state.cancelled.load(Ordering::Acquire) {
             std::task::Poll::Ready(())
+        } else {
+            std::pin::Pin::new(listener).poll(cx).map(|_| ())
         }
     }
 }
@@ -242,7 +244,16 @@ impl<T: Future> FutureExtension for T {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
+    use futures::task::{waker_ref, ArcWake};
+    use std::sync::atomic::AtomicUsize;
+
+    struct WakeCounter(AtomicUsize);
+
+    impl ArcWake for WakeCounter {
+        fn wake_by_ref(arc_self: &Arc<Self>) {
+            arc_self.0.fetch_add(1, Ordering::Relaxed);
+        }
+    }
 
     #[test]
     fn test_cancellation_token_basic() {
@@ -264,5 +275,27 @@ mod tests {
         parent.cancel();
         assert!(parent.is_cancelled());
         assert!(child.is_cancelled());
+    }
+
+    #[test]
+    fn cancellation_wakes_every_waiter() {
+        let token = CancellationToken::new();
+        let mut first = Box::pin(token.cancelled());
+        let mut second = Box::pin(token.clone().cancelled());
+        let first_counter = Arc::new(WakeCounter(AtomicUsize::new(0)));
+        let second_counter = Arc::new(WakeCounter(AtomicUsize::new(0)));
+        let first_waker = waker_ref(&first_counter);
+        let second_waker = waker_ref(&second_counter);
+        let mut first_context = std::task::Context::from_waker(&first_waker);
+        let mut second_context = std::task::Context::from_waker(&second_waker);
+
+        assert!(first.as_mut().poll(&mut first_context).is_pending());
+        assert!(second.as_mut().poll(&mut second_context).is_pending());
+        token.cancel();
+
+        assert_eq!(first_counter.0.load(Ordering::Relaxed), 1);
+        assert_eq!(second_counter.0.load(Ordering::Relaxed), 1);
+        assert!(first.as_mut().poll(&mut first_context).is_ready());
+        assert!(second.as_mut().poll(&mut second_context).is_ready());
     }
 }
