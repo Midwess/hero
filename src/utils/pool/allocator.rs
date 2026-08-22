@@ -16,17 +16,17 @@ use super::reponse::PoolResponse;
 
 pub struct Pool<T>
 where
-    T: Send + Sync + 'static
+    T: Send + Sync + 'static,
 {
     max_size: usize,
     min_size: usize,
     items: Mutex<VecDeque<PoolItem<T>>>,
-    counter: Mutex<usize>
+    counter: Mutex<usize>,
 }
 
 impl<T> Pool<T>
 where
-    T: Send + Sync + 'static
+    T: Send + Sync + 'static,
 {
     fn new(min_size: usize, max_size: usize) -> Self {
         if min_size > max_size {
@@ -37,7 +37,7 @@ where
             items: Mutex::new(VecDeque::with_capacity(min_size)),
             counter: Mutex::new(0),
             min_size,
-            max_size
+            max_size,
         }
     }
 
@@ -133,7 +133,7 @@ where
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
 pub trait PoolResourceProvider<T>: Send + Sync
 where
-    T: Send + Sync
+    T: Send + Sync,
 {
     async fn new(&self) -> T
     where
@@ -142,20 +142,20 @@ where
 
 struct PoolCleaner<T>
 where
-    T: Send + Sync + 'static
+    T: Send + Sync + 'static,
 {
     pool: Arc<Pool<T>>,
-    background_handle: Arc<Mutex<Option<JoinHandle<()>>>>
+    background_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
 }
 
 impl<T> PoolCleaner<T>
 where
-    T: Send + Sync
+    T: Send + Sync,
 {
     fn new(pool: Arc<Pool<T>>) -> Self {
         Self {
             pool,
-            background_handle: Arc::new(Mutex::new(None))
+            background_handle: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -216,7 +216,7 @@ where
 
 impl<T> Drop for PoolCleaner<T>
 where
-    T: Send + Sync
+    T: Send + Sync,
 {
     fn drop(&mut self) {
         let background_handle = self.background_handle.clone();
@@ -231,36 +231,36 @@ where
 
 pub struct PoolAllocator<T>
 where
-    T: 'static + Send + Sync
+    T: 'static + Send + Sync,
 {
     pub pool: Arc<Pool<T>>,
     resource_idle_timeout: Duration,
     resource_provider: Box<dyn PoolResourceProvider<T> + 'static>,
     waiters: Mutex<VecDeque<oneshot::Sender<PoolResponse<T>>>>,
 
-    cleaner: PoolCleaner<T>
+    cleaner: PoolCleaner<T>,
 }
 
 pub struct PoolBuilder<T>
 where
-    T: Send + Sync + 'static
+    T: Send + Sync + 'static,
 {
     min_pool_size: usize,
     max_pool_size: usize,
     resource_idle_timeout: Duration,
-    pool_resource_provider: Option<Box<dyn PoolResourceProvider<T> + 'static>>
+    pool_resource_provider: Option<Box<dyn PoolResourceProvider<T> + 'static>>,
 }
 
 impl<T> PoolBuilder<T>
 where
-    T: Send + Sync + 'static
+    T: Send + Sync + 'static,
 {
     pub fn new(resource_provider: Box<dyn PoolResourceProvider<T> + 'static>) -> Self {
         Self {
             min_pool_size: 10,
             max_pool_size: 20,
             resource_idle_timeout: Duration::new(60 * 10, 0),
-            pool_resource_provider: Some(resource_provider)
+            pool_resource_provider: Some(resource_provider),
         }
     }
 
@@ -295,7 +295,7 @@ where
             resource_idle_timeout: self.resource_idle_timeout,
             pool,
             cleaner,
-            waiters: Mutex::new(VecDeque::new())
+            waiters: Mutex::new(VecDeque::new()),
         };
 
         pool_allocator.init().await;
@@ -306,22 +306,22 @@ where
 
 pub struct PoolItem<T>
 where
-    T: Send + Sync + 'static
+    T: Send + Sync + 'static,
 {
     resource: Box<T>,
     start_time: Instant,
-    max_idling_timeout: Duration
+    max_idling_timeout: Duration,
 }
 
 impl<T> PoolItem<T>
 where
-    T: Send + Sync + 'static
+    T: Send + Sync + 'static,
 {
     pub fn new(resource: Box<T>, max_idling_timeout: Duration) -> Self {
         Self {
             resource,
             start_time: Instant::now(),
-            max_idling_timeout
+            max_idling_timeout,
         }
     }
 
@@ -341,7 +341,7 @@ where
 
 impl<T> Deref for PoolItem<T>
 where
-    T: Send + Sync + 'static
+    T: Send + Sync + 'static,
 {
     type Target = T;
 
@@ -352,7 +352,7 @@ where
 
 impl<T> DerefMut for PoolItem<T>
 where
-    T: Send + Sync + 'static
+    T: Send + Sync + 'static,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.resource.borrow_mut()
@@ -361,7 +361,7 @@ where
 
 impl<T> PoolAllocator<T>
 where
-    T: Send + Sync + 'static
+    T: Send + Sync + 'static,
 {
     pub async fn init(&self) {
         if self.pool.min_size == 0 {

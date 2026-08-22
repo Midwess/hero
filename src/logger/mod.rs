@@ -18,7 +18,7 @@ pub fn setup() {
             match Reflect::get(&global, &JsValue::from_str("__midwess_log")) {
                 Ok(v) if v.is_undefined() => cfg!(debug_assertions),
                 Ok(v) => v.is_truthy(),
-                Err(_) => cfg!(debug_assertions)
+                Err(_) => cfg!(debug_assertions),
             }
         }
 
@@ -120,7 +120,7 @@ fn default_file_log_path() -> String {
 
 #[cfg(not(target_arch = "wasm32"))]
 struct FileTee {
-    file: std::fs::File
+    file: std::fs::File,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -139,7 +139,7 @@ impl std::io::Write for FileTee {
 
 pub struct ThrottleLogger {
     messages: Arc<Mutex<HashMap<String, usize>>>,
-    join_handle: JoinHandle<()>
+    join_handle: JoinHandle<()>,
 }
 
 impl ThrottleLogger {

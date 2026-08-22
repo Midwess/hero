@@ -18,7 +18,7 @@ impl<T> SendSync for T where T: Sync + Send {}
 pub trait Repository<T, I>: Send + Sync
 where
     T: SendSync + Table<I>,
-    I: SendSync + DbId
+    I: SendSync + DbId,
 {
     async fn create(&self, data: T) -> Resolve<T>
     where

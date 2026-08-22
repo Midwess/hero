@@ -5,7 +5,7 @@ pub struct ExponentialGrowth {
     initial_value: i64,
     step: i64,
     growth_rate: f64,
-    max: i64
+    max: i64,
 }
 
 impl ExponentialGrowth {
@@ -15,7 +15,7 @@ impl ExponentialGrowth {
             initial_value,
             step,
             growth_rate,
-            max
+            max,
         }
     }
 

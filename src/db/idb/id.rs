@@ -64,7 +64,7 @@ pub trait IdbId: DbId + SendSync + Debug + serde::Serialize + for<'de> serde::De
                 let values = entries.into_iter().map(|(_, v)| v).collect();
                 serde_json::Value::Array(values)
             }
-            other => serde_json::Value::Array(vec![other])
+            other => serde_json::Value::Array(vec![other]),
         }
     }
 }

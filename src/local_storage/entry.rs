@@ -7,7 +7,7 @@ pub struct FileEntry {
     pub is_dir: bool,
     pub modified_at: SystemTime,
     pub size: u64,
-    pub path: PathBuf
+    pub path: PathBuf,
 }
 
 impl FileEntry {

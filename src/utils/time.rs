@@ -38,13 +38,13 @@ pub fn epoch_micro() -> u64 {
     // Get window
     let window = match web_sys::window() {
         Some(w) => w,
-        None => return epoch_from_js_fallback()
+        None => return epoch_from_js_fallback(),
     };
 
     // Get performance
     let perf = match window.performance() {
         Some(p) => p,
-        None => return epoch_from_js_fallback()
+        None => return epoch_from_js_fallback(),
     };
 
     // High-resolution timer

@@ -11,22 +11,15 @@ use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use wasm_streams::ReadableStream;
 use web_sys::{
-    AbortController,
-    Blob,
-    Event,
-    Headers,
-    ProgressEvent,
-    Request,
-    RequestInit,
-    Response,
-    XmlHttpRequest as WasmXmlHttpRequest
+    AbortController, Blob, Event, Headers, ProgressEvent, Request, RequestInit, Response,
+    XmlHttpRequest as WasmXmlHttpRequest,
 };
 
 pub struct HttpClient {
     method: String,
     url: Option<String>,
     headers: HashMap<String, String>,
-    body: Option<Body>
+    body: Option<Body>,
 }
 
 pub enum Body {
@@ -34,17 +27,17 @@ pub enum Body {
     Blob(Blob),
     Bytes(Vec<u8>),
     Uint8Array(Uint8Array),
-    AsyncReader(Box<dyn AsyncRead + Unpin + 'static>)
+    AsyncReader(Box<dyn AsyncRead + Unpin + 'static>),
 }
 
 pub struct XmlHttpRequest {
     xml_http: Arc<NeverSend<WasmXmlHttpRequest>>,
-    event_rx: Receiver<XhrEvent>
+    event_rx: Receiver<XhrEvent>,
 }
 
 pub struct FetchRequest {
     request: Request,
-    _abort_controller: Option<AbortController>
+    _abort_controller: Option<AbortController>,
 }
 
 impl HttpClient {
@@ -53,7 +46,7 @@ impl HttpClient {
             method: "GET".to_string(),
             url: None,
             headers: HashMap::new(),
-            body: None
+            body: None,
         }
     }
 
@@ -158,7 +151,7 @@ impl HttpClient {
                 let _ = tx2
                     .send(XhrEvent::Complete {
                         headers: headers_map,
-                        body
+                        body,
                     })
                     .await;
             });
@@ -192,7 +185,7 @@ impl HttpClient {
             Some(Body::Bytes(ref bytes)) => xml_http.send_with_opt_u8_array(Some(bytes))?,
             Some(Body::Uint8Array(u8a)) => xml_http.send_with_opt_js_u8_array(Some(&u8a))?,
             Some(Body::AsyncReader(_)) => return Err(JsValue::from_str("Async reader not supported for xhr")),
-            None => xml_http.send()?
+            None => xml_http.send()?,
         };
 
         Ok(XmlHttpRequest { xml_http, event_rx: rx })
@@ -245,7 +238,7 @@ impl HttpClient {
 
         Ok(FetchRequest {
             request,
-            _abort_controller: abort_controller
+            _abort_controller: abort_controller,
         })
     }
 }
@@ -269,9 +262,9 @@ pub enum XhrEvent {
     InProgress(ProgressEvent),
     Complete {
         headers: HashMap<String, String>,
-        body: JsValue
+        body: JsValue,
     },
-    Error(JsValue)
+    Error(JsValue),
 }
 
 impl XmlHttpRequest {

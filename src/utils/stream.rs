@@ -9,14 +9,14 @@ use futures::io::{AsyncRead, AsyncWrite};
 #[derive(Clone)]
 pub struct DuplexConfig {
     pub buffer_size: usize,
-    pub max_buffer_size: usize
+    pub max_buffer_size: usize,
 }
 
 impl Default for DuplexConfig {
     fn default() -> Self {
         Self {
             buffer_size: 8192,
-            max_buffer_size: 65536
+            max_buffer_size: 65536,
         }
     }
 }
@@ -25,7 +25,7 @@ impl Default for DuplexConfig {
 struct BufferState {
     buffer: VecDeque<u8>,
     is_closed: bool,
-    max_size: usize
+    max_size: usize,
 }
 
 impl BufferState {
@@ -33,7 +33,7 @@ impl BufferState {
         Self {
             buffer: VecDeque::new(),
             is_closed: false,
-            max_size
+            max_size,
         }
     }
 
@@ -90,13 +90,13 @@ pub struct DuplexWriter {
     // Buffer where we write data that will be read by the paired reader
     write_buffer: Arc<Mutex<BufferState>>,
     config: DuplexConfig,
-    local_buffer: Vec<u8>
+    local_buffer: Vec<u8>,
 }
 
 pub struct DuplexReader {
     // Buffer from where we read data written by the paired writer
     read_buffer: Arc<Mutex<BufferState>>,
-    config: DuplexConfig
+    config: DuplexConfig,
 }
 
 pub fn duplex() -> (DuplexStream, DuplexStream) {
@@ -111,24 +111,24 @@ pub fn duplex_with_config(config: DuplexConfig) -> (DuplexStream, DuplexStream) 
         writer: DuplexWriter {
             write_buffer: buffer1.clone(),
             config: config.clone(),
-            local_buffer: Vec::with_capacity(config.buffer_size)
+            local_buffer: Vec::with_capacity(config.buffer_size),
         },
         reader: DuplexReader {
             read_buffer: buffer2.clone(),
-            config: config.clone()
-        }
+            config: config.clone(),
+        },
     };
 
     let stream2 = DuplexStream {
         writer: DuplexWriter {
             write_buffer: buffer2.clone(),
             config: config.clone(),
-            local_buffer: Vec::with_capacity(config.buffer_size)
+            local_buffer: Vec::with_capacity(config.buffer_size),
         },
         reader: DuplexReader {
             read_buffer: buffer1.clone(),
-            config: config.clone()
-        }
+            config: config.clone(),
+        },
     };
 
     (stream1, stream2)
@@ -136,7 +136,7 @@ pub fn duplex_with_config(config: DuplexConfig) -> (DuplexStream, DuplexStream) 
 
 pub struct DuplexStream {
     writer: DuplexWriter,
-    reader: DuplexReader
+    reader: DuplexReader,
 }
 
 impl DuplexStream {
@@ -187,13 +187,13 @@ impl AsyncRead for DuplexReader {
     fn poll_read(self: Pin<&mut Self>, _cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<Result<usize, Error>> {
         let mut buffer_state = match self.read_buffer.lock() {
             Ok(guard) => guard,
-            Err(_) => return Poll::Ready(Err(Error::other("buffer lock poisoned")))
+            Err(_) => return Poll::Ready(Err(Error::other("buffer lock poisoned"))),
         };
 
         match buffer_state.read_data(buf) {
             Ok(bytes_read) => Poll::Ready(Ok(bytes_read)),
             Err(e) if e.kind() == ErrorKind::WouldBlock => Poll::Pending,
-            Err(e) => Poll::Ready(Err(e))
+            Err(e) => Poll::Ready(Err(e)),
         }
     }
 }
@@ -223,7 +223,7 @@ impl AsyncWrite for DuplexWriter {
     fn poll_flush(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
         match self.flush_local_buffer() {
             Ok(()) => Poll::Ready(Ok(())),
-            Err(e) => Poll::Ready(Err(e))
+            Err(e) => Poll::Ready(Err(e)),
         }
     }
 

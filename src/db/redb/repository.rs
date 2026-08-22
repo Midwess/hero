@@ -11,7 +11,7 @@ use crate::utils::pool::reponse::PoolResponse;
 pub trait RedbRepository<T, I>: SendSync + Repository<T, I>
 where
     T: SendSync + RedbTable<I> + Debug,
-    I: SendSync + RedbId
+    I: SendSync + RedbId,
 {
     async fn get_db(&self) -> PoolResponse<Database>;
 
@@ -28,7 +28,7 @@ where
 
     async fn create(&self, item: T) -> Resolve<T>
     where
-        T: 'async_trait
+        T: 'async_trait,
     {
         let table_name = T::get_table();
         let db = self.get_db().await;
@@ -50,7 +50,7 @@ where
 
     async fn update_one(&self, item: T) -> Resolve<T>
     where
-        T: 'async_trait
+        T: 'async_trait,
     {
         if RedbRepository::find_one(self, &RedbTable::id(&item)).await?.is_some() {
             // Redb will override the existing item if the key already exists
@@ -58,7 +58,7 @@ where
         } else {
             Err(RepositoryError::NotFound(
                 format!("{:?}: {:?}", T::get_table(), RedbTable::id(&item)),
-                T::get_table().to_string()
+                T::get_table().to_string(),
             ))
         }
     }
@@ -119,7 +119,7 @@ where
         let Some(item) = RedbRepository::find_one(self, id).await? else {
             return Err(RepositoryError::NotFound(
                 format!("{:?}: {:?}", T::get_table(), id),
-                T::get_table().to_string()
+                T::get_table().to_string(),
             ));
         };
 
@@ -141,7 +141,7 @@ where
                 None => {
                     return Err(RepositoryError::NotFound(
                         format!("{:?}: {:?}", T::get_table(), id),
-                        T::get_table().to_string()
+                        T::get_table().to_string(),
                     ))
                 }
             };
@@ -169,7 +169,7 @@ where
             (Some(from_key), Some(to_key)) => table.range(from_key.as_slice()..=to_key.as_slice())?,
             (Some(from_key), None) => table.range(from_key.as_slice()..)?,
             (None, Some(to_key)) => table.range(..=to_key.as_slice())?,
-            (None, None) => table.iter()?
+            (None, None) => table.iter()?,
         };
 
         let mut items = Vec::new();
@@ -191,18 +191,18 @@ impl<X, T, I> Repository<T, I> for X
 where
     X: RedbRepository<T, I> + SendSync,
     T: SendSync + RedbTable<I> + Clone + Debug,
-    I: SendSync + RedbId + Clone
+    I: SendSync + RedbId + Clone,
 {
     async fn create(&self, data: T) -> Resolve<T>
     where
-        T: 'async_trait
+        T: 'async_trait,
     {
         RedbRepository::create(self, data).await
     }
 
     async fn update_one(&self, data: T) -> Resolve<T>
     where
-        T: 'async_trait
+        T: 'async_trait,
     {
         RedbRepository::update_one(self, data).await
     }

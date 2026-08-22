@@ -27,12 +27,12 @@ pub type ZipInputStream = Pin<Box<dyn Stream<Item = Result<Box<dyn IOCursor>>> +
 enum WriterState {
     ProcessingEntry {
         writer: EntryStreamWriter<Vec<u8>>,
-        cursor: Box<dyn IOCursor>
+        cursor: Box<dyn IOCursor>,
     },
     Finalizing {
-        writer: Vec<u8>
+        writer: Vec<u8>,
     },
-    Completed
+    Completed,
 }
 
 pub struct ZipStream {
@@ -42,7 +42,7 @@ pub struct ZipStream {
     chunk_size: usize,
     buffer: Vec<u8>,
     buffer_pos: usize,
-    buffer_len: usize
+    buffer_len: usize,
 }
 
 impl ZipStream {
@@ -57,7 +57,7 @@ impl ZipStream {
             is_dir: false,
             modified_at: Utc::now().into(),
             size: total_size,
-            path: path.clone()
+            path: path.clone(),
         };
 
         let inputs = stream! {
@@ -72,7 +72,7 @@ impl ZipStream {
     pub async fn new_from_stream(
         mut stream: ZipInputStream,
         zip_entry: FileEntry,
-        max_chunk_size: usize
+        max_chunk_size: usize,
     ) -> Result<Self> {
         let chunk_size = max_chunk_size.min(zip_entry.size as usize);
 
@@ -98,8 +98,8 @@ impl ZipStream {
             buffer_len: 0,
             state: WriterState::ProcessingEntry {
                 writer: entry_writer,
-                cursor: first_cursor
-            }
+                cursor: first_cursor,
+            },
         })
     }
 
@@ -111,7 +111,7 @@ impl ZipStream {
         let writer_data = match &mut self.state {
             WriterState::ProcessingEntry { writer, .. } => writer.most_inner_mut(),
             WriterState::Finalizing { writer } => Some(writer),
-            WriterState::Completed => return Ok(false)
+            WriterState::Completed => return Ok(false),
         };
 
         if let Some(data) = writer_data {
@@ -155,7 +155,7 @@ impl ZipStream {
 
                 self.state = WriterState::ProcessingEntry {
                     writer: new_entry_writer,
-                    cursor: next_cursor
+                    cursor: next_cursor,
                 };
                 Ok(true)
             }

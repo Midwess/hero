@@ -8,13 +8,13 @@ type Cleanup = Pin<Box<dyn Future<Output = ()> + Send>>;
 
 #[derive(Default, Clone)]
 pub struct Finally {
-    cleanup_tasks: Arc<Mutex<Option<Vec<Cleanup>>>>
+    cleanup_tasks: Arc<Mutex<Option<Vec<Cleanup>>>>,
 }
 
 impl Finally {
     pub async fn add_cleanup<T>(&self, task: T)
     where
-        T: Future<Output = ()> + Send + 'static
+        T: Future<Output = ()> + Send + 'static,
     {
         let mut tasks = self.cleanup_tasks.lock().await;
         if tasks.is_none() {

@@ -13,12 +13,12 @@ pub enum YieldError {
     #[error("The container is already empty")]
     AlreadyYielded,
     #[error("The container is empty")]
-    NotYielded
+    NotYielded,
 }
 
 #[derive(Clone)]
 pub struct YieldContainer<T: Send + 'static> {
-    pub value_container: Arc<Mutex<Option<Yieldable<T>>>>
+    pub value_container: Arc<Mutex<Option<Yieldable<T>>>>,
 }
 
 impl<T: Send + 'static> YieldContainer<T> {
@@ -26,7 +26,7 @@ impl<T: Send + 'static> YieldContainer<T> {
         let container = Arc::new(Mutex::new(None));
         let yieldable = Yieldable {
             value: Some(value),
-            container: Arc::downgrade(&container)
+            container: Arc::downgrade(&container),
         };
 
         {
@@ -35,13 +35,13 @@ impl<T: Send + 'static> YieldContainer<T> {
         }
 
         Self {
-            value_container: container
+            value_container: container,
         }
     }
 
     pub fn empty() -> Self {
         Self {
-            value_container: Arc::new(Mutex::new(None))
+            value_container: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -53,7 +53,7 @@ impl<T: Send + 'static> YieldContainer<T> {
         let container = Arc::downgrade(&self.value_container);
         *lock = Some(Yieldable {
             value: Some(value),
-            container
+            container,
         });
         Ok(())
     }
@@ -63,7 +63,7 @@ impl<T: Send + 'static> YieldContainer<T> {
         let mut lock = self.value_container.lock().await;
         match lock.take() {
             Some(yieldable) => Ok(yieldable),
-            None => Err(YieldError::NotYielded)
+            None => Err(YieldError::NotYielded),
         }
     }
 
@@ -88,7 +88,7 @@ impl<T: Send + 'static> YieldContainer<T> {
 
 pub struct Yieldable<T: Send + 'static> {
     pub value: Option<T>,
-    container: Weak<Mutex<Option<Yieldable<T>>>>
+    container: Weak<Mutex<Option<Yieldable<T>>>>,
 }
 
 impl<T: Send + 'static> Deref for Yieldable<T> {
@@ -112,7 +112,7 @@ impl<T: Send + 'static> Drop for Yieldable<T> {
                 let mut lock = container.lock().await;
                 *lock = Some(Yieldable {
                     value: Some(value),
-                    container: Arc::downgrade(&container)
+                    container: Arc::downgrade(&container),
                 });
             });
         }

@@ -8,14 +8,14 @@ use tokio_stream::Stream;
 
 pub struct StdStream {
     stdout: Lines<BufReader<ChildStdout>>,
-    stderr: Lines<BufReader<ChildStderr>>
+    stderr: Lines<BufReader<ChildStderr>>,
 }
 
 impl From<Child> for StdStream {
     fn from(mut value: Child) -> Self {
         Self {
             stdout: BufReader::new(value.stdout.take().unwrap()).lines(),
-            stderr: BufReader::new(value.stderr.take().unwrap()).lines()
+            stderr: BufReader::new(value.stderr.take().unwrap()).lines(),
         }
     }
 }
@@ -37,7 +37,7 @@ impl Stream for StdStream {
         match stderr.as_mut().poll(cx) {
             Poll::Ready(Ok(result)) => Poll::Ready(result.map(|it| it.to_string())),
             Poll::Ready(Err(_)) => Poll::Ready(None),
-            _ => Poll::Pending
+            _ => Poll::Pending,
         }
     }
 }

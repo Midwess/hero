@@ -7,29 +7,29 @@ use std::time::Duration;
 
 pub struct PoolRequest<T>
 where
-    T: Send + Sync + 'static
+    T: Send + Sync + 'static,
 {
     pub retrieving_timeout: Option<Duration>,
-    pub pool: Arc<PoolAllocator<T>>
+    pub pool: Arc<PoolAllocator<T>>,
 }
 
 #[derive(Default)]
 pub struct PoolRequestBuilder<T>
 where
-    T: 'static + Send + Sync
+    T: 'static + Send + Sync,
 {
     pub retrieving_timeout: Option<Duration>,
-    pub pool_sync: Option<Arc<PoolAllocator<T>>>
+    pub pool_sync: Option<Arc<PoolAllocator<T>>>,
 }
 
 impl<T> PoolRequestBuilder<T>
 where
-    T: Send + Sync + 'static
+    T: Send + Sync + 'static,
 {
     pub fn new() -> Self {
         Self {
             retrieving_timeout: None,
-            pool_sync: None
+            pool_sync: None,
         }
     }
 
@@ -46,26 +46,26 @@ where
     pub fn build(mut self) -> PoolRequest<T> {
         PoolRequest {
             retrieving_timeout: self.retrieving_timeout,
-            pool: self.pool_sync.take().expect("Pool must be set")
+            pool: self.pool_sync.take().expect("Pool must be set"),
         }
     }
 }
 
 impl<T> Clone for PoolRequest<T>
 where
-    T: Send + Sync + 'static
+    T: Send + Sync + 'static,
 {
     fn clone(&self) -> Self {
         Self {
             pool: self.pool.clone(),
-            retrieving_timeout: self.retrieving_timeout
+            retrieving_timeout: self.retrieving_timeout,
         }
     }
 }
 
 impl<T> PoolRequest<T>
 where
-    T: Send + Sync + 'static
+    T: Send + Sync + 'static,
 {
     pub async fn retrieve(&self) -> Option<PoolResponse<T>> {
         match (self.retrieving_timeout, self.pool.retrieve().await) {
@@ -79,10 +79,10 @@ where
 
                 match value {
                     Some(Ok(value)) => Some(value),
-                    _ => None
+                    _ => None,
                 }
             }
-            _ => None
+            _ => None,
         }
     }
 }

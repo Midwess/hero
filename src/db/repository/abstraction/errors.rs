@@ -11,7 +11,7 @@ pub enum RepositoryError {
     #[error("Error on db side {0}")]
     BincodeError(#[from] bincode::Error),
     #[error("Json serialization error {0:?}")]
-    JsonSerializationError(#[from] serde_json::Error)
+    JsonSerializationError(#[from] serde_json::Error),
 }
 
 #[cfg(feature = "grpc-server")]

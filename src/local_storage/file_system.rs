@@ -24,7 +24,7 @@ impl FileEntry {
             is_dir: path.is_dir(),
             size: if path.is_dir() { 0 } else { path.metadata()?.len() },
             modified_at,
-            path
+            path,
         })
     }
 
@@ -114,7 +114,7 @@ impl FileEntry {
 #[derive(Debug, Clone)]
 pub struct Folder {
     pub name: String,
-    pub path: PathBuf
+    pub path: PathBuf,
 }
 
 impl Folder {
@@ -148,7 +148,7 @@ impl Folder {
             is_dir: false,
             modified_at: SystemTime::now(),
             size: self.zip_store_size().await,
-            path: self.path.clone()
+            path: self.path.clone(),
         };
 
         let path = self.path.clone();
@@ -252,7 +252,7 @@ pub struct FileCursor {
     path: PathBuf,
     position: usize,
     is_eof: bool,
-    buffer: BytesMut
+    buffer: BytesMut,
 }
 
 impl FileCursor {
@@ -264,7 +264,7 @@ impl FileCursor {
             path,
             position: 0,
             is_eof: false,
-            buffer
+            buffer,
         })
     }
 

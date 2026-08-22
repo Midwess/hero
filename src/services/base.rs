@@ -19,15 +19,15 @@ pub fn error_message<T>(resolve: Option<Resolve<T>>) -> Option<String> {
 pub struct ClonedResult<T, E>
 where
     T: Clone,
-    E: Clone
+    E: Clone,
 {
-    result: Result<T, E>
+    result: Result<T, E>,
 }
 
 impl<T, E> From<Result<T, E>> for ClonedResult<T, E>
 where
     T: Clone,
-    E: Clone
+    E: Clone,
 {
     fn from(value: Result<T, E>) -> Self {
         Self { result: value }
@@ -37,7 +37,7 @@ where
 impl<T, E> Deref for ClonedResult<T, E>
 where
     T: Clone,
-    E: Clone
+    E: Clone,
 {
     type Target = Result<T, E>;
 
@@ -51,7 +51,7 @@ pub trait Response {}
 #[async_trait]
 pub trait Service<P, T>
 where
-    P: Clone
+    P: Clone,
 {
     async fn execute(&self, params: P) -> Resolve<T>
     where

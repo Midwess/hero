@@ -5,7 +5,7 @@ pub enum Environment {
     Local,
     Dev,
     Staging,
-    Production
+    Production,
 }
 
 static CURRENT: OnceLock<Environment> = OnceLock::new();
@@ -22,7 +22,7 @@ impl Environment {
             "dev" | "development" => Environment::Dev,
             "staging" | "stage" => Environment::Staging,
             "prod" | "production" => Environment::Production,
-            _ => Environment::Local
+            _ => Environment::Local,
         }
     }
 
@@ -39,7 +39,7 @@ impl Environment {
             Environment::Local => "local",
             Environment::Dev => "dev",
             Environment::Staging => "staging",
-            Environment::Production => "production"
+            Environment::Production => "production",
         }
     }
 }

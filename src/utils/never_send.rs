@@ -10,11 +10,11 @@ pub struct NeverSend<T>(pub T);
 // Serialize impl (only if T: Serialize)
 impl<T> Serialize for NeverSend<T>
 where
-    T: Serialize
+    T: Serialize,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer
+        S: serde::Serializer,
     {
         self.0.serialize(serializer)
     }
@@ -23,11 +23,11 @@ where
 // Deserialize impl (only if T: Deserialize<'de>)
 impl<'de, T> Deserialize<'de> for NeverSend<T>
 where
-    T: Deserialize<'de>
+    T: Deserialize<'de>,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de>
+        D: serde::Deserializer<'de>,
     {
         T::deserialize(deserializer).map(NeverSend)
     }
@@ -41,7 +41,7 @@ impl<T> NeverSend<T> {
 
 impl<T> Clone for NeverSend<T>
 where
-    T: Clone
+    T: Clone,
 {
     fn clone(&self) -> Self {
         Self(self.0.clone())

@@ -16,7 +16,7 @@ use std::time::Duration;
 
 #[derive(Clone)]
 pub struct SmtpClient {
-    pub transport: Arc<AsyncSmtpTransport<Tokio1Executor>>
+    pub transport: Arc<AsyncSmtpTransport<Tokio1Executor>>,
 }
 
 impl SmtpClient {
@@ -34,7 +34,7 @@ impl SmtpClient {
             Some(Template::Welcome(_)) => "Welcome to Midwess".to_owned(),
             Some(Template::SendFile(_)) => "Files received".to_owned(),
             Some(Template::Feedback(_)) => "Feedback received".to_owned(),
-            None => "Midwess".to_owned()
+            None => "Midwess".to_owned(),
         };
 
         let html = self.get_html_template(&template).await?;
@@ -43,7 +43,7 @@ impl SmtpClient {
             .to(receiver.parse().unwrap())
             .subject(subject)
             .multipart(
-                MultiPart::alternative().singlepart(SinglePart::builder().header(ContentType::TEXT_HTML).body(html))
+                MultiPart::alternative().singlepart(SinglePart::builder().header(ContentType::TEXT_HTML).body(html)),
             )?;
         self.transport
             .send(message)

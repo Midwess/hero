@@ -9,7 +9,7 @@ use std::sync::{Arc, Weak};
 struct CancelState {
     cancelled: AtomicBool,
     event: Event,
-    children: Mutex<Vec<Weak<CancelState>>>
+    children: Mutex<Vec<Weak<CancelState>>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -17,14 +17,14 @@ pub struct CancellationToken {
     #[serde(skip)]
     state: Arc<CancelState>,
     #[serde(skip)]
-    timeout_handle: Option<JoinHandle<()>>
+    timeout_handle: Option<JoinHandle<()>>,
 }
 
 impl Clone for CancellationToken {
     fn clone(&self) -> Self {
         Self {
             state: self.state.clone(),
-            timeout_handle: None
+            timeout_handle: None,
         }
     }
 }
@@ -63,9 +63,9 @@ impl CancellationToken {
             state: Arc::new(CancelState {
                 cancelled: AtomicBool::new(false),
                 event: Event::new(),
-                children: Mutex::new(Vec::new())
+                children: Mutex::new(Vec::new()),
             }),
-            timeout_handle: None
+            timeout_handle: None,
         }
     }
 
@@ -146,7 +146,7 @@ impl CancellationToken {
     pub fn cancelled(&self) -> Cancelled {
         Cancelled {
             state: Arc::downgrade(&self.state),
-            listener: None
+            listener: None,
         }
     }
 
@@ -156,7 +156,7 @@ impl CancellationToken {
 }
 
 pub struct DropGuard {
-    token: Option<CancellationToken>
+    token: Option<CancellationToken>,
 }
 
 impl DropGuard {
@@ -179,7 +179,7 @@ impl Drop for DropGuard {
 
 pub struct Cancelled {
     state: Weak<CancelState>,
-    listener: Option<EventListener>
+    listener: Option<EventListener>,
 }
 
 impl Future for Cancelled {
@@ -214,7 +214,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum TaskErrors {
     #[error("Task cancelled")]
-    Cancelled
+    Cancelled,
 }
 
 pub trait FutureExtension: Future + Sized {

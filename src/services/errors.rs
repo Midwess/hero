@@ -54,14 +54,14 @@ pub enum Errors {
     SmtpError(#[from] lettre::transport::smtp::Error),
     #[cfg(feature = "smtp")]
     #[error("Smtp syntax error {}", .0)]
-    SmtpSyntax(#[from] lettre::error::Error)
+    SmtpSyntax(#[from] lettre::error::Error),
 }
 
 #[cfg(feature = "s3")]
 impl<E, R> From<SdkError<E, R>> for Errors
 where
     E: std::fmt::Debug,
-    R: std::fmt::Debug
+    R: std::fmt::Debug,
 {
     fn from(err: SdkError<E, R>) -> Self {
         let msg = match &err {
@@ -70,7 +70,7 @@ where
             SdkError::ResponseError(e) => format!("S3 ResponseError: raw={:?}, service={:?}", e.raw(), e),
             SdkError::ServiceError(e) => format!("S3 ServiceError: {:?}", e.err()),
             SdkError::TimeoutError(e) => format!("S3 TimeoutError: {:?}", e),
-            other => format!("S3 Unknown error: {:?}", other)
+            other => format!("S3 Unknown error: {:?}", other),
         };
 
         Self::AwsS3Error(msg)
@@ -112,7 +112,7 @@ impl From<Errors> for Status {
             #[cfg(feature = "smtp")]
             Errors::SmtpError(_) => Self::internal("Failed to send email"),
             #[cfg(feature = "smtp")]
-            Errors::SmtpSyntax(_) => Self::internal("Failed to send email")
+            Errors::SmtpSyntax(_) => Self::internal("Failed to send email"),
         }
     }
 }

@@ -4,7 +4,7 @@ use crate::db::repository::abstraction::table::Table;
 
 pub trait RedbTable<T>: Table<T> + serde::Serialize + for<'de> serde::Deserialize<'de>
 where
-    T: RedbId
+    T: RedbId,
 {
     fn id(&self) -> T {
         Table::id(self)

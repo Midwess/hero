@@ -10,15 +10,15 @@ pub type ThrottleFn<T> = Box<dyn (FnMut(T) -> Pin<Box<dyn Future<Output = ()> + 
 
 pub struct ThrottleFuture<T>
 where
-    T: Send + Sync + 'static
+    T: Send + Sync + 'static,
 {
     last_value: Arc<Mutex<Option<T>>>,
-    join_handle: Option<JoinHandle<()>>
+    join_handle: Option<JoinHandle<()>>,
 }
 
 impl<T> ThrottleFuture<T>
 where
-    T: Send + Sync + 'static
+    T: Send + Sync + 'static,
 {
     pub fn new(mut future_fn: ThrottleFn<T>, delay: Duration) -> Self {
         let last_value = Arc::new(Mutex::new(None::<T>));
@@ -47,7 +47,7 @@ where
 
         Self {
             last_value,
-            join_handle: Some(join_handle)
+            join_handle: Some(join_handle),
         }
     }
 
@@ -71,7 +71,7 @@ where
 
 impl<T> Drop for ThrottleFuture<T>
 where
-    T: Send + Sync + 'static
+    T: Send + Sync + 'static,
 {
     fn drop(&mut self) {
         if let Some(join_handle) = self.join_handle.take() {

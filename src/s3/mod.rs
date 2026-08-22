@@ -17,20 +17,20 @@ pub struct UploadPart {
     pub part_number: i32,
     pub upload_url: String,
     // None means the client will decide
-    pub x_content_length: Option<u64>
+    pub x_content_length: Option<u64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MultipartUpload {
     pub upload_id: String,
-    pub parts: Vec<UploadPart>
+    pub parts: Vec<UploadPart>,
 }
 
 pub struct S3ClientResourceProvider;
 
 #[derive(Clone)]
 pub struct S3Client {
-    pub client: Arc<Client>
+    pub client: Arc<Client>,
 }
 
 impl S3Client {
@@ -44,7 +44,7 @@ impl S3Client {
             // Ignoring it self
             if path.prefix().ne(&prefix) {
                 result.push(StaticResource {
-                    source: Some(Source::S3Path(S3Path::new(path.bucket().to_owned(), prefix)))
+                    source: Some(Source::S3Path(S3Path::new(path.bucket().to_owned(), prefix))),
                 })
             }
         }
@@ -79,7 +79,7 @@ impl S3Client {
             Err(SdkError::ServiceError(e)) if matches!(e.err(), HeadObjectError::NotFound(_)) => {
                 Err(Errors::S3NotFound(format!("S3 object not found: {:?}", path)))
             }
-            Err(e) => Err(e.into())
+            Err(e) => Err(e.into()),
         }
     }
 
@@ -91,18 +91,18 @@ impl S3Client {
             Ok(download_url) => {
                 let body = match download_url.body.collect().await {
                     Ok(body) => body,
-                    Err(_) => return Ok(None)
+                    Err(_) => return Ok(None),
                 };
                 Ok(Some(body.to_vec()))
             }
-            Err(_) => Ok(None)
+            Err(_) => Ok(None),
         }
     }
 
     pub async fn use_cdn(&self, s3_object: &mut StaticResource, cdn_host_url: String) -> Resolve<()> {
         let path = match &s3_object.source {
             Some(Source::S3Path(path)) => path.clone(),
-            _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned()))
+            _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned())),
         };
 
         let cdn_url = format!("{cdn_host_url}/{}", path.prefix());
@@ -116,7 +116,7 @@ impl S3Client {
         let path = match &s3_object.source {
             Some(Source::S3Path(path)) => path.clone(),
             Some(Source::Url(url)) => return Ok(url.clone()),
-            _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned()))
+            _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned())),
         };
 
         let presigning_config = PresigningConfig::expires_in(duration)?;
@@ -138,7 +138,7 @@ impl S3Client {
         let path = match &s3_object.source {
             Some(Source::S3Path(path)) => path.clone(),
             Some(Source::Url(url)) => return Ok(url.clone()),
-            _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned()))
+            _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned())),
         };
 
         let presigning_config = PresigningConfig::expires_in(duration)?;
@@ -158,7 +158,7 @@ impl S3Client {
     pub async fn create_multipart_upload(&self, s3_object: &StaticResource) -> Resolve<String> {
         let path = match &s3_object.source {
             Some(Source::S3Path(path)) => path.clone(),
-            _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned()))
+            _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned())),
         };
 
         let upload_req = self.client.create_multipart_upload().bucket(path.bucket()).key(path.prefix()).send().await?;
@@ -175,11 +175,11 @@ impl S3Client {
         s3_object: &StaticResource,
         upload_id: &str,
         part_number: usize,
-        duration: Duration
+        duration: Duration,
     ) -> Resolve<String> {
         let path = match &s3_object.source {
             Some(Source::S3Path(path)) => path.clone(),
-            _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned()))
+            _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned())),
         };
 
         let presigning_config = PresigningConfig::expires_in(duration)?;
@@ -200,11 +200,11 @@ impl S3Client {
         &self,
         s3_object: &StaticResource,
         upload_id: String,
-        e_tags: Vec<String>
+        e_tags: Vec<String>,
     ) -> Resolve<()> {
         let path = match &s3_object.source {
             Some(Source::S3Path(path)) => path.clone(),
-            _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned()))
+            _ => return Err(Errors::BadRequest("Bad request, static resource must be a s3 path".to_owned())),
         };
 
         let completed_parts: Vec<_> = e_tags

@@ -25,7 +25,7 @@ pub trait VecTableLookup<I: DbId> {
 
 impl<I> VecTableLookup<I> for Vec<I::Table>
 where
-    I: DbId
+    I: DbId,
 {
     fn lookup(&self, id: &I) -> Option<&I::Table> {
         self.iter().find(|t| id.is_represent(t))

@@ -8,7 +8,7 @@ use thiserror::Error;
 pub struct Claims<T> {
     exp: usize,
     iat: usize,
-    data: T
+    data: T,
 }
 
 #[derive(Debug, Error)]
@@ -18,12 +18,12 @@ pub enum JwtErrors {
     #[error("Serialization error: {0}")]
     SerializationError(#[from] serde_json::Error),
     #[error("Invalid secret")]
-    InvalidSecret
+    InvalidSecret,
 }
 
 pub fn create_jwt_token<T: Clone>(data: T, secret: &str, expiration: Duration) -> Result<String, JwtErrors>
 where
-    T: Serialize
+    T: Serialize,
 {
     if secret.is_empty() {
         return Err(JwtErrors::InvalidSecret);
@@ -36,7 +36,7 @@ where
     let claims = Claims {
         exp: (Utc::now() + expiration).timestamp() as usize,
         iat: now,
-        data
+        data,
     };
 
     let token = encode(&header, &claims, &encoding_key)?;
@@ -45,7 +45,7 @@ where
 
 pub fn decode_jwt_token<T: Clone>(token: &str, secret: &str) -> Result<T, JwtErrors>
 where
-    T: for<'de> Deserialize<'de>
+    T: for<'de> Deserialize<'de>,
 {
     if secret.is_empty() {
         return Err(JwtErrors::InvalidSecret);
@@ -60,7 +60,7 @@ where
 
 pub fn decode_jwt_token_without_validation<T: Clone>(token: &str) -> Result<T, JwtErrors>
 where
-    T: for<'de> Deserialize<'de>
+    T: for<'de> Deserialize<'de>,
 {
     let mut validation = Validation::new(Algorithm::HS256);
     #[allow(deprecated)]

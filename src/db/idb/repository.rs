@@ -10,13 +10,13 @@ use idb::{Database, KeyRange, Query, TransactionMode};
 pub trait IdbRepository<T, I>: Send + Sync + Repository<T, I>
 where
     T: Send + Sync + IdbTable<I>,
-    I: Send + Sync + IdbId
+    I: Send + Sync + IdbId,
 {
     async fn get_db(&self) -> PoolResponse<NeverSend<Database>>;
 
     async fn create(&self, item: T) -> Resolve<T>
     where
-        T: 'async_trait
+        T: 'async_trait,
     {
         let table_name = T::get_table();
 
@@ -73,7 +73,7 @@ where
                 let id = IdbId::into_query_value(id)?;
                 Some(id)
             }
-            None => None
+            None => None,
         };
 
         let to_id = match to {
@@ -81,7 +81,7 @@ where
                 let to_id = IdbId::into_query_value(to_id)?;
                 Some(to_id)
             }
-            None => None
+            None => None,
         };
 
         let range_query = match (from_id, to_id) {
@@ -90,7 +90,7 @@ where
             }
             (Some(from_id), None) => Some(Query::KeyRange(KeyRange::lower_bound(&from_id, Some(false))?)),
             (None, Some(to_id)) => Some(Query::KeyRange(KeyRange::upper_bound(&to_id, Some(false))?)),
-            (None, None) => None
+            (None, None) => None,
         };
 
         let transaction = db.transaction(&[table_name], TransactionMode::ReadOnly)?;
@@ -110,7 +110,7 @@ where
                     log::error!("Error deserializing record: {:?}", e);
                     None
                 }
-                (Ok(key), Ok(record)) => Some((key, record))
+                (Ok(key), Ok(record)) => Some((key, record)),
             })
             .collect())
     }
@@ -134,7 +134,7 @@ where
 
     async fn update_one(&self, item: T) -> Resolve<T>
     where
-        T: 'async_trait
+        T: 'async_trait,
     {
         let id = IdbTable::id(&item);
         let table_name = T::get_table();
@@ -142,7 +142,7 @@ where
         let Some(record) = IdbRepository::find_one(self, &id).await? else {
             return Err(RepositoryError::NotFound(
                 table_name.to_owned(),
-                format!("{:?}", IdbTable::id(&item))
+                format!("{:?}", IdbTable::id(&item)),
             ));
         };
 
@@ -169,18 +169,18 @@ impl<X, T, I> Repository<T, I> for X
 where
     X: IdbRepository<T, I> + Send + Sync,
     T: Send + Sync + IdbTable<I> + Clone,
-    I: Send + Sync + IdbId + Clone
+    I: Send + Sync + IdbId + Clone,
 {
     async fn create(&self, data: T) -> Resolve<T>
     where
-        T: 'async_trait
+        T: 'async_trait,
     {
         IdbRepository::create(self, data).await
     }
 
     async fn update_one(&self, data: T) -> Resolve<T>
     where
-        T: 'async_trait
+        T: 'async_trait,
     {
         IdbRepository::update_one(self, data).await
     }
