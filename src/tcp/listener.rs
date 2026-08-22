@@ -11,7 +11,7 @@ use tonic::transport::server::TcpIncoming;
 pub struct GrpcConnection {
     pub listener: TcpIncoming,
     pub port: u16,
-    pub public_host: String // The host of this service that is available for others to connect
+    pub public_host: String, // The host of this service that is available for others to connect
 }
 
 pub async fn find_grpc_listener(from: Option<u16>) -> Resolve<GrpcConnection> {
@@ -75,14 +75,14 @@ pub async fn find_grpc_listener(from: Option<u16>) -> Resolve<GrpcConnection> {
         port,
         public_host: env::var("SERVICE_HOST")
             .map(|it| it.parse().expect("SERVICE_HOST must be string"))
-            .unwrap_or("host.docker.internal".to_owned())
+            .unwrap_or("host.docker.internal".to_owned()),
     })
 }
 
 pub struct TcpConnection {
     pub listener: TokioTcpListener,
     pub port: u16,
-    pub public_host: String // The host of this service that is available for others to connect
+    pub public_host: String, // The host of this service that is available for others to connect
 }
 
 pub async fn find_tcp_listener(from: Option<u16>) -> Resolve<TcpConnection> {
@@ -145,7 +145,7 @@ pub async fn find_tcp_listener(from: Option<u16>) -> Resolve<TcpConnection> {
     Ok(TcpConnection {
         listener,
         port,
-        public_host: env::var("SERVICE_HOST").unwrap_or_else(|_| "host.docker.internal".to_owned())
+        public_host: env::var("SERVICE_HOST").unwrap_or_else(|_| "host.docker.internal".to_owned()),
     })
 }
 
@@ -184,14 +184,14 @@ pub async fn bind_tcp_listener(port: u16) -> Resolve<TcpConnection> {
     Ok(TcpConnection {
         listener,
         port,
-        public_host: env::var("SERVICE_HOST").unwrap_or_else(|_| "host.docker.internal".to_owned())
+        public_host: env::var("SERVICE_HOST").unwrap_or_else(|_| "host.docker.internal".to_owned()),
     })
 }
 
 pub struct UdpConnection {
     pub socket: UdpSocket,
     pub port: u16,
-    pub public_host: String // The host of this service that is available for others to connect
+    pub public_host: String, // The host of this service that is available for others to connect
 }
 
 pub async fn find_udp_socket(from: Option<u16>) -> Resolve<UdpConnection> {
@@ -247,6 +247,6 @@ pub async fn find_udp_socket(from: Option<u16>) -> Resolve<UdpConnection> {
         port,
         public_host: env::var("SERVICE_HOST")
             .map(|it| it.parse().expect("SERVICE_HOST must be string"))
-            .unwrap_or("host.docker.internal".to_owned())
+            .unwrap_or("host.docker.internal".to_owned()),
     })
 }

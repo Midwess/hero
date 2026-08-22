@@ -9,7 +9,7 @@ pub const SUBSCRIBER_MOD: i32 = 100_000_000;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RegionCodeError {
-    OutOfRange { value: i32, min: i32, max: i32 }
+    OutOfRange { value: i32, min: i32, max: i32 },
 }
 
 impl fmt::Display for RegionCodeError {
@@ -29,7 +29,7 @@ pub fn generate_phone_number(region_code: i32) -> Result<i64, RegionCodeError> {
         return Err(RegionCodeError::OutOfRange {
             value: region_code,
             min: REGION_CODE_MIN,
-            max: REGION_CODE_MAX
+            max: REGION_CODE_MAX,
         });
     }
     let subscriber = rand::rng().random_range(0..SUBSCRIBER_MOD);
@@ -59,7 +59,7 @@ mod tests {
             0,
             -1,
             i32::MIN,
-            i32::MAX
+            i32::MAX,
         ] {
             let err = generate_phone_number(v).unwrap_err();
             assert_eq!(
@@ -86,7 +86,7 @@ mod tests {
             REGION_CODE_MIN,
             3548,
             7721,
-            REGION_CODE_MAX
+            REGION_CODE_MAX,
         ] {
             for _ in 0..50 {
                 let phone = generate_phone_number(region).unwrap();

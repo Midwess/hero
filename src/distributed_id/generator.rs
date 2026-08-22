@@ -16,14 +16,14 @@ pub enum DistributedIdError {
     #[error("Coordinator error: {0}")]
     Coordinator(String),
     #[error("Worker id space exhausted in namespace {0}")]
-    WorkerIdsExhausted(String)
+    WorkerIdsExhausted(String),
 }
 
 #[derive(Debug, Clone)]
 pub struct Worker {
     pub distributed_id: u64,
     pub name: String,
-    pub created_at: DateTime<Utc>
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug)]
@@ -31,7 +31,7 @@ pub struct DistributedIdGenerator {
     pub worker: Worker,
     pub last_timestamp: u64,
     // Sequence counter for IDs generated in that same ms
-    pub sequence: u64
+    pub sequence: u64,
 }
 
 impl DistributedIdGenerator {
@@ -39,7 +39,7 @@ impl DistributedIdGenerator {
         Self {
             worker,
             last_timestamp: 0,
-            sequence: 0
+            sequence: 0,
         }
     }
 
@@ -48,10 +48,10 @@ impl DistributedIdGenerator {
             worker: Worker {
                 distributed_id: (MAX_WORKER_ID - 1) as u64,
                 name: app_name.clone(),
-                created_at: Utc::now()
+                created_at: Utc::now(),
             },
             last_timestamp: 0,
-            sequence: 0
+            sequence: 0,
         }
     }
 
@@ -60,10 +60,10 @@ impl DistributedIdGenerator {
             worker: Worker {
                 distributed_id: id as u64,
                 name: name.clone(),
-                created_at: Utc::now()
+                created_at: Utc::now(),
             },
             last_timestamp: 0,
-            sequence: 0
+            sequence: 0,
         }
     }
 
@@ -121,13 +121,13 @@ mod tests {
         let worker = Worker {
             distributed_id: 42,
             name: "test_worker".to_string(),
-            created_at: Utc::now()
+            created_at: Utc::now(),
         };
 
         let mut generator = DistributedIdGenerator {
             worker,
             last_timestamp: 0,
-            sequence: 0
+            sequence: 0,
         };
 
         let first_id = generator.next_id().await?;
@@ -150,13 +150,13 @@ mod tests {
         let worker = Worker {
             distributed_id: 1,
             name: "rollover_test".to_string(),
-            created_at: Utc::now()
+            created_at: Utc::now(),
         };
 
         let mut generator = DistributedIdGenerator {
             worker,
             last_timestamp: 1000,       // pretend we're at "second 1000"
-            sequence: MAX_ID_IN_MS - 1  // about to overflow
+            sequence: MAX_ID_IN_MS - 1, // about to overflow
         };
 
         let first_id = generator.next_id().await?;

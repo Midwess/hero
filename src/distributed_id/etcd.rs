@@ -19,7 +19,7 @@ use tokio::task::JoinHandle;
 pub struct EtcdWorkerOptions {
     pub endpoints: Vec<String>,
     pub namespace: String,
-    pub lease_ttl: Duration
+    pub lease_ttl: Duration,
 }
 
 impl Default for EtcdWorkerOptions {
@@ -27,7 +27,7 @@ impl Default for EtcdWorkerOptions {
         Self {
             endpoints: vec!["http://localhost:2379".to_string()],
             namespace: "snowflake".to_string(),
-            lease_ttl: Duration::from_secs(30)
+            lease_ttl: Duration::from_secs(30),
         }
     }
 }
@@ -65,7 +65,7 @@ impl EtcdWorkerOptions {
 
         if endpoints.is_empty() {
             return Err(DistributedIdError::InvalidConfig(
-                "SNOWFLAKE_ETCD_ENDPOINTS must include at least one http(s) endpoint".into()
+                "SNOWFLAKE_ETCD_ENDPOINTS must include at least one http(s) endpoint".into(),
             ));
         }
 
@@ -156,7 +156,7 @@ pub struct WorkerLeaseGuard {
     key: Arc<RwLock<String>>,
     worker_id: Arc<AtomicU16>,
     keep_alive_task: Arc<TokioMutex<Option<JoinHandle<()>>>>,
-    app_name: String
+    app_name: String,
 }
 
 const MAX_RECONNECT_DELAY: Duration = Duration::from_secs(60);
@@ -171,7 +171,7 @@ impl WorkerLeaseGuard {
         keep_alive_interval: Duration,
         endpoints: Vec<String>,
         app_name: String,
-        options: EtcdWorkerOptions
+        options: EtcdWorkerOptions,
     ) -> Result<Self, DistributedIdError> {
         let mut keep_alive_client = client.clone();
         // Keep the keeper so we can call its `keep_alive` method periodically.
@@ -229,7 +229,7 @@ impl WorkerLeaseGuard {
                         &app_name_clone,
                         &options_clone,
                         &key_task,
-                        &worker_id_task
+                        &worker_id_task,
                     )
                     .await
                     {
@@ -283,7 +283,7 @@ impl WorkerLeaseGuard {
                             &app_name_clone,
                             &options_clone,
                             &key_task,
-                            &worker_id_task
+                            &worker_id_task,
                         )
                         .await
                         {
@@ -321,7 +321,7 @@ impl WorkerLeaseGuard {
                             &app_name_clone,
                             &options_clone,
                             &key_task,
-                            &worker_id_task
+                            &worker_id_task,
                         )
                         .await
                         {
@@ -349,7 +349,7 @@ impl WorkerLeaseGuard {
             key: key_shared,
             worker_id: worker_id_shared,
             keep_alive_task: Arc::new(TokioMutex::new(Some(keep_alive_task))),
-            app_name
+            app_name,
         })
     }
 
@@ -360,7 +360,7 @@ impl WorkerLeaseGuard {
 
 enum ReconnectResult {
     Success,
-    Failed
+    Failed,
 }
 
 async fn try_reconnect(
@@ -374,7 +374,7 @@ async fn try_reconnect(
     app_name: &str,
     options: &EtcdWorkerOptions,
     key_shared: &Arc<RwLock<String>>,
-    worker_id_shared: &Arc<AtomicU16>
+    worker_id_shared: &Arc<AtomicU16>,
 ) -> ReconnectResult {
     const MAX_RECONNECT_ATTEMPTS: u32 = 10;
 
@@ -500,7 +500,7 @@ impl Drop for WorkerLeaseGuard {
 
 pub async fn register_worker(
     app_name: &str,
-    mut options: EtcdWorkerOptions
+    mut options: EtcdWorkerOptions,
 ) -> Result<(Worker, WorkerLeaseGuard), DistributedIdError> {
     options.normalize();
     options.validate()?;
@@ -528,14 +528,14 @@ pub async fn register_worker(
         options.keep_alive_interval(),
         options.endpoints.clone(),
         app_name.to_string(),
-        options.clone()
+        options.clone(),
     )
     .await?;
 
     let worker = Worker {
         distributed_id: worker_id as u64,
         name: app_name.to_owned(),
-        created_at: Utc::now()
+        created_at: Utc::now(),
     };
 
     Ok((worker, guard))
@@ -545,7 +545,7 @@ async fn allocate_worker_id(
     client: &mut Client,
     app_name: &str,
     options: &EtcdWorkerOptions,
-    lease_id: i64
+    lease_id: i64,
 ) -> Result<(u16, String), DistributedIdError> {
     let prefix = options.workers_prefix(app_name);
 

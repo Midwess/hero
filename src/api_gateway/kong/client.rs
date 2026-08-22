@@ -9,7 +9,7 @@ use crate::api_gateway::client::ApiGatewayClient;
 use crate::api_gateway::service::{GatewayRoute, GatewayService};
 
 pub struct KongGatewayAdminClient {
-    url: String
+    url: String,
 }
 
 impl KongGatewayAdminClient {
@@ -68,7 +68,7 @@ impl KongGatewayAdminClient {
                     // Get the existing CORS plugin ID
                     let plugins_resp =
                         client.get(format!("{kong_url}/services/{}/plugins", service_name)).send().await.map_err(
-                            |it| Errors::UnnableToRegisterApiGateway(format!("Unable to get plugins: {it}"))
+                            |it| Errors::UnnableToRegisterApiGateway(format!("Unable to get plugins: {it}")),
                         )?;
 
                     let plugins: serde_json::Value = plugins_resp.json().await.map_err(|it| {
@@ -89,10 +89,10 @@ impl KongGatewayAdminClient {
 
                     // Update the existing plugin
                     client.patch(format!("{kong_url}/plugins/{}", plugin_id)).json(&cors_config).send().await.map_err(
-                        |it| Errors::UnnableToRegisterApiGateway(format!("Unable to update CORS plugin: {it}"))
+                        |it| Errors::UnnableToRegisterApiGateway(format!("Unable to update CORS plugin: {it}")),
                     )?
                 }
-                _ => resp
+                _ => resp,
             };
 
             if !resp.status().is_success() {
@@ -209,7 +209,7 @@ impl KongGatewayAdminClient {
         &self,
         service_name: String,
         route: &GatewayRoute,
-        enable_web: bool
+        enable_web: bool,
     ) -> Resolve<()> {
         let kong_url = self.url.clone();
         let client = reqwest::Client::new();
@@ -267,7 +267,7 @@ impl KongGatewayAdminClient {
     async fn handle_request_transformer_plugin(
         &self,
         service_name: String,
-        request_headers: &HashMap<String, String>
+        request_headers: &HashMap<String, String>,
     ) -> Resolve<()> {
         let kong_url = self.url.clone();
         let client = reqwest::Client::new();
@@ -297,7 +297,7 @@ impl KongGatewayAdminClient {
                 StatusCode::CONFLICT => {
                     let plugins_resp =
                         client.get(format!("{kong_url}/services/{}/plugins", service_name)).send().await.map_err(
-                            |it| Errors::UnnableToRegisterApiGateway(format!("Unable to get plugins: {it}"))
+                            |it| Errors::UnnableToRegisterApiGateway(format!("Unable to get plugins: {it}")),
                         )?;
 
                     let plugins: serde_json::Value = plugins_resp.json().await.map_err(|it| {
@@ -314,7 +314,7 @@ impl KongGatewayAdminClient {
                         })
                         .ok_or_else(|| {
                             Errors::UnnableToRegisterApiGateway(
-                                "request-transformer plugin exists but ID not found".to_owned()
+                                "request-transformer plugin exists but ID not found".to_owned(),
                             )
                         })?;
 
@@ -329,7 +329,7 @@ impl KongGatewayAdminClient {
                             ))
                         })?
                 }
-                _ => resp
+                _ => resp,
             };
 
             if !resp.status().is_success() {
@@ -362,7 +362,7 @@ impl KongGatewayAdminClient {
                                                 "Failed to delete request-transformer plugin {}: {it}",
                                                 plugin_id
                                             ))
-                                        }
+                                        },
                                     )?;
                             }
                         }
@@ -393,7 +393,7 @@ impl KongGatewayAdminClient {
                 .send()
                 .await
                 .map_err(|it| Errors::UnnableToRegisterApiGateway(format!("Unable to register route {it}")))?,
-            _ => resp
+            _ => resp,
         };
 
         if !resp.status().is_success() {
@@ -489,7 +489,7 @@ impl ApiGatewayClient for KongGatewayAdminClient {
                 .map_err(|it| {
                     Errors::UnnableToRegisterApiGateway(format!("Unable to register service, failed to update {it}"))
                 })?,
-            _ => resp
+            _ => resp,
         };
 
         if !resp.status().is_success() {
@@ -543,7 +543,7 @@ async fn delete_plugins_under(client: &reqwest::Client, plugins_url: &str) {
 
     let base = match base {
         Some(b) => b,
-        None => return
+        None => return,
     };
 
     for plugin in items {

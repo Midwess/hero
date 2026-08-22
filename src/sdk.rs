@@ -11,7 +11,7 @@ pub trait DependenciesInjection {
 
 pub struct DevlogSdk {
     #[cfg(feature = "s3")]
-    s3_client: OnceCell<S3Client>
+    s3_client: OnceCell<S3Client>,
 }
 
 impl Default for DevlogSdk {
@@ -24,7 +24,7 @@ impl DevlogSdk {
     pub fn new() -> Self {
         Self {
             #[cfg(feature = "s3")]
-            s3_client: OnceCell::new()
+            s3_client: OnceCell::new(),
         }
     }
 }
@@ -59,7 +59,7 @@ impl DependenciesInjection for DevlogSdk {
         let client = Client::from_conf(s3_config_builder.build());
 
         let s3_client = S3Client {
-            client: Arc::new(client)
+            client: Arc::new(client),
         };
 
         let _ = self.s3_client.set(s3_client.clone());

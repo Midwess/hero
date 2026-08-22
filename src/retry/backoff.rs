@@ -10,7 +10,7 @@ pub async fn with_capped_backoff<F, Fut, T, E>(initial: Duration, max: Duration,
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T, E>>,
-    E: Display
+    E: Display,
 {
     let mut delay = initial;
     loop {

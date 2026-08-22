@@ -19,7 +19,7 @@ pub struct GatewayService {
     #[serde(skip_serializing, skip_deserializing)]
     pub enable_cors: bool,
     #[serde(skip_serializing, skip_deserializing)]
-    pub request_headers: HashMap<String, String>
+    pub request_headers: HashMap<String, String>,
 }
 
 impl GatewayService {
@@ -38,7 +38,7 @@ pub struct GatewayServiceBuilder {
     pub write_timeout: Option<u32>,
     pub read_timeout: Option<u32>,
     pub enable_cors: bool,
-    pub request_headers: HashMap<String, String>
+    pub request_headers: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone)]
@@ -87,7 +87,7 @@ pub struct GatewayRoute {
     pub is_public: bool,
     pub enable_grpc_web: bool,
     pub request_buffering: bool,
-    pub response_buffering: bool
+    pub response_buffering: bool,
 }
 
 impl GatewayRoute {
@@ -195,7 +195,7 @@ pub struct GatewayRouteBuilder {
     pub enable_web_cors: bool,
     pub request_buffering: bool,
     pub response_buffering: bool,
-    pub headers: HashMap<String, Vec<String>>
+    pub headers: HashMap<String, Vec<String>>,
 }
 
 impl GatewayRouteBuilder {
@@ -298,11 +298,11 @@ impl GatewayRouteBuilder {
 
         self.methods = Some(
             [
-                "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "CONNECT", "TRACE", "OPTIONS"
+                "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "CONNECT", "TRACE", "OPTIONS",
             ]
             .iter()
             .map(|s| s.to_string())
-            .collect()
+            .collect(),
         );
 
         self
@@ -318,7 +318,7 @@ impl GatewayRouteBuilder {
                     "application/grpc".to_owned(),
                     "application/grpc+proto".to_owned(),
                     "application/grpc+json".to_owned(),
-                ]
+                ],
             );
         }
 
@@ -345,7 +345,7 @@ impl GatewayRouteBuilder {
             is_public: self.is_public.unwrap_or(true),
             enable_grpc_web: self.enable_grpc_web,
             response_buffering: self.response_buffering,
-            request_buffering: self.request_buffering
+            request_buffering: self.request_buffering,
         }
     }
 }
@@ -433,7 +433,7 @@ impl GatewayServiceBuilder {
             write_timeout: self.write_timeout,
             read_timeout: self.read_timeout,
             enable_cors: self.enable_cors,
-            request_headers: self.request_headers
+            request_headers: self.request_headers,
         }
     }
 }

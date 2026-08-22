@@ -9,7 +9,7 @@ pub struct KongGatewayConfig {
     pub port: u16,
     pub public_host: String,
     pub public_port: u16,
-    pub public_with_ssl: bool
+    pub public_with_ssl: bool,
 }
 
 impl Default for KongGatewayConfig {
@@ -21,7 +21,7 @@ impl Default for KongGatewayConfig {
             port: env::var("KONG_GATEWAY_PORT").unwrap_or("8000".to_owned()).parse().unwrap_or(8000),
             public_host: env::var("PUBLIC_GATEWAY_HOST").unwrap_or("localhost".to_owned()),
             public_port: env::var("PUBLIC_GATEWAY_PORT").ok().and_then(|it| it.parse().ok()).unwrap_or(8000),
-            public_with_ssl: env::var("PUBLIC_GATEWAY_WITH_SSL").ok().and_then(|it| it.parse().ok()).unwrap_or(false)
+            public_with_ssl: env::var("PUBLIC_GATEWAY_WITH_SSL").ok().and_then(|it| it.parse().ok()).unwrap_or(false),
         }
     }
 }
@@ -38,7 +38,7 @@ impl KongGatewayConfig {
 
 pub struct Config {
     pub kong: KongGatewayConfig,
-    pub environment: String
+    pub environment: String,
 }
 
 impl Default for Config {
@@ -46,7 +46,7 @@ impl Default for Config {
         let environment = env::var("ENVIRONMENT").unwrap_or("development".to_owned());
         Self {
             kong: KongGatewayConfig::default(),
-            environment
+            environment,
         }
     }
 }

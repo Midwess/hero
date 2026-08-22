@@ -14,12 +14,7 @@ pub use etcd::EtcdWorkerOptions;
 
 pub use generator::EPOCH_SINCE;
 pub use scoped::{
-    format_phone_number,
-    generate_phone_number,
-    RegionCodeError,
-    REGION_CODE_MAX,
-    REGION_CODE_MIN,
-    SUBSCRIBER_MOD
+    format_phone_number, generate_phone_number, RegionCodeError, REGION_CODE_MAX, REGION_CODE_MIN, SUBSCRIBER_MOD,
 };
 
 pub static DISTRIBUTED_ID_GENERATOR: OnceCell<Arc<Mutex<DistributedIdGenerator>>> = OnceCell::const_new();
@@ -44,7 +39,7 @@ pub fn id_to_unix_timestamp(id: u64) -> u64 {
 #[cfg(any(feature = "distributed_id"))]
 pub async fn init_id_generator(
     app_name: String,
-    options: EtcdWorkerOptions
+    options: EtcdWorkerOptions,
 ) -> Result<(), generator::DistributedIdError> {
     if DISTRIBUTED_ID_GENERATOR.get().is_some() {
         return Ok(());
