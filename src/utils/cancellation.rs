@@ -5,6 +5,10 @@ use std::fmt::Debug;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
+tokio::task_local! {
+    static CANCELLATION_SCOPE: (CancellationToken, Option<CancellationToken>);
+}
+
 #[derive(Debug, Default)]
 struct CancelState {
     cancelled: AtomicBool,
@@ -58,6 +62,90 @@ impl Drop for CancellationToken {
 }
 
 impl CancellationToken {
+    /// Return the token installed by the active cancellation scope.
+    pub fn current() -> Result<Self, TaskErrors> {
+        CANCELLATION_SCOPE
+            .try_with(|(token, _)| token.clone())
+            .map_err(|_| TaskErrors::MissingCancellationScope)
+    }
+
+    /// Return the active token, or create an independent token outside a scope.
+    ///
+    /// The fallback is not installed as a scope. Separate calls outside a scope
+    /// return separate tokens.
+    pub fn current_or_new() -> Self {
+        Self::current().unwrap_or_default()
+    }
+
+    /// Return the enclosing scope's token, if this scope has a parent.
+    ///
+    /// This describes scope nesting, not the ancestry of an arbitrary token.
+    pub fn parent() -> Option<Self> {
+        CANCELLATION_SCOPE.try_with(|(_, parent)| parent.clone()).ok().flatten()
+    }
+
+    /// Install this token while the supplied future is polled or dropped.
+    ///
+    /// Captures the enclosing scope when called. Awaited calls see this token;
+    /// independently spawned tasks must use `spawn_scoped` or an explicit scope.
+    /// Exiting restores the enclosing scope without cancelling this token.
+    ///
+    /// ```
+    /// use core_services::utils::cancellation::CancellationToken;
+    ///
+    /// # futures::executor::block_on(async {
+    /// let token = CancellationToken::current_or_new();
+    /// token.scope(async {
+    ///     let current = CancellationToken::current().unwrap();
+    ///     CancellationToken::child_scope(async {
+    ///         assert!(CancellationToken::parent().is_some());
+    ///     }).unwrap().await;
+    ///     assert!(!current.is_cancelled());
+    /// }).await;
+    /// # });
+    /// ```
+    pub fn scope<F: Future>(self, future: F) -> impl Future<Output = F::Output> {
+        let parent = Self::current().ok();
+        CANCELLATION_SCOPE.scope((self, parent), future)
+    }
+
+    /// Create a child of the current token and scope the supplied future to it.
+    ///
+    /// Captures the parent when called, before the future is polled or spawned.
+    /// The child and its descendants are cancelled on completion, panic, or drop.
+    /// This signals cancellation; child work must observe its token to stop.
+    /// Outside a scope this returns `MissingCancellationScope`; install an
+    /// explicit root with `current_or_new().scope(...)` when a fallback is wanted.
+    pub fn child_scope<F: Future>(future: F) -> Result<impl Future<Output = F::Output>, TaskErrors> {
+        let parent = Self::current()?;
+        let token = parent.child_token();
+        let guard = token.drop_guard();
+        Ok(CANCELLATION_SCOPE.scope((token, Some(parent)), async move {
+            let _guard = guard;
+            future.await
+        }))
+    }
+
+    /// Spawn a task in a child scope captured from the current scope.
+    #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
+    pub fn spawn_scoped<F>(future: F) -> Result<JoinHandle<F::Output>, TaskErrors>
+    where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        Ok(spawn(Self::child_scope(future)?))
+    }
+
+    /// Spawn a browser task in a child scope captured from the current scope.
+    #[cfg(all(target_family = "wasm", target_os = "unknown"))]
+    pub fn spawn_scoped<F>(future: F) -> Result<JoinHandle<F::Output>, TaskErrors>
+    where
+        F: Future + 'static,
+        F::Output: 'static,
+    {
+        Ok(spawn(Self::child_scope(future)?))
+    }
+
     pub fn new() -> Self {
         Self {
             state: Arc::new(CancelState {
@@ -213,6 +301,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum TaskErrors {
+    #[error("No cancellation scope is active")]
+    MissingCancellationScope,
     #[error("Task cancelled")]
     Cancelled,
 }
@@ -246,6 +336,224 @@ mod tests {
     use super::*;
     use futures::task::{waker_ref, ArcWake};
     use std::sync::atomic::AtomicUsize;
+
+    #[test]
+    fn missing_scope_and_fallback_tokens_are_explicit() {
+        assert!(matches!(
+            CancellationToken::current(),
+            Err(TaskErrors::MissingCancellationScope)
+        ));
+        assert!(CancellationToken::parent().is_none());
+        assert!(matches!(
+            CancellationToken::child_scope(async {}),
+            Err(TaskErrors::MissingCancellationScope)
+        ));
+        let first = CancellationToken::current_or_new();
+        let second = CancellationToken::current_or_new();
+        first.cancel();
+        assert!(!second.is_cancelled());
+        assert!(CancellationToken::current().is_err());
+    }
+
+    #[test]
+    fn current_or_new_shares_the_scoped_token() {
+        let root = CancellationToken::new();
+        futures::executor::block_on(root.clone().scope(async {
+            CancellationToken::current_or_new().cancel();
+            assert!(CancellationToken::current().unwrap().is_cancelled());
+            assert!(CancellationToken::current_or_new().is_cancelled());
+            assert!(CancellationToken::parent().is_none());
+        }));
+        assert!(root.is_cancelled());
+        assert!(CancellationToken::current().is_err());
+    }
+
+    #[test]
+    fn nested_scopes_restore_the_enclosing_token() {
+        let root = CancellationToken::new();
+        let nested = CancellationToken::new();
+        futures::executor::block_on(root.clone().scope(async {
+            nested
+                .clone()
+                .scope(async {
+                    assert!(Arc::ptr_eq(&CancellationToken::current().unwrap().state, &nested.state));
+                    assert!(Arc::ptr_eq(&CancellationToken::parent().unwrap().state, &root.state));
+                })
+                .await;
+            assert!(Arc::ptr_eq(&CancellationToken::current().unwrap().state, &root.state));
+            assert!(CancellationToken::parent().is_none());
+        }));
+        assert!(CancellationToken::current().is_err());
+        assert!(!root.is_cancelled());
+        assert!(!nested.is_cancelled());
+    }
+
+    #[test]
+    fn child_scope_completion_cancels_descendants_but_not_siblings_or_parent() {
+        let root = CancellationToken::new();
+        let sibling = root.child_token();
+        let (child, descendant) = futures::executor::block_on(root.clone().scope(async {
+            CancellationToken::child_scope(async {
+                let child = CancellationToken::current().unwrap();
+                assert!(Arc::ptr_eq(&CancellationToken::parent().unwrap().state, &root.state));
+                let descendant = child.child_token();
+                (child, descendant)
+            })
+            .unwrap()
+            .await
+        }));
+        assert!(child.is_cancelled());
+        assert!(descendant.is_cancelled());
+        assert!(!root.is_cancelled());
+        assert!(!sibling.is_cancelled());
+    }
+
+    #[test]
+    fn parent_cancellation_reaches_the_scoped_child() {
+        let root = CancellationToken::new();
+        futures::executor::block_on(root.clone().scope(async {
+            CancellationToken::child_scope(async {
+                let child = CancellationToken::current().unwrap();
+                root.cancel();
+                child.cancelled().await;
+                assert!(child.is_cancelled());
+            })
+            .unwrap()
+            .await;
+        }));
+    }
+
+    #[test]
+    fn dropping_an_unpolled_child_scope_cancels_its_token() {
+        let root = CancellationToken::new();
+        futures::executor::block_on(root.clone().scope(async {
+            let child = CancellationToken::child_scope(futures::future::pending::<()>()).unwrap();
+            let child_state = root.state.children.lock()[0].upgrade().unwrap();
+            drop(child);
+            assert!(child_state.cancelled.load(Ordering::Acquire));
+            assert!(Arc::ptr_eq(&CancellationToken::current().unwrap().state, &root.state));
+        }));
+        assert!(!root.is_cancelled());
+    }
+
+    #[test]
+    fn dropping_a_suspended_child_scope_cancels_and_restores_context() {
+        let root = CancellationToken::new();
+        futures::executor::block_on(root.clone().scope(async {
+            let observed = std::cell::RefCell::new(None);
+            let mut scoped = Box::pin(
+                CancellationToken::child_scope(async {
+                    *observed.borrow_mut() = Some(CancellationToken::current().unwrap());
+                    futures::future::pending::<()>().await;
+                })
+                .unwrap(),
+            );
+            assert!(futures::poll!(&mut scoped).is_pending());
+            assert!(Arc::ptr_eq(&CancellationToken::current().unwrap().state, &root.state));
+            drop(scoped);
+            assert!(observed.borrow().as_ref().unwrap().is_cancelled());
+        }));
+        assert!(CancellationToken::current().is_err());
+        assert!(!root.is_cancelled());
+    }
+
+    #[test]
+    fn panicking_child_scope_cancels_and_restores_context() {
+        let root = CancellationToken::new();
+        futures::executor::block_on(root.clone().scope(async {
+            let observed = std::cell::RefCell::new(None);
+            let scoped = CancellationToken::child_scope(async {
+                *observed.borrow_mut() = Some(CancellationToken::current().unwrap());
+                panic!("scope panic");
+            })
+            .unwrap();
+            assert!(std::panic::AssertUnwindSafe(scoped).catch_unwind().await.is_err());
+            assert!(observed.borrow().as_ref().unwrap().is_cancelled());
+            assert!(Arc::ptr_eq(&CancellationToken::current().unwrap().state, &root.state));
+        }));
+        assert!(!root.is_cancelled());
+    }
+
+    #[test]
+    fn interleaved_scopes_keep_separate_tokens_across_awaits() {
+        let first = CancellationToken::new();
+        let second = CancellationToken::new();
+        futures::executor::block_on(async {
+            let one = first.clone().scope(async {
+                let mut pending = true;
+                futures::future::poll_fn(|cx| {
+                    assert!(Arc::ptr_eq(&CancellationToken::current().unwrap().state, &first.state));
+                    if std::mem::take(&mut pending) {
+                        cx.waker().wake_by_ref();
+                        std::task::Poll::Pending
+                    } else {
+                        std::task::Poll::Ready(())
+                    }
+                })
+                .await;
+                CancellationToken::current().unwrap().cancel();
+            });
+            let two = second.clone().scope(async {
+                let mut pending = true;
+                futures::future::poll_fn(|cx| {
+                    assert!(Arc::ptr_eq(&CancellationToken::current().unwrap().state, &second.state));
+                    if std::mem::take(&mut pending) {
+                        cx.waker().wake_by_ref();
+                        std::task::Poll::Pending
+                    } else {
+                        std::task::Poll::Ready(())
+                    }
+                })
+                .await;
+                assert!(!CancellationToken::current().unwrap().is_cancelled());
+            });
+            futures::join!(one, two);
+        });
+        assert!(first.is_cancelled());
+        assert!(!second.is_cancelled());
+        assert!(CancellationToken::current().is_err());
+    }
+
+    #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
+    #[test]
+    fn spawned_tasks_inherit_a_child_scope_and_abort_cancels_it() {
+        let runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(2).build().unwrap();
+        runtime.block_on(async {
+            assert!(matches!(
+                CancellationToken::spawn_scoped(async {}),
+                Err(TaskErrors::MissingCancellationScope)
+            ));
+            let root = CancellationToken::new();
+            root.clone()
+                .scope(async {
+                    let expected_parent = root.clone();
+                    let completed = CancellationToken::spawn_scoped(async move {
+                        tokio::task::yield_now().await;
+                        assert!(Arc::ptr_eq(&CancellationToken::parent().unwrap().state, &expected_parent.state));
+                        CancellationToken::current().unwrap()
+                    })
+                    .unwrap()
+                    .await
+                    .unwrap();
+                    assert!(completed.is_cancelled());
+                    assert!(tokio::spawn(async { CancellationToken::current().is_err() }).await.unwrap());
+
+                    let (sender, receiver) = tokio::sync::oneshot::channel();
+                    let running = CancellationToken::spawn_scoped(async move {
+                        sender.send(CancellationToken::current().unwrap()).unwrap();
+                        futures::future::pending::<()>().await;
+                    })
+                    .unwrap();
+                    let child = receiver.await.unwrap();
+                    running.abort();
+                    assert!(running.await.unwrap_err().is_cancelled());
+                    assert!(child.is_cancelled());
+                    assert!(!root.is_cancelled());
+                })
+                .await;
+            assert!(CancellationToken::current().is_err());
+        });
+    }
 
     struct WakeCounter(AtomicUsize);
 
