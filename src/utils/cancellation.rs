@@ -1,3 +1,42 @@
+//! Cancellation: one token per unit of work, linked into a tree, observed by
+//! the work rather than enforced on it.
+//!
+//! A [`CancellationToken`] is a shared flag with waiters. Cloning shares the
+//! flag; [`child_token`](CancellationToken::child_token) makes a new flag the
+//! parent reaches when it cancels. A scope installs a token as the task-local
+//! [`current`](CancellationToken::current) for the future it wraps and keeps
+//! the enclosing one as [`parent`](CancellationToken::parent).
+//!
+//! Cancellation contract:
+//!
+//! - Cancelling is a signal, never a stop. [`cancel`](CancellationToken::cancel) sets the flag, wakes every waiter on
+//!   [`cancelled`](CancellationToken::cancelled), and reaches every descendant, recursively. Work stops only where it
+//!   looks: `is_cancelled`, `cancelled().await`, or [`with_cancel`](FutureExtension::with_cancel), which answers
+//!   [`TaskErrors::Cancelled`] and drops the wrapped future, and answers it without polling when the token was already
+//!   cancelled.
+//! - Cancellation flows down, never up or sideways. A cancelled parent cancels its children and theirs; a cancelled
+//!   child leaves its parent and siblings running. A child made under an already cancelled parent is born cancelled.
+//! - A token cancels at most once and never clears. A second `cancel` does nothing.
+//! - No wakeup is lost. A waiter registered before the flag flips is woken exactly once and finds it set; one
+//!   registered after finds it set without waiting.
+//! - Dropping every handle to a token resolves its `cancelled()` waiters as if it had been cancelled, and detaches its
+//!   children: a parent holds them weakly, they hold nothing back, so they run on as roots, uncancelled.
+//! - A scope is lexical to the future, not to the task. [`scope`](CancellationToken::scope) makes the token `current()`
+//!   while the future is polled and restores the enclosing token when the future completes, panics, or is dropped; it
+//!   never cancels the token it installed. Interleaved scopes on one thread keep their own tokens across awaits. A task
+//!   spawned inside a scope with a runtime's own `spawn` inherits nothing;
+//!   [`spawn_scoped`](CancellationToken::spawn_scoped) inherits by opening a child scope captured at the call.
+//! - [`child_scope`](CancellationToken::child_scope) ties a child token's life to its future: the token is cancelled
+//!   when the future completes, panics, or is dropped, polled or not. [`drop_guard`](CancellationToken::drop_guard) is
+//!   the same rule held by hand; [`DropGuard::disarm`] lets go of it.
+//! - Outside a scope there is no ambient token. `current()` and `child_scope` answer
+//!   [`TaskErrors::MissingCancellationScope`]; [`current_or_new`](CancellationToken::current_or_new) hands out a fresh,
+//!   independent root on every call and installs nothing.
+//! - [`timeout`](CancellationToken::timeout) and [`cancel_after`](CancellationToken::cancel_after) cancel from a
+//!   spawned timer. Dropping the handle `timeout` returned aborts its timer; clones carry no timer and never abort it.
+//! - Equality says nothing: two tokens always compare equal, so containing types can derive it. Serialization carries
+//!   nothing: a deserialized token is a fresh, uncancelled root.
+
 use event_listener::{Event, EventListener};
 use n0_future::task::{spawn, JoinHandle};
 use parking_lot::Mutex;
