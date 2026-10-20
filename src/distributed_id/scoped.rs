@@ -1,15 +1,33 @@
+//! Synthetic phone-number helpers independent of the ID generator.
+//!
+//! These values are useful for test identities and scoped internal identifiers;
+//! they are not real telephone numbers and are generated with a non-cryptographic
+//! random number generator.
+
 use std::error::Error;
 use std::fmt;
 
 use rand::Rng;
 
+/// Smallest accepted four-digit region code.
 pub const REGION_CODE_MIN: i32 = 1000;
+/// Largest accepted region code that keeps formatted values within 12 digits.
 pub const REGION_CODE_MAX: i32 = 9222;
+/// Number of subscriber values available under each region code.
 pub const SUBSCRIBER_MOD: i32 = 100_000_000;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// Validation failure for a synthetic phone-number region.
 pub enum RegionCodeError {
-    OutOfRange { value: i32, min: i32, max: i32 },
+    /// The requested region falls outside Hero's supported inclusive range.
+    OutOfRange {
+        /// Rejected region code.
+        value: i32,
+        /// Inclusive lower bound.
+        min: i32,
+        /// Inclusive upper bound.
+        max: i32,
+    },
 }
 
 impl fmt::Display for RegionCodeError {
@@ -24,6 +42,11 @@ impl fmt::Display for RegionCodeError {
 
 impl Error for RegionCodeError {}
 
+/// Generates a 12-digit synthetic value under a four-digit region.
+///
+/// Generation does not initialize or mutate the global distributed-ID
+/// generator. Collisions remain statistically possible; enforce uniqueness in
+/// storage when the value is used as an identifier.
 pub fn generate_phone_number(region_code: i32) -> Result<i64, RegionCodeError> {
     if !(REGION_CODE_MIN..=REGION_CODE_MAX).contains(&region_code) {
         return Err(RegionCodeError::OutOfRange {
@@ -36,6 +59,10 @@ pub fn generate_phone_number(region_code: i32) -> Result<i64, RegionCodeError> {
     Ok(region_code as i64 * SUBSCRIBER_MOD as i64 + subscriber as i64)
 }
 
+/// Formats a synthetic value as `RRRR-SSSS-SSSS`.
+///
+/// The function assumes the value follows Hero's region/subscriber layout; it
+/// does not validate the range before formatting.
 pub fn format_phone_number(phone: i64) -> String {
     let region = phone / SUBSCRIBER_MOD as i64;
     let subscriber = phone % SUBSCRIBER_MOD as i64;

@@ -1,12 +1,18 @@
+//! A transparent ownership wrapper for values intended to remain local.
+
 use std::ops::{Deref, DerefMut};
 
 /// Marks a value as intentionally local to its current thread.
 ///
 /// This wrapper does not implement `Send` or `Sync` unless the wrapped type
 /// naturally implements those traits.
-pub struct NeverSend<T>(pub T);
+pub struct NeverSend<T>(
+    /// The wrapped value.
+    pub T,
+);
 
 impl<T> NeverSend<T> {
+    /// Consumes the wrapper without cloning the value.
     pub fn into_inner(self) -> T {
         self.0
     }

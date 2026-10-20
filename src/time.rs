@@ -1,3 +1,8 @@
+//! Cross-platform Unix epoch time with microsecond units.
+//!
+//! Native builds use [`std::time::SystemTime`]. WASM builds combine the wall
+//! clock with `Performance.now()` when available, falling back to `Date.now()`.
+
 use std::sync::atomic::AtomicU64;
 use std::sync::Once;
 
@@ -36,6 +41,9 @@ fn epoch_from_js_fallback() -> u64 {
 }
 
 #[cfg(target_arch = "wasm32")]
+/// Returns microseconds elapsed since the Unix epoch.
+///
+/// Browser precision and privacy settings may reduce the effective resolution.
 pub fn epoch_micro() -> u64 {
     use std::sync::atomic::Ordering;
     init_epoch();
@@ -63,6 +71,9 @@ pub fn epoch_micro() -> u64 {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+/// Returns microseconds elapsed since the Unix epoch.
+///
+/// Times before the epoch are represented as zero rather than panicking.
 pub fn epoch_micro() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
 

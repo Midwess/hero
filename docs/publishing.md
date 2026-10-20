@@ -12,8 +12,19 @@ matching `v<version>` GitHub release. Existing crates.io versions are not
 republished. Publishing uses the organization-level `CARGO_REGISTRY_TOKEN`
 secret.
 
+The workflow can also be started manually to repair a missing crates.io or
+GitHub release for the current version. It never uploads a version already
+present in the crates.io index.
+
 Do not reuse or decrease a released version. Changes to `Cargo.toml` that leave
 the package version unchanged do not create a release.
+
+docs.rs builds Hero with every feature enabled for the native default target.
+The versioned documentation bundle additionally builds the complete supported
+`wasm32-unknown-unknown` API with the target-compatible feature set. Public
+items are guarded by `#![deny(missing_docs)]`, while CI treats Rustdoc warnings
+(including broken intra-doc links) as errors. Because crates.io releases are
+immutable, documentation corrections require a patch release.
 
 ## Documentation Bundles
 

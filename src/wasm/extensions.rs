@@ -1,10 +1,15 @@
+//! Conversions between Rust byte containers and browser values.
+
 use bytes::Bytes;
 use js_sys::{Reflect, Uint8Array};
 use wasm_bindgen::JsValue;
 
+/// Converts byte containers into JavaScript `Uint8Array` values.
 pub trait VecExtension {
+    /// Copies the bytes into a JavaScript-owned typed array.
     fn to_uint8_array(&self) -> Uint8Array;
 
+    /// Copies the bytes into a JavaScript value containing a typed array.
     fn to_js_value(&self) -> JsValue {
         self.to_uint8_array().into()
     }
@@ -18,7 +23,9 @@ pub trait VecExtension {
     unsafe fn view_uint8_array(&self) -> Uint8Array;
 }
 
+/// Reads non-standard browser path metadata from uploaded files.
 pub trait FileExtension {
+    /// Returns Chromium's `webkitRelativePath` when a directory upload supplied it.
     fn webkit_path(&self) -> Option<String>;
 }
 

@@ -34,6 +34,8 @@ Use these sources in priority order:
 
 - The public Git repository, release artifacts, and versioned documentation
   bundles may be indexed under the repository's MIT license.
+- docs.rs provides the versioned native API reference with every Cargo feature
+  enabled; documentation bundles add the complete supported WASM API.
 - Never place credentials, internal endpoints, customer data, or other secrets
   in the documentation corpus.
 - Preserve version/revision metadata in derived vector or search indexes.

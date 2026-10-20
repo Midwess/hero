@@ -1,50 +1,82 @@
+//! Low-level Snowflake identifier generation.
+
 use chrono::{DateTime, Utc};
 use futures_timer::Delay;
 use std::time::Duration;
 use thiserror::Error;
 
+/// Unix timestamp in milliseconds used as the ID format's custom epoch.
+///
+/// The value represents `2024-12-29T00:00:00Z`.
 pub const EPOCH_SINCE: u64 = 1735405200000; // 2024-12-29T00:00:00Z
 
+/// Number of sequence values available to one worker per millisecond.
 pub const MAX_ID_IN_MS: u64 = 1024;
 
+/// Largest worker ID representable by the 13-bit worker field.
 pub const MAX_WORKER_ID: u16 = (1 << 13) - 1;
 
 #[derive(Error, Debug)]
+/// Failures from generator initialization, coordination, or clock handling.
 pub enum DistributedIdError {
+    /// No process-global generator has been installed.
     #[error("distributed ID generator is not initialized")]
     NotInitialized,
+    /// The process-global generator or lease guard was initialized twice.
     #[error("distributed ID generator is already initialized")]
     AlreadyInitialized,
+    /// Coordinator settings cannot produce a valid etcd lease.
     #[error("Invalid coordinator configuration: {0}")]
     InvalidConfig(String),
+    /// An etcd operation failed.
     #[error("Coordinator error: {0}")]
     Coordinator(String),
+    /// Every representable worker ID is already reserved.
     #[error("Worker id space exhausted in namespace {0}")]
     WorkerIdsExhausted(String),
+    /// An ID encoded a timestamp that `chrono` cannot represent.
     #[error("invalid timestamp encoded in distributed ID {0}")]
     InvalidTimestamp(u64),
+    /// The system clock is earlier than Hero's custom epoch.
     #[error("system clock is before the distributed ID epoch")]
     ClockBeforeEpoch,
+    /// The clock regressed after at least one ID had been generated.
     #[error("system clock moved backwards from {previous_ms}ms to {current_ms}ms since the epoch")]
-    ClockMovedBackwards { previous_ms: u64, current_ms: u64 },
+    ClockMovedBackwards {
+        /// Previously observed milliseconds since [`EPOCH_SINCE`].
+        previous_ms: u64,
+        /// Current milliseconds since [`EPOCH_SINCE`].
+        current_ms: u64,
+    },
 }
 
 #[derive(Debug, Clone)]
+/// Identity and creation metadata for one generator worker.
 pub struct Worker {
+    /// Worker ID encoded into generated IDs.
     pub distributed_id: u64,
+    /// Human-readable application or worker name.
     pub name: String,
+    /// Time at which this worker record was created.
     pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug)]
+/// Stateful generator for one worker.
+///
+/// Prefer the process-level helpers in [`crate::distributed_id`] unless a
+/// caller needs to manage generator state explicitly.
 pub struct DistributedIdGenerator {
+    /// Worker metadata used for the 13-bit worker field.
     pub worker: Worker,
+    /// Last emitted millisecond offset from [`EPOCH_SINCE`].
     pub last_timestamp: u64,
-    // Sequence counter for IDs generated in that same ms
+    /// Sequence counter used within [`DistributedIdGenerator::last_timestamp`].
     pub sequence: u64,
 }
 
 impl DistributedIdGenerator {
+    /// Starts a generator from an allocated worker record.
     pub fn from_worker(worker: Worker) -> Self {
         Self {
             worker,
@@ -53,6 +85,7 @@ impl DistributedIdGenerator {
         }
     }
 
+    /// Starts a process-local generator using Hero's reserved scoped worker ID.
     pub fn init_scoped(app_name: String) -> Self {
         Self {
             worker: Worker {
@@ -65,6 +98,7 @@ impl DistributedIdGenerator {
         }
     }
 
+    /// Starts a process-local generator with a caller-assigned worker ID.
     pub fn init_scoped_with_id(id: u32, name: String) -> Self {
         Self {
             worker: Worker {
@@ -77,10 +111,12 @@ impl DistributedIdGenerator {
         }
     }
 
-    /// Generates a 64-bit ID with the layout:
-    /// [41 bits: timestamp in ms since EPOCH_SINCE]
-    /// [13 bits: worker ID]
-    /// [10 bits: sequence for that ms]
+    /// Generates the next monotonically increasing ID for this worker.
+    ///
+    /// The bit layout is 41 bits of milliseconds since [`EPOCH_SINCE`], 13
+    /// bits of worker ID, and 10 bits of sequence. Sequence exhaustion waits
+    /// for the next millisecond. Clock regression is returned as an error rather
+    /// than risking an out-of-order or duplicate ID.
     pub async fn next_id(&mut self) -> Result<u64, DistributedIdError> {
         let current_ms =
             u64::try_from(Utc::now().timestamp_millis()).map_err(|_| DistributedIdError::ClockBeforeEpoch)?;

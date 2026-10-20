@@ -1,3 +1,10 @@
+//! etcd-backed worker ID reservation for fleet-wide uniqueness.
+//!
+//! Each application receives a key under `<namespace>/<app>/workers/<id>` that
+//! is attached to a renewable etcd lease. Losing the keep-alive stream triggers
+//! bounded exponential reconnection and may assign a new worker ID; callers
+//! using [`crate::distributed_id::init_id_generator`] are updated automatically.
+
 use crate::distributed_id::generator::{DistributedIdError, Worker, MAX_WORKER_ID};
 use chrono::Utc;
 use etcd_client::{Client, Compare, CompareOp, PutOptions, Txn, TxnOp};
@@ -17,8 +24,11 @@ use tokio::task::JoinHandle;
 /// - `SNOWFLAKE_ETCD_LEASE_TTL_SECS`: optional lease TTL override in seconds (default: 30)
 #[derive(Clone, Debug)]
 pub struct EtcdWorkerOptions {
+    /// etcd client endpoints, including an `http://` or `https://` scheme.
     pub endpoints: Vec<String>,
+    /// Key prefix shared by all Hero worker reservations.
     pub namespace: String,
+    /// Lease lifetime; keep-alive requests run roughly every third of this value.
     pub lease_ttl: Duration,
 }
 
@@ -33,6 +43,9 @@ impl Default for EtcdWorkerOptions {
 }
 
 impl EtcdWorkerOptions {
+    /// Builds options from endpoints and local-development defaults.
+    ///
+    /// Empty entries and surrounding whitespace are removed.
     pub fn new(endpoints: Vec<String>) -> Self {
         let mut options = Self {
             endpoints,
@@ -42,17 +55,24 @@ impl EtcdWorkerOptions {
         options
     }
 
+    /// Sets the etcd key namespace after trimming leading and trailing slashes.
     pub fn namespace(mut self, namespace: impl Into<String>) -> Self {
         self.namespace = namespace.into();
         self.normalize();
         self
     }
 
+    /// Sets the lease lifetime used for worker ownership.
     pub fn lease_ttl(mut self, ttl: Duration) -> Self {
         self.lease_ttl = ttl;
         self
     }
 
+    /// Loads worker coordination settings from the process environment.
+    ///
+    /// `SNOWFLAKE_ETCD_ENDPOINTS` is required and comma-separated.
+    /// `SNOWFLAKE_ETCD_NAMESPACE` defaults to `snowflake`, and
+    /// `SNOWFLAKE_ETCD_LEASE_TTL_SECS` defaults to 30 seconds.
     pub fn from_env() -> Result<Self, DistributedIdError> {
         let endpoints = std::env::var("SNOWFLAKE_ETCD_ENDPOINTS")
             .map_err(|_| DistributedIdError::InvalidConfig("SNOWFLAKE_ETCD_ENDPOINTS must be set".into()))?;
@@ -90,11 +110,13 @@ impl EtcdWorkerOptions {
         Ok(options)
     }
 
+    /// Returns Hero's keep-alive cadence for this lease.
     pub fn keep_alive_interval(&self) -> Duration {
         let secs = (self.lease_ttl.as_secs() / 3).max(1);
         Duration::from_secs(secs)
     }
 
+    /// Checks that the endpoints and lease lifetime can be sent to etcd.
     pub fn validate(&self) -> Result<(), DistributedIdError> {
         if self.endpoints.is_empty() {
             return Err(DistributedIdError::InvalidConfig("no etcd endpoints configured".into()));
@@ -150,6 +172,11 @@ impl EtcdWorkerOptions {
 }
 
 #[derive(Clone)]
+/// Owns a reserved worker ID and its lease-renewal task.
+///
+/// Clones share one lease. [`WorkerLeaseGuard::shutdown`] is idempotent and
+/// closes the shared reservation for every clone. Dropping the final clone
+/// performs best-effort asynchronous cleanup when a Tokio runtime is available.
 pub struct WorkerLeaseGuard {
     client: Client,
     lease_id: Arc<AtomicI64>,
@@ -164,6 +191,10 @@ const MAX_RECONNECT_DELAY: Duration = Duration::from_secs(60);
 const INITIAL_RECONNECT_DELAY: Duration = Duration::from_secs(1);
 
 impl WorkerLeaseGuard {
+    /// Starts renewal for an already granted lease and allocated worker key.
+    ///
+    /// Most callers should use [`register_worker`], which performs the grant and
+    /// allocation before constructing the guard.
     pub async fn new(
         client: Client,
         lease_id: i64,
@@ -354,14 +385,22 @@ impl WorkerLeaseGuard {
         })
     }
 
+    /// Returns the currently assigned worker ID.
+    ///
+    /// Reconnection can change this value if the previous ID was claimed after
+    /// the lease expired.
     pub async fn worker_id(&self) -> u16 {
         self.worker_id.load(Ordering::SeqCst)
     }
 
+    /// Reports whether shared lease cleanup has started.
     pub fn is_closed(&self) -> bool {
         self.closed.load(Ordering::Acquire)
     }
 
+    /// Stops renewal, deletes the worker key, and revokes the lease.
+    ///
+    /// Repeated calls are no-ops after the first successful close transition.
     pub async fn shutdown(&self) -> Result<(), DistributedIdError> {
         if self.closed.swap(true, Ordering::AcqRel) {
             return Ok(());
@@ -546,6 +585,11 @@ async fn cleanup_lease(
     Ok(())
 }
 
+/// Connects to etcd and atomically reserves the first available worker ID.
+///
+/// Reservations are scoped by namespace and application name, so separate
+/// applications may reuse numeric worker IDs safely. Keep the returned guard
+/// alive for as long as IDs are generated.
 pub async fn register_worker(
     app_name: &str,
     mut options: EtcdWorkerOptions,

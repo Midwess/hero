@@ -1,8 +1,15 @@
 use tokio::task::JoinHandle;
 
+/// Aborts a Tokio task when the guard is dropped.
+///
+/// Wrap the guard in an [`std::sync::Arc`] when several owners should keep the
+/// task alive until the last reference disappears. The output is intentionally
+/// inaccessible; use the original [`JoinHandle`] when awaiting completion is
+/// part of the protocol.
 pub struct AbortOnDrop<T>(JoinHandle<T>);
 
 impl<T> AbortOnDrop<T> {
+    /// Takes ownership of a spawned task.
     pub fn new(handle: JoinHandle<T>) -> Self {
         Self(handle)
     }

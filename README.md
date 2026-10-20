@@ -115,6 +115,7 @@ in the consuming `Cargo.toml` so architectural dependencies remain visible.
 
 ## Documentation
 
+- [API reference on docs.rs](https://docs.rs/midwess-hero)
 - [Feature documentation](docs/features/README.md)
 - [Documentation publishing](docs/publishing.md)
 

@@ -3,6 +3,7 @@
 Hero is the opt-in shared Rust library for Midwess architectural boundaries.
 
 - [Overview](../README.md)
+- [Published API reference](https://docs.rs/midwess-hero)
 - [Architecture](architecture.md)
 - [Feature index](features/README.md)
 - [Machine-readable feature catalog](../hero.features.json)

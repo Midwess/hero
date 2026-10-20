@@ -1,3 +1,14 @@
+//! In-memory bidirectional byte streams using `futures::io` traits.
+//!
+//! [`duplex`] returns two connected endpoints. Bytes written and flushed on one
+//! endpoint become readable from the other. The implementation is intentionally
+//! runtime-independent and uses bounded in-memory buffers.
+//!
+//! This stream does not currently register reader or writer wakers when a buffer
+//! is empty or full. It is best suited to code that polls opportunistically or
+//! controls both sides, rather than as a general replacement for runtime-native
+//! duplex streams.
+
 use std::collections::VecDeque;
 use std::io::{Error, ErrorKind};
 use std::pin::Pin;
@@ -7,8 +18,11 @@ use std::task::{Context, Poll};
 use futures::io::{AsyncRead, AsyncWrite};
 
 #[derive(Clone)]
+/// Buffering limits shared by both ends of a duplex pair.
 pub struct DuplexConfig {
+    /// Per-writer staging buffer used to batch writes before a flush.
     pub buffer_size: usize,
+    /// Maximum queued bytes in each direction.
     pub max_buffer_size: usize,
 }
 
@@ -86,6 +100,7 @@ impl BufferState {
     }
 }
 
+/// Write half of a [`DuplexStream`].
 pub struct DuplexWriter {
     // Buffer where we write data that will be read by the paired reader
     write_buffer: Arc<Mutex<BufferState>>,
@@ -93,16 +108,19 @@ pub struct DuplexWriter {
     local_buffer: Vec<u8>,
 }
 
+/// Read half of a [`DuplexStream`].
 pub struct DuplexReader {
     // Buffer from where we read data written by the paired writer
     read_buffer: Arc<Mutex<BufferState>>,
     config: DuplexConfig,
 }
 
+/// Creates a connected pair using [`DuplexConfig::default`].
 pub fn duplex() -> (DuplexStream, DuplexStream) {
     duplex_with_config(DuplexConfig::default())
 }
 
+/// Creates two connected endpoints with symmetric buffering limits.
 pub fn duplex_with_config(config: DuplexConfig) -> (DuplexStream, DuplexStream) {
     let buffer1 = Arc::new(Mutex::new(BufferState::new(config.max_buffer_size)));
     let buffer2 = Arc::new(Mutex::new(BufferState::new(config.max_buffer_size)));
@@ -134,20 +152,24 @@ pub fn duplex_with_config(config: DuplexConfig) -> (DuplexStream, DuplexStream) 
     (stream1, stream2)
 }
 
+/// One endpoint of a connected in-memory byte stream.
 pub struct DuplexStream {
     writer: DuplexWriter,
     reader: DuplexReader,
 }
 
 impl DuplexStream {
+    /// Separates the endpoint into independently owned read and write halves.
     pub fn split(self) -> (DuplexReader, DuplexWriter) {
         (self.reader, self.writer)
     }
 
+    /// Returns the buffering configuration used by the pair.
     pub fn config(&self) -> &DuplexConfig {
         &self.reader.config
     }
 
+    /// Reports whether the peer has queued at least one readable byte.
     pub fn has_data_available(&self) -> bool {
         if let Ok(buffer) = self.reader.read_buffer.lock() {
             !buffer.is_empty()
@@ -156,6 +178,10 @@ impl DuplexStream {
         }
     }
 
+    /// Returns `(readable_bytes, outbound_bytes)` for this endpoint.
+    ///
+    /// Outbound bytes include only data already flushed into the shared buffer,
+    /// not the writer's private staging buffer.
     pub fn buffer_stats(&self) -> (usize, usize) {
         let read_len = self.reader.read_buffer.lock().map(|b| b.len()).unwrap_or(0);
         let write_len = self.writer.write_buffer.lock().map(|b| b.len()).unwrap_or(0);

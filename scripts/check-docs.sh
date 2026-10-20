@@ -2,6 +2,10 @@
 set -euo pipefail
 
 jq --exit-status '.schema_version == 1 and .crate.name == "midwess-hero" and .crate.lib_name == "hero" and (.crate.default_features | length == 0)' hero.features.json >/dev/null
+jq --exit-status \
+    '.packages[] | select(.name == "midwess-hero") | .metadata.docs.rs."all-features" == true and .metadata.docs.rs."default-target" == "x86_64-unknown-linux-gnu" and .metadata.docs.rs.targets == ["x86_64-unknown-linux-gnu"]' \
+    < <(cargo metadata --no-deps --format-version 1) >/dev/null
+rg -q '^#!\[deny\(missing_docs\)\]$' src/lib.rs
 node scripts/validate-feature-catalog.mjs
 node scripts/generate-feature-docs.mjs --check
 node scripts/generate-llms-full.mjs --check

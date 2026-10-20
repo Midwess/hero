@@ -1,3 +1,5 @@
+//! Indefinite capped exponential backoff with jitter.
+
 use std::fmt::Display;
 use std::future::Future;
 use std::time::Duration;
@@ -6,6 +8,13 @@ use log::warn;
 use rand::Rng;
 use tokio::time::sleep;
 
+/// Repeats an operation until it succeeds.
+///
+/// Delays double after each failure, are randomized between 75% and 125%, and
+/// never exceed `max`. Failures are logged under the `hero-retry` target with
+/// `label`. There is deliberately no attempt limit or cancellation hook; wrap
+/// the returned future with a timeout or cancellation token when the caller
+/// needs an upper bound.
 pub async fn with_capped_backoff<F, Fut, T, E>(initial: Duration, max: Duration, label: &str, mut op: F) -> T
 where
     F: FnMut() -> Fut,

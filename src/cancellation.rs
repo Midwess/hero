@@ -56,6 +56,11 @@ struct CancelState {
 }
 
 #[derive(Serialize, Deserialize)]
+/// A clonable cancellation signal that can form parent-child trees.
+///
+/// Clones observe the same state. Use [`CancellationToken::child_token`] when
+/// cancellation should flow from one unit of work into another without flowing
+/// back to the parent.
 pub struct CancellationToken {
     #[serde(skip)]
     state: Arc<CancelState>,
@@ -185,6 +190,7 @@ impl CancellationToken {
         Ok(spawn(Self::child_scope(future)?))
     }
 
+    /// Creates an independent, initially active root token.
     pub fn new() -> Self {
         Self {
             state: Arc::new(CancelState {
@@ -196,6 +202,10 @@ impl CancellationToken {
         }
     }
 
+    /// Creates a token that cancels itself after a delay.
+    ///
+    /// The returned handle owns the timer. Dropping that handle cancels the
+    /// timer; clones continue to share cancellation state but do not own it.
     pub fn timeout(duration: Duration) -> Self {
         let mut token = CancellationToken::new();
         let child = token.clone();
@@ -213,6 +223,9 @@ impl CancellationToken {
         self.state.cancelled.load(Ordering::Acquire)
     }
 
+    /// Schedules cancellation after a delay without tying the timer to a handle.
+    ///
+    /// Calling this more than once is harmless; the earliest timer to fire wins.
     pub fn cancel_after(&self, duration: Duration) {
         let token = self.clone();
         spawn(async move {
@@ -277,20 +290,26 @@ impl CancellationToken {
         }
     }
 
+    /// Creates a guard that cancels this token when the guard is dropped.
+    ///
+    /// Use [`DropGuard::disarm`] to transfer responsibility elsewhere.
     pub fn drop_guard(&self) -> DropGuard {
         DropGuard::new(self.clone())
     }
 }
 
+/// Cancels its token on drop unless explicitly disarmed.
 pub struct DropGuard {
     token: Option<CancellationToken>,
 }
 
 impl DropGuard {
+    /// Begins guarding a token.
     pub fn new(token: CancellationToken) -> Self {
         Self { token: Some(token) }
     }
 
+    /// Prevents cancellation when this guard is dropped.
     pub fn disarm(&mut self) {
         self.token = None;
     }
@@ -304,6 +323,10 @@ impl Drop for DropGuard {
     }
 }
 
+/// Future returned by [`CancellationToken::cancelled`].
+///
+/// It also resolves when the last strong handle to the token disappears, so a
+/// waiter cannot remain suspended after its cancellation source is gone.
 pub struct Cancelled {
     state: Weak<CancelState>,
     listener: Option<EventListener>,
@@ -339,14 +362,22 @@ use std::time::Duration;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
+/// Failures produced by scoped or cancellation-aware task helpers.
 pub enum TaskErrors {
+    /// An operation requiring [`CancellationToken::current`] ran outside a scope.
     #[error("No cancellation scope is active")]
     MissingCancellationScope,
+    /// Cancellation won the race against the wrapped future.
     #[error("Task cancelled")]
     Cancelled,
 }
 
+/// Adds cancellation-aware completion to every future.
 pub trait FutureExtension: Future + Sized {
+    /// Races this future against a token without spawning either branch.
+    ///
+    /// If the token is already cancelled, the future is never polled. When
+    /// cancellation wins later, the future is dropped in place.
     fn with_cancel(self, cancellation: &CancellationToken) -> impl Future<Output = Result<Self::Output, TaskErrors>>;
 }
 

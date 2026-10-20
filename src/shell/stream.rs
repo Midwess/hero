@@ -1,3 +1,5 @@
+//! A line stream that polls a child's stdout before stderr.
+
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -6,6 +8,12 @@ use tokio::io::{AsyncBufReadExt, BufReader, Lines};
 use tokio::process::{Child, ChildStderr, ChildStdout};
 use tokio_stream::Stream;
 
+/// Merges piped stdout and stderr into a stream of text lines.
+///
+/// Constructing the stream requires both handles to be piped. I/O errors end
+/// the stream because the item type intentionally contains only successful
+/// lines. Ordering between stdout and stderr follows readiness, with stdout
+/// checked first when both are ready.
 pub struct StdStream {
     stdout: Lines<BufReader<ChildStdout>>,
     stderr: Lines<BufReader<ChildStderr>>,

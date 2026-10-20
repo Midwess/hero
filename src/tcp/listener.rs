@@ -1,3 +1,10 @@
+//! Bind helpers that expose both the socket and its advertised service address.
+//!
+//! Discovery helpers scan from port 3000 (or a supplied starting port) through
+//! 50100 and bind an IPv6 socket with IPv4 compatibility. `SERVICE_HOST`
+//! controls the host returned to gateway registration; it defaults to
+//! `host.docker.internal`.
+
 use std::env;
 use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 
@@ -10,22 +17,30 @@ use tokio::net::{TcpListener as TokioTcpListener, UdpSocket};
 #[cfg(feature = "grpc-server")]
 use tonic::transport::server::TcpIncoming;
 
+/// Result type for listener discovery and binding.
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Error)]
+/// Listener creation failure.
 pub enum Error {
+    /// Socket creation, configuration, binding, or conversion failed.
     #[error("network listener failure: {0}")]
     Listener(String),
 }
 
 #[cfg(feature = "grpc-server")]
+/// Bound tonic incoming stream and the address metadata advertised to peers.
 pub struct GrpcConnection {
+    /// Incoming connections accepted by tonic.
     pub listener: TcpIncoming,
+    /// Selected local port.
     pub port: u16,
-    pub public_host: String, // The host of this service that is available for others to connect
+    /// Host other services should use to reach this listener.
+    pub public_host: String,
 }
 
 #[cfg(feature = "grpc-server")]
+/// Finds the first available dual-stack tonic listener in Hero's port range.
 pub async fn find_grpc_listener(from: Option<u16>) -> Result<GrpcConnection> {
     let base_port: u16 = from.unwrap_or(3000); // Starting port
     let max_port: u16 = 50100; // Maximum port to try
@@ -89,12 +104,17 @@ pub async fn find_grpc_listener(from: Option<u16>) -> Result<GrpcConnection> {
     })
 }
 
+/// Bound Tokio TCP listener and the address metadata advertised to peers.
 pub struct TcpConnection {
+    /// Nonblocking Tokio listener.
     pub listener: TokioTcpListener,
+    /// Selected local port.
     pub port: u16,
-    pub public_host: String, // The host of this service that is available for others to connect
+    /// Host other services should use to reach this listener.
+    pub public_host: String,
 }
 
+/// Finds the first available dual-stack TCP listener in Hero's port range.
 pub async fn find_tcp_listener(from: Option<u16>) -> Result<TcpConnection> {
     let base_port: u16 = from.unwrap_or(3000); // Starting port
     let max_port: u16 = 50100; // Maximum port to try
@@ -159,8 +179,9 @@ pub async fn find_tcp_listener(from: Option<u16>) -> Result<TcpConnection> {
     })
 }
 
-/// Bind to a specific port (not finding next available)
-/// Returns error if the port is already in use
+/// Binds a dual-stack TCP listener to exactly one port.
+///
+/// Unlike [`find_tcp_listener`], this never scans forward when the port is busy.
 pub async fn bind_tcp_listener(port: u16) -> Result<TcpConnection> {
     let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), port);
 
@@ -198,12 +219,17 @@ pub async fn bind_tcp_listener(port: u16) -> Result<TcpConnection> {
     })
 }
 
+/// Bound Tokio UDP socket and the address metadata advertised to peers.
 pub struct UdpConnection {
+    /// Nonblocking Tokio UDP socket.
     pub socket: UdpSocket,
+    /// Selected local port.
     pub port: u16,
-    pub public_host: String, // The host of this service that is available for others to connect
+    /// Host other services should use to reach this socket.
+    pub public_host: String,
 }
 
+/// Finds the first available dual-stack UDP socket in Hero's port range.
 pub async fn find_udp_socket(from: Option<u16>) -> Result<UdpConnection> {
     let base_port: u16 = from.unwrap_or(3000); // Starting port
     let max_port: u16 = 50100; // Maximum port to try

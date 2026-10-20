@@ -19,6 +19,9 @@ jobs:
       - run: cargo test
       - run: cargo test --all-features
       - run: cargo clippy --all-targets --all-features -- -D warnings
+      - run: cargo doc --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: -D warnings
       - run: scripts/check-features.sh --native
       - run: scripts/check-exclusions.sh
       - run: scripts/check-docs.sh
@@ -34,3 +37,6 @@ jobs:
       - run: cargo check --target wasm32-unknown-unknown
       - run: scripts/check-features.sh --wasm
       - run: cargo clippy --target wasm32-unknown-unknown --no-default-features --features cancellation,config,distributed-id,env,finally,logger,maybe,never-send,number,pool,retry,stream,string,throttle-future,time,wasm,yield-container -- -D warnings
+      - run: cargo doc --no-deps --target wasm32-unknown-unknown --no-default-features --features cancellation,config,distributed-id,env,finally,logger,maybe,never-send,number,pool,retry,stream,string,throttle-future,time,wasm,yield-container
+        env:
+          RUSTDOCFLAGS: -D warnings

@@ -7,12 +7,20 @@ use crate::api_gateway::client::ApiGatewayClient;
 use crate::api_gateway::error::{Error, Result};
 use crate::api_gateway::service::{GatewayRoute, GatewayService};
 
+/// Client for declaratively reconciling services with the Kong Admin API.
+///
+/// The client creates or patches named resources, making repeated startup
+/// registration safe. Service names and routes should remain stable so Kong can
+/// update existing resources instead of creating new ones.
 pub struct KongGatewayAdminClient {
     url: String,
     client: reqwest::Client,
 }
 
 impl KongGatewayAdminClient {
+    /// Creates a client for a Kong Admin API base URL.
+    ///
+    /// The URL should not include a trailing resource path.
     pub fn new(url: String) -> Self {
         Self {
             url,
@@ -20,6 +28,7 @@ impl KongGatewayAdminClient {
         }
     }
 
+    /// Returns the configured Admin API base URL.
     pub fn url(&self) -> &str {
         &self.url
     }

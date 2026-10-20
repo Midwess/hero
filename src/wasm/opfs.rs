@@ -1,20 +1,28 @@
+//! Async-write adaptation for Origin Private File System handles.
+
 use futures::io::AsyncWrite;
 use std::io::Error;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use web_sys::FileSystemSyncAccessHandle;
 
-/// Writer wrapping FileSystemSyncAccessHandle for async_zip and other async writers
+/// Sequential writer over a browser [`FileSystemSyncAccessHandle`].
+///
+/// This adapter is useful for libraries that expect `futures::io::AsyncWrite`,
+/// including streaming archive writers. Closing flushes and closes the browser
+/// handle. Browser exceptions are surfaced as [`std::io::Error`].
 pub struct SyncAccessHandleWriter {
     handle: FileSystemSyncAccessHandle,
     position: u64,
 }
 
 impl SyncAccessHandleWriter {
+    /// Starts writing at byte offset zero.
     pub fn new(handle: FileSystemSyncAccessHandle) -> Self {
         Self { handle, position: 0 }
     }
 
+    /// Returns the next byte offset that will be written.
     pub fn position(&self) -> u64 {
         self.position
     }

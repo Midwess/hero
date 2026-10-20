@@ -1,3 +1,10 @@
+//! Logging defaults for native processes and browser applications.
+//!
+//! Native setup honors `RUST_LOG`. Setting `FILE_LOG` enables an uncolored tee
+//! to `FILE_LOG_PATH`, or to `logs/sandbox-<SANDBOX_ID>.log` when no path is
+//! supplied. Browser setup writes informational records to the console and can
+//! be toggled through the global `__midwess_log` value.
+
 use futures_util::lock::Mutex;
 use log::info;
 use n0_future::task::{spawn, JoinHandle};
@@ -6,6 +13,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
+/// Installs Hero's process logger if another logger has not already won.
+///
+/// Repeated calls are harmless. Native builds suppress known noisy targets and
+/// browser builds also install the panic hook.
 pub fn setup() {
     #[cfg(target_arch = "wasm32")]
     {
@@ -137,12 +148,14 @@ impl std::io::Write for FileTee {
     }
 }
 
+/// Aggregates repeated messages and periodically emits occurrence counts.
 pub struct ThrottleLogger {
     messages: Arc<Mutex<HashMap<String, usize>>>,
     join_handle: JoinHandle<()>,
 }
 
 impl ThrottleLogger {
+    /// Starts an aggregation interval under the supplied log target.
     pub fn new(namespace: String, delay: Duration) -> Self {
         let messages = Arc::new(Mutex::new(HashMap::new()));
         let messages_clone = messages.clone();
@@ -168,6 +181,7 @@ impl ThrottleLogger {
         Self { messages, join_handle }
     }
 
+    /// Increments the count for an exact message string.
     pub async fn log(&self, content: String) {
         let mut msgs = self.messages.lock().await;
         *msgs.entry(content).or_insert(0) += 1;

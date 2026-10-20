@@ -1,3 +1,24 @@
+/// Retries an async block with a fixed delay.
+///
+/// The block must evaluate to a `Result`. `retries` counts the initial attempt,
+/// so `retries = 1` never sleeps. An optional callback runs after each failed
+/// attempt, including the final one, and receives a shared reference to the
+/// error.
+///
+/// # Example
+///
+/// ```
+/// # async fn example() -> Result<(), &'static str> {
+/// let value = hero::retry!(
+///     retries = 3,
+///     delay = std::time::Duration::from_millis(10),
+///     |_| {},
+///     { Ok::<_, &'static str>(42) }
+/// )?;
+/// assert_eq!(value, 42);
+/// # Ok(())
+/// # }
+/// ```
 #[macro_export]
 macro_rules! retry {
     (

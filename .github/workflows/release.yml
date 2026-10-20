@@ -1,6 +1,7 @@
 name: Release
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -92,21 +93,29 @@ jobs:
           scripts/check-features.sh --all
           scripts/check-exclusions.sh
           scripts/check-docs.sh
+          RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features
+          RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --target wasm32-unknown-unknown --no-default-features --features cancellation,config,distributed-id,env,finally,logger,maybe,never-send,number,pool,retry,stream,string,throttle-future,time,wasm,yield-container
           cargo publish --dry-run --locked
-      - name: Check crates.io
+      - name: Check crates.io index
         if: steps.release.outputs.changed == 'true'
         id: registry
         env:
           VERSION: ${{ steps.release.outputs.version }}
         run: |
           set -euo pipefail
-          status=$(curl --silent --show-error --output /tmp/crates-io-response.json \
+          status=$(curl --silent --show-error --output /tmp/crates-io-index.jsonl \
             --write-out '%{http_code}' \
-            "https://crates.io/api/v1/crates/midwess-hero/$VERSION")
+            --user-agent 'midwess-hero-release-workflow/1.0 (https://github.com/Midwess/hero)' \
+            "https://index.crates.io/mi/dw/midwess-hero")
           case "$status" in
             200)
-              echo "exists=true" >> "$GITHUB_OUTPUT"
-              echo "midwess-hero $VERSION is already published; skipping Cargo upload."
+              if jq --slurp --exit-status --arg version "$VERSION" \
+                'any(.[]; .vers == $version)' /tmp/crates-io-index.jsonl >/dev/null; then
+                echo "exists=true" >> "$GITHUB_OUTPUT"
+                echo "midwess-hero $VERSION is already published; skipping Cargo upload."
+              else
+                echo "exists=false" >> "$GITHUB_OUTPUT"
+              fi
               ;;
             404)
               echo "exists=false" >> "$GITHUB_OUTPUT"

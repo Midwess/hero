@@ -17,11 +17,22 @@ use super::response::PoolResponse;
 use crate::maybe::MaybeSendSync;
 
 #[derive(Debug, Error, PartialEq, Eq)]
+/// Invalid pool configuration detected during construction.
 pub enum PoolBuildError {
+    /// The lower bound cannot be satisfied without exceeding the upper bound.
     #[error("minimum pool size {min} exceeds maximum pool size {max}")]
-    InvalidSize { min: usize, max: usize },
+    InvalidSize {
+        /// Requested number of permanently retained resources.
+        min: usize,
+        /// Requested maximum number of live resources.
+        max: usize,
+    },
 }
 
+/// Shared storage and capacity accounting behind a [`PoolAllocator`].
+///
+/// Most callers interact with [`PoolBuilder`] and
+/// [`crate::pool::request::PoolRequest`] instead of manipulating this type.
 pub struct Pool<T>
 where
     T: MaybeSendSync + 'static,
@@ -127,7 +138,10 @@ where
         *self.counter.lock().await > self.min_size
     }
 
-    // Wait until no requests to the pool and the cleanup has finished it's job
+    /// Waits until every checkout has returned and only the minimum remains.
+    ///
+    /// This is primarily a shutdown/testing primitive. It has no timeout and
+    /// will wait forever if a response guard is leaked.
     pub async fn wait_for_idle(&self) {
         loop {
             if self.min_size == *self.counter.lock().await && self.min_size == self.number_of_available_items().await {
@@ -141,10 +155,15 @@ where
 
 #[cfg_attr(not(target_family = "wasm"), async_trait::async_trait)]
 #[cfg_attr(target_family = "wasm", async_trait::async_trait(?Send))]
+/// Creates resources when the pool is empty but remains below capacity.
+///
+/// Creation failures should be represented in `T` or handled by the provider
+/// because the pool assumes every call produces a usable value.
 pub trait PoolResourceProvider<T>: MaybeSendSync
 where
     T: MaybeSendSync,
 {
+    /// Creates one resource for immediate checkout or idle storage.
     async fn create(&self) -> T
     where
         Self: 'async_trait;
@@ -239,10 +258,12 @@ where
     }
 }
 
+/// Coordinates pooled resources, pending borrowers, and idle cleanup.
 pub struct PoolAllocator<T>
 where
     T: 'static + MaybeSendSync,
 {
+    /// Underlying capacity and idle-resource storage.
     pub pool: Arc<Pool<T>>,
     resource_idle_timeout: Duration,
     resource_provider: Box<dyn PoolResourceProvider<T> + 'static>,
@@ -251,6 +272,7 @@ where
     cleaner: PoolCleaner<T>,
 }
 
+/// Configures and initializes a [`PoolAllocator`].
 pub struct PoolBuilder<T>
 where
     T: MaybeSendSync + 'static,
@@ -265,6 +287,8 @@ impl<T> PoolBuilder<T>
 where
     T: MaybeSendSync + 'static,
 {
+    /// Starts with a minimum of 10 resources, a maximum of 20, and a ten-minute
+    /// idle timeout for resources above the minimum.
     pub fn new(resource_provider: Box<dyn PoolResourceProvider<T> + 'static>) -> Self {
         Self {
             min_pool_size: 10,
@@ -274,23 +298,28 @@ where
         }
     }
 
+    /// Sets how long excess idle resources remain reusable.
     pub fn resource_idle_timeout(mut self, timeout: Duration) -> Self {
         self.resource_idle_timeout = timeout;
 
         self
     }
 
+    /// Sets the number of resources created eagerly and retained while idle.
     pub fn min_pool_size(mut self, size: usize) -> Self {
         self.min_pool_size = size;
 
         self
     }
 
+    /// Sets the maximum number of resources that may exist at once.
     pub fn max_pool_size(mut self, size: usize) -> Self {
         self.max_pool_size = size;
         self
     }
 
+    /// Validates capacity, creates the minimum resources concurrently, and
+    /// returns a shareable allocator.
     pub async fn build(self) -> Result<Arc<PoolAllocator<T>>, PoolBuildError> {
         let pool = Arc::new(Pool::new(self.min_pool_size, self.max_pool_size)?);
 
@@ -310,6 +339,9 @@ where
     }
 }
 
+/// A resource plus the timestamp used for excess-idle cleanup.
+///
+/// `Deref` and `DerefMut` expose the resource directly.
 pub struct PoolItem<T>
 where
     T: MaybeSendSync + 'static,
@@ -323,6 +355,7 @@ impl<T> PoolItem<T>
 where
     T: MaybeSendSync + 'static,
 {
+    /// Wraps a newly created resource and starts its idle clock.
     pub fn new(resource: Box<T>, max_idling_timeout: Duration) -> Self {
         Self {
             resource,
@@ -331,10 +364,12 @@ where
         }
     }
 
+    /// Restarts the idle clock when a resource returns to the pool.
     pub fn refresh(&mut self) {
         self.start_time = Instant::now();
     }
 
+    /// Returns the remaining idle lifetime, saturating at zero.
     pub fn timeleft(&self) -> Duration {
         let elapsed = self.start_time.elapsed();
         if elapsed.gt(&self.max_idling_timeout) {
@@ -369,6 +404,10 @@ impl<T> PoolAllocator<T>
 where
     T: MaybeSendSync + 'static,
 {
+    /// Fills the pool to its configured minimum size.
+    ///
+    /// [`PoolBuilder::build`] calls this automatically. Calling it again only
+    /// adds resources while capacity remains.
     pub async fn init(&self) {
         if self.pool.min_size == 0 {
             return;
@@ -398,6 +437,10 @@ where
         );
     }
 
+    /// Checks out a resource or returns a receiver queued for the next return.
+    ///
+    /// The lower-level receiver form lets [`crate::pool::request::PoolRequest`]
+    /// add timeout behavior without allocating a second queue.
     pub async fn retrieve(self: &Arc<Self>) -> Result<PoolResponse<T>, oneshot::Receiver<PoolResponse<T>>> {
         let mut waiters = self.waiters.lock().await;
         let available_item = self.pool.borrow_item().await;
@@ -421,10 +464,10 @@ where
         Err(receiver)
     }
 
-    /// Put back resource to the pool
-    /// If there are waiters in the queue, we will serve waiters first
-    /// Otherwise the resource will be returned to the pool.
-    /// The cleanup also being triggered if the pool has exceed it's min_size.
+    /// Returns a resource, preferring the oldest pending borrower.
+    ///
+    /// When no waiter accepts it, the resource becomes idle and may trigger
+    /// cleanup if the pool is above its minimum size.
     pub async fn put(self: &Arc<Self>, resource: PoolItem<T>) {
         let mut waiters = self.waiters.lock().await;
         let resource = 'serve_waiter_first: {

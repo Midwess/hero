@@ -1,3 +1,10 @@
+//! Browser-native request construction with Fetch and XMLHttpRequest backends.
+//!
+//! Builder methods consume and return [`HttpClient`], allowing a request to be
+//! assembled before selecting a transport. Dropping an in-flight
+//! [`FetchRequest`] aborts it; dropping [`XmlHttpRequest`] calls the browser's
+//! abort method.
+
 use futures::channel::mpsc::{channel, Receiver};
 use futures::{AsyncRead, StreamExt};
 use futures_util::SinkExt;
@@ -14,6 +21,7 @@ use web_sys::{
     XmlHttpRequest as WasmXmlHttpRequest,
 };
 
+/// Transport-neutral browser HTTP request builder.
 pub struct HttpClient {
     method: String,
     url: Option<String>,
@@ -21,19 +29,27 @@ pub struct HttpClient {
     body: Option<Body>,
 }
 
+/// Request body formats supported by Hero's browser transports.
 pub enum Body {
+    /// UTF-8 text passed directly to the browser.
     Text(String),
+    /// Browser-managed binary blob.
     Blob(Blob),
+    /// Rust-owned bytes copied into a `Uint8Array` when Fetch is selected.
     Bytes(Vec<u8>),
+    /// Existing JavaScript byte array.
     Uint8Array(Uint8Array),
+    /// Streaming body available only through Fetch in supporting browsers.
     AsyncReader(Box<dyn AsyncRead + Unpin + 'static>),
 }
 
+/// Started XMLHttpRequest with a bounded stream of progress and completion events.
 pub struct XmlHttpRequest {
     xml_http: Rc<WasmXmlHttpRequest>,
     event_rx: Receiver<XhrEvent>,
 }
 
+/// Prepared Fetch request that aborts when dropped before completion.
 pub struct FetchRequest {
     request: Request,
     _abort_controller: Option<AbortController>,
@@ -46,6 +62,7 @@ impl Default for HttpClient {
 }
 
 impl HttpClient {
+    /// Starts a `GET` request with no URL, headers, or body.
     pub fn new() -> Self {
         Self {
             method: "GET".to_string(),
@@ -55,46 +72,57 @@ impl HttpClient {
         }
     }
 
+    /// Sets the uppercase HTTP method.
     pub fn method(mut self, method: &str) -> Self {
         self.method = method.to_uppercase();
         self
     }
 
+    /// Sets the absolute or browser-resolvable request URL.
     pub fn url(mut self, url: &str) -> Self {
         self.url = Some(url.to_string());
         self
     }
 
+    /// Adds or replaces one request header.
     pub fn header(mut self, name: &str, value: &str) -> Self {
         self.headers.insert(name.to_string(), value.to_string());
         self
     }
 
+    /// Uses a copied text body.
     pub fn body_text(mut self, text: &str) -> Self {
         self.body = Some(Body::Text(text.to_string()));
         self
     }
 
+    /// Uses an existing browser blob as the body.
     pub fn body_blob(mut self, blob: Blob) -> Self {
         self.body = Some(Body::Blob(blob));
         self
     }
 
+    /// Uses owned Rust bytes as the body.
     pub fn body_bytes(mut self, bytes: Vec<u8>) -> Self {
         self.body = Some(Body::Bytes(bytes));
         self
     }
 
+    /// Uses an existing JavaScript typed array as the body.
     pub fn body_uint8array(mut self, u8a: Uint8Array) -> Self {
         self.body = Some(Body::Uint8Array(u8a));
         self
     }
 
+    /// Sets a body variant directly.
     pub fn body(mut self, body: Body) -> Self {
         self.body = Some(body);
         self
     }
 
+    /// Detects the browser's Fetch request-streaming extension.
+    ///
+    /// Browser support is inferred from the presence of `Request.prototype.duplex`.
     pub fn is_support_duplex_stream() -> bool {
         let global = js_sys::global();
         let Ok(request_ctor) = Reflect::get(&global, &JsValue::from_str("Request")) else {
@@ -106,9 +134,10 @@ impl HttpClient {
         Reflect::has(&proto, &JsValue::from_str("duplex")).unwrap_or(false)
     }
 
-    /// Allow body as an AsyncRead
-    /// only supported on some browser like Chrome or Edge.
-    /// if the browser is not supported, it will return error
+    /// Streams an async reader through Fetch using `duplex: "half"`.
+    ///
+    /// Browsers without request-streaming support are rejected during request
+    /// construction. XMLHttpRequest cannot send this body variant.
     pub fn body_stream(mut self, value: impl AsyncRead + Unpin + 'static) -> Result<Self, anyhow::Error> {
         if !Self::is_support_duplex_stream() {
             return Err(anyhow::anyhow!("Browser does not support duplex stream"));
@@ -118,6 +147,7 @@ impl HttpClient {
         Ok(self)
     }
 
+    /// Serializes JSON and sets `Content-Type: application/json`.
     pub fn body_json<T: Serialize>(mut self, value: &T) -> Result<Self, serde_json::Error> {
         let json_string = serde_json::to_string(value)?;
         self.headers.insert("Content-Type".into(), "application/json".into());
@@ -125,6 +155,10 @@ impl HttpClient {
         Ok(self)
     }
 
+    /// Starts an XMLHttpRequest immediately and returns its event stream.
+    ///
+    /// XHR is the appropriate backend when upload progress is needed. Streaming
+    /// reader bodies are rejected.
     pub fn xhr(self) -> Result<XmlHttpRequest, JsValue> {
         let url = self.url.ok_or_else(|| JsValue::from_str("URL must be set before send()"))?;
         let xml_http = Rc::new(WasmXmlHttpRequest::new()?);
@@ -199,6 +233,10 @@ impl HttpClient {
         Ok(XmlHttpRequest { xml_http, event_rx: rx })
     }
 
+    /// Prepares a Fetch request without sending it.
+    ///
+    /// The returned value owns an `AbortController`; dropping it aborts a fetch
+    /// that is still pending.
     pub fn fetch(self) -> Result<FetchRequest, JsValue> {
         let url = self.url.ok_or_else(|| JsValue::from_str("URL must be set before fetch()"))?;
 
@@ -266,20 +304,28 @@ fn parse_headers(headers: web_sys::Headers) -> Result<HashMap<String, String>, J
 }
 
 #[derive(Debug)]
+/// Upload lifecycle events emitted by [`XmlHttpRequest`].
 pub enum XhrEvent {
+    /// Browser upload progress event.
     InProgress(ProgressEvent),
+    /// Request completed with parsed response headers and the raw response body.
     Complete {
+        /// Response headers keyed by browser-normalized names.
         headers: HashMap<String, String>,
+        /// Raw XMLHttpRequest response value.
         body: JsValue,
     },
+    /// Network failure or explicit abort.
     Error(JsValue),
 }
 
 impl XmlHttpRequest {
+    /// Waits for the next upload or completion event.
     pub async fn next_event(&mut self) -> Option<XhrEvent> {
         self.event_rx.next().await
     }
 
+    /// Waits for completion while discarding progress events.
     pub async fn response(mut self) -> Result<(HashMap<String, String>, JsValue), JsValue> {
         while let Some(event) = self.next_event().await {
             match event {
@@ -302,12 +348,16 @@ impl Drop for XmlHttpRequest {
 }
 
 impl FetchRequest {
+    /// Sends the request and returns the browser response without status checks.
     pub async fn send(self) -> Result<Response, JsValue> {
         let window = web_sys::window().ok_or_else(|| JsValue::from_str("No global window"))?;
         let resp_js = JsFuture::from(window.fetch_with_request(&self.request)).await?;
         resp_js.dyn_into().map_err(|_| JsValue::from_str("Failed to convert to Response"))
     }
 
+    /// Sends the request and buffers the complete response body as bytes.
+    ///
+    /// The status code is returned to the caller rather than interpreted.
     pub async fn bytes(self) -> Result<(u16, HashMap<String, String>, Vec<u8>), JsValue> {
         let window = web_sys::window().ok_or_else(|| JsValue::from_str("No global window"))?;
         let resp_js = JsFuture::from(window.fetch_with_request(&self.request)).await?;
@@ -325,6 +375,10 @@ impl FetchRequest {
         Ok((status, headers_map, bytes))
     }
 
+    /// Sends the request and decodes a successful response as JavaScript JSON.
+    ///
+    /// Non-2xx statuses are errors. If the body is empty or invalid JSON, the
+    /// returned body is `JsValue::NULL` while response headers remain available.
     pub async fn response(self) -> Result<(HashMap<String, String>, JsValue), JsValue> {
         let window = web_sys::window().ok_or_else(|| JsValue::from_str("No global window"))?;
         let resp_js = JsFuture::from(window.fetch_with_request(&self.request)).await?;

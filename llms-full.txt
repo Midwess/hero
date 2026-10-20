@@ -117,6 +117,7 @@ in the consuming `Cargo.toml` so architectural dependencies remain visible.
 
 ## Documentation
 
+- [API reference on docs.rs](https://docs.rs/midwess-hero)
 - [Feature documentation](docs/features/README.md)
 - [Documentation publishing](docs/publishing.md)
 
@@ -141,7 +142,7 @@ buildable by feature on supported native and WASM targets.
 
 [package]
 name = "midwess-hero"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 description = "Opt-in cross-platform runtime and service integration utilities"
 repository = "https://github.com/Midwess/hero"
@@ -151,6 +152,12 @@ readme = "README.md"
 license = "MIT"
 keywords = ["midwess", "async", "infrastructure", "wasm", "gateway"]
 categories = ["asynchronous", "web-programming"]
+
+[package.metadata.docs.rs]
+all-features = true
+default-target = "x86_64-unknown-linux-gnu"
+targets = ["x86_64-unknown-linux-gnu"]
+rustdoc-args = ["--cfg", "docsrs"]
 
 [lib]
 name = "hero"
@@ -240,7 +247,7 @@ tokio = { version = "1.46.1", default-features = false, features = ["rt-multi-th
   "crate": {
     "name": "midwess-hero",
     "lib_name": "hero",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "default_features": [],
     "cargo_manifest": "Cargo.toml"
   },
@@ -567,6 +574,10 @@ Repository invariants:
 - Do not add broad production presets such as `full` or `backend`.
 - Native-only features must remain unavailable on WASM.
 - Feature relationships belong in `Cargo.toml` and `hero.features.json`.
+- Every public Rust item must have behavior-focused Rustdoc; do not merely
+  restate its signature, parameters, or return type.
+- `#![deny(missing_docs)]` and the docs.rs all-features metadata must remain
+  enabled so published API documentation cannot silently become empty.
 - Keep README content product-facing; discovery-system instructions belong in
   `llms.txt`, `AGENTS.md`, and `docs/indexing.md`.
 
@@ -579,6 +590,7 @@ When adding or changing a feature:
 5. Run `scripts/check-docs.sh`, `scripts/check-features.sh`, and
    `scripts/check-exclusions.sh`.
 6. Run native and supported-WASM Clippy checks.
+7. Build native and supported-WASM Rustdoc with warnings denied.
 
 When releasing Hero:
 
@@ -2520,6 +2532,8 @@ Use these sources in priority order:
 
 - The public Git repository, release artifacts, and versioned documentation
   bundles may be indexed under the repository's MIT license.
+- docs.rs provides the versioned native API reference with every Cargo feature
+  enabled; documentation bundles add the complete supported WASM API.
 - Never place credentials, internal endpoints, customer data, or other secrets
   in the documentation corpus.
 - Preserve version/revision metadata in derived vector or search indexes.
@@ -2606,8 +2620,19 @@ matching `v<version>` GitHub release. Existing crates.io versions are not
 republished. Publishing uses the organization-level `CARGO_REGISTRY_TOKEN`
 secret.
 
+The workflow can also be started manually to repair a missing crates.io or
+GitHub release for the current version. It never uploads a version already
+present in the crates.io index.
+
 Do not reuse or decrease a released version. Changes to `Cargo.toml` that leave
 the package version unchanged do not create a release.
+
+docs.rs builds Hero with every feature enabled for the native default target.
+The versioned documentation bundle additionally builds the complete supported
+`wasm32-unknown-unknown` API with the target-compatible feature set. Public
+items are guarded by `#![deny(missing_docs)]`, while CI treats Rustdoc warnings
+(including broken intra-doc links) as errors. Because crates.io releases are
+immutable, documentation corrections require a patch release.
 
 ## Documentation Bundles
 

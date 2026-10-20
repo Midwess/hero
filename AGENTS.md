@@ -16,6 +16,10 @@ Repository invariants:
 - Do not add broad production presets such as `full` or `backend`.
 - Native-only features must remain unavailable on WASM.
 - Feature relationships belong in `Cargo.toml` and `hero.features.json`.
+- Every public Rust item must have behavior-focused Rustdoc; do not merely
+  restate its signature, parameters, or return type.
+- `#![deny(missing_docs)]` and the docs.rs all-features metadata must remain
+  enabled so published API documentation cannot silently become empty.
 - Keep README content product-facing; discovery-system instructions belong in
   `llms.txt`, `AGENTS.md`, and `docs/indexing.md`.
 
@@ -28,6 +32,7 @@ When adding or changing a feature:
 5. Run `scripts/check-docs.sh`, `scripts/check-features.sh`, and
    `scripts/check-exclusions.sh`.
 6. Run native and supported-WASM Clippy checks.
+7. Build native and supported-WASM Rustdoc with warnings denied.
 
 When releasing Hero:
 

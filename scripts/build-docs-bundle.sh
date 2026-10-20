@@ -19,8 +19,9 @@ fi
 
 wasm_features="cancellation,config,distributed-id,env,finally,logger,maybe,never-send,number,pool,retry,stream,string,throttle-future,time,wasm,yield-container"
 rm -rf target/doc target/wasm32-unknown-unknown/doc
-cargo doc --no-deps --all-features
-cargo doc --no-deps --target wasm32-unknown-unknown --no-default-features --features "$wasm_features"
+RUSTDOCFLAGS="${RUSTDOCFLAGS:+$RUSTDOCFLAGS }-D warnings" cargo doc --no-deps --all-features
+RUSTDOCFLAGS="${RUSTDOCFLAGS:+$RUSTDOCFLAGS }-D warnings" \
+    cargo doc --no-deps --target wasm32-unknown-unknown --no-default-features --features "$wasm_features"
 
 bundle_root="target/docs-bundle/${version}/${revision_label}"
 rm -rf "$bundle_root"

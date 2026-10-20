@@ -11,6 +11,7 @@ the consuming project and target.
 - [Feature Pages](docs/features/README.md): one focused page per Cargo feature.
 - [Architecture](docs/architecture.md): design boundaries and common flows.
 - [Cargo Manifest](Cargo.toml): executable source of truth for features and dependencies.
+- [Published API Reference](https://docs.rs/midwess-hero/latest/hero/): behavior, examples, feature requirements, and public API details.
 - Native rustdoc: generated bundles expose `rustdoc/native/hero/index.html`.
 - WASM rustdoc: generated bundles expose `rustdoc/wasm/hero/index.html`.
 

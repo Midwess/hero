@@ -5,6 +5,11 @@ use std::sync::Arc;
 use super::allocator::{PoolAllocator, PoolItem};
 use crate::maybe::MaybeSendSync;
 
+/// Checked-out resource guard that returns its value to the pool on drop.
+///
+/// The return is scheduled asynchronously. Converting the guard into a
+/// [`PoolItem`] transfers responsibility to the caller and disables automatic
+/// return from this guard.
 pub struct PoolResponse<T>
 where
     T: MaybeSendSync + 'static,
@@ -17,6 +22,10 @@ impl<T> PoolResponse<T>
 where
     T: MaybeSendSync + 'static,
 {
+    /// Associates a pooled item with the allocator that should receive it back.
+    ///
+    /// Pool users normally obtain guards from
+    /// [`PoolAllocator::retrieve`](crate::pool::allocator::PoolAllocator::retrieve).
     pub fn new(resource: PoolItem<T>, pool: Arc<PoolAllocator<T>>) -> Self {
         Self {
             resource: Some(resource),
