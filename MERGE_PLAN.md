@@ -17,6 +17,16 @@ not remain as deprecated modules. SDK code that currently depends on
 `services::{Resolve, Errors}` will be replaced by module-local error and result
 types instead.
 
+## Implementation Status
+
+The Hero crate migration is implemented in this repository: both source
+histories are connected, the scoped source tree and clean feature model are in
+place, documentation and CI are present, and native/WASM validation is green.
+
+Consumer repository edits and remote archival are intentionally not performed
+here because those repositories are outside the writable Hero workspace. The
+required downstream changes are documented in `MIGRATION.md`.
+
 ## Target Structure
 
 Build one crate, not a workspace of renamed copies:
@@ -218,7 +228,8 @@ These should be isolated from the initial file move, but should block a stable
 - `WorkerLeaseGuard::drop` spawns Tokio tasks and can fail when dropped outside
   an active runtime. Provide explicit async shutdown and make drop best-effort.
 - `utils::pool::reponse` is misspelled and is widely consumed. Introduce the
-  correct `response` module and keep a deprecated re-export at `reponse`.
+  correct `response` module and remove the misspelled path as part of the
+  breaking migration.
 - Kong operations repeatedly construct HTTP clients and often unwrap error
   response bodies. Share a configured client and preserve the original error
   if reading its body fails.
@@ -281,8 +292,8 @@ Special cases:
 3. Keep cancellation only at `hero::utils::cancellation`. Do not add a second
    `hero::task` re-export.
 
-4. Add `hero::utils::pool::response`, while temporarily re-exporting it from
-   the legacy `hero::utils::pool::reponse` path.
+4. Add `hero::utils::pool::response` without retaining the misspelled legacy
+   path.
 
 5. Do not retain `sdk.rs`, `DevlogSdk`, or the `DependenciesInjection` trait.
    Move their only meaningful behavior to a typed
@@ -404,7 +415,7 @@ repository, and none of the excluded feature names exist.
 
 ### Phase 4: Harden retained APIs
 
-1. Add the corrected `pool::response` path and deprecated typo alias.
+1. Add the corrected `pool::response` path and remove the typo path.
 2. Add fallible distributed-ID initialization/generation APIs.
 3. Add explicit async shutdown for etcd lease guards.
 4. Replace or contain `NeverSend` so thread-safety is not asserted without a

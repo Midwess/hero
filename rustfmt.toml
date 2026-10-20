@@ -1,0 +1,14 @@
+fn_call_width = 80
+chain_width = 100
+max_width = 120
+edition = "2021"
+fn_params_layout = "Tall"
+force_explicit_abi = true
+match_arm_leading_pipes = "Preserve"
+match_block_trailing_comma = false
+merge_derives = true
+reorder_imports = true
+remove_nested_parens = true
+short_array_element_width_threshold = 10
+use_try_shorthand = true
+
