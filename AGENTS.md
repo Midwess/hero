@@ -29,3 +29,11 @@ When adding or changing a feature:
    `scripts/check-exclusions.sh`.
 6. Run native and supported-WASM Clippy checks.
 
+When releasing Hero:
+
+1. Increase the stable semantic version in `Cargo.toml`.
+2. Set the same version in `hero.features.json`.
+3. Regenerate feature pages and `llms-full.txt`.
+4. Push to `main`; `.github/workflows/release.yml` publishes the crate and
+   creates the matching GitHub release after validation.
+

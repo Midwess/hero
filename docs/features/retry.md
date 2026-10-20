@@ -16,7 +16,7 @@ Retry transient async operations with fixed or capped backoff.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["retry"]
 }
 ```

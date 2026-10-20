@@ -16,7 +16,7 @@ Abort an owned Tokio task when its guard drops.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["task"]
 }
 ```

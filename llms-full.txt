@@ -23,7 +23,7 @@ Add Hero from crates.io and select only the features the project uses:
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["cancellation", "task"]
 }
 ```
@@ -141,7 +141,7 @@ buildable by feature on supported native and WASM targets.
 
 [package]
 name = "midwess-hero"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 description = "Opt-in cross-platform runtime and service integration utilities"
 repository = "https://github.com/Midwess/hero"
@@ -240,7 +240,7 @@ tokio = { version = "1.46.1", default-features = false, features = ["rt-multi-th
   "crate": {
     "name": "midwess-hero",
     "lib_name": "hero",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "default_features": [],
     "cargo_manifest": "Cargo.toml"
   },
@@ -580,6 +580,14 @@ When adding or changing a feature:
    `scripts/check-exclusions.sh`.
 6. Run native and supported-WASM Clippy checks.
 
+When releasing Hero:
+
+1. Increase the stable semantic version in `Cargo.toml`.
+2. Set the same version in `hero.features.json`.
+3. Regenerate feature pages and `llms-full.txt`.
+4. Push to `main`; `.github/workflows/release.yml` publishes the crate and
+   creates the matching GitHub release after validation.
+
 ---
 
 # Source: docs/architecture.md
@@ -709,7 +717,7 @@ Define and register Kong services, routes, and plugins.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["api-gateway"]
 }
 ```
@@ -777,7 +785,7 @@ Propagate structured, scoped cancellation through async work.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["cancellation"]
 }
 ```
@@ -844,7 +852,7 @@ Read the standard Midwess Kong and deployment configuration.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["config"]
 }
 ```
@@ -918,7 +926,7 @@ Generate Snowflake-style IDs without a coordination service.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["distributed-id"]
 }
 ```
@@ -986,7 +994,7 @@ Coordinate distributed-ID worker leases through etcd.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["distributed-id-etcd"]
 }
 ```
@@ -1055,7 +1063,7 @@ Normalize local, development, staging, and production checks.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["env"]
 }
 ```
@@ -1120,7 +1128,7 @@ Run collected asynchronous cleanup work when an owner drops.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["finally"]
 }
 ```
@@ -1184,7 +1192,7 @@ Reuse a tonic channel through the configured gateway.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["grpc-gateway"]
 }
 ```
@@ -1248,7 +1256,7 @@ Add tonic incoming-listener support to Hero's TCP pattern.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["grpc-server"]
 }
 ```
@@ -1313,7 +1321,7 @@ Apply Midwess logging defaults and throttled logging.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["logger"]
 }
 ```
@@ -1382,7 +1390,7 @@ Express target-dependent sendability in generic APIs.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["maybe"]
 }
 ```
@@ -1447,7 +1455,7 @@ Mark a value as intentionally local without faking auto-traits.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["never-send"]
 }
 ```
@@ -1511,7 +1519,7 @@ Compute time-based exponential integer growth.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["number"]
 }
 ```
@@ -1575,7 +1583,7 @@ Manage bounded reusable resources and waiter queues.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["pool"]
 }
 ```
@@ -1642,7 +1650,7 @@ Retry transient async operations with fixed or capped backoff.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["retry"]
 }
 ```
@@ -1707,7 +1715,7 @@ Access S3-compatible object storage with product-neutral paths.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["s3"]
 }
 ```
@@ -1777,7 +1785,7 @@ Consume piped child stdout and stderr as one async stream.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["shell"]
 }
 ```
@@ -1841,7 +1849,7 @@ Send rendered HTML email with delivery cancellation.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["smtp"]
 }
 ```
@@ -1905,7 +1913,7 @@ Create in-memory duplex byte streams.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["stream"]
 }
 ```
@@ -1971,7 +1979,7 @@ Use shared string validation helpers.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["string"]
 }
 ```
@@ -2035,7 +2043,7 @@ Abort an owned Tokio task when its guard drops.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["task"]
 }
 ```
@@ -2099,7 +2107,7 @@ Bind dual-stack TCP and UDP listeners without tonic.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["tcp"]
 }
 ```
@@ -2165,7 +2173,7 @@ Coalesce frequent values before asynchronous processing.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["throttle-future"]
 }
 ```
@@ -2230,7 +2238,7 @@ Read epoch time in microseconds across targets.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["time"]
 }
 ```
@@ -2294,7 +2302,7 @@ Create and decode HS256 JSON Web Tokens.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["token"]
 }
 ```
@@ -2360,7 +2368,7 @@ Use browser HTTP, byte/file, and OPFS helpers.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["wasm"]
 }
 ```
@@ -2428,7 +2436,7 @@ Lend a value temporarily and return it on drop.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["yield-container"]
 }
 ```
@@ -2584,7 +2592,24 @@ rules in `docs/indexing.md`.
 
 # Source: docs/publishing.md
 
-# Publishing Hero Documentation
+# Publishing Hero
+
+## Crate Releases
+
+Hero releases start at `1.0.0`. To release a new version, update the package
+version in `Cargo.toml` and keep `hero.features.json` synchronized. A push to
+`main` that increases the stable semantic version runs the release workflow.
+
+The workflow validates native and WASM feature combinations, performs a Cargo
+publish dry run, publishes the new version to crates.io, and creates the
+matching `v<version>` GitHub release. Existing crates.io versions are not
+republished. Publishing uses the organization-level `CARGO_REGISTRY_TOKEN`
+secret.
+
+Do not reuse or decrease a released version. Changes to `Cargo.toml` that leave
+the package version unchanged do not create a release.
+
+## Documentation Bundles
 
 Hero documentation is built as a versioned artifact and is not automatically
 published to a public site.

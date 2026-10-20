@@ -16,7 +16,7 @@ Send rendered HTML email with delivery cancellation.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["smtp"]
 }
 ```

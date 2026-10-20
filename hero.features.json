@@ -4,7 +4,7 @@
   "crate": {
     "name": "midwess-hero",
     "lib_name": "hero",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "default_features": [],
     "cargo_manifest": "Cargo.toml"
   },

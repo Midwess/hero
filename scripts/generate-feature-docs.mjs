@@ -7,6 +7,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const catalogPath = resolve(root, "hero.features.json");
 const catalog = JSON.parse(await readFile(catalogPath, "utf8"));
 const check = process.argv.includes("--check");
+const dependencyVersion = catalog.crate.version.split(".")[0];
 
 const targetLabel = (targets) => targets.map((target) => (target === "native" ? "Native" : `\`${target}\``)).join(" and ");
 
@@ -44,7 +45,7 @@ ${feature.summary}
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "${dependencyVersion}",
     features = ["${feature.name}"]
 }
 \`\`\`

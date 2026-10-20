@@ -16,7 +16,7 @@ Reuse a tonic channel through the configured gateway.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["grpc-gateway"]
 }
 ```

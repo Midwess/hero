@@ -1,4 +1,21 @@
-# Publishing Hero Documentation
+# Publishing Hero
+
+## Crate Releases
+
+Hero releases start at `1.0.0`. To release a new version, update the package
+version in `Cargo.toml` and keep `hero.features.json` synchronized. A push to
+`main` that increases the stable semantic version runs the release workflow.
+
+The workflow validates native and WASM feature combinations, performs a Cargo
+publish dry run, publishes the new version to crates.io, and creates the
+matching `v<version>` GitHub release. Existing crates.io versions are not
+republished. Publishing uses the organization-level `CARGO_REGISTRY_TOKEN`
+secret.
+
+Do not reuse or decrease a released version. Changes to `Cargo.toml` that leave
+the package version unchanged do not create a release.
+
+## Documentation Bundles
 
 Hero documentation is built as a versioned artifact and is not automatically
 published to a public site.

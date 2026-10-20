@@ -16,7 +16,7 @@ Consume piped child stdout and stderr as one async stream.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["shell"]
 }
 ```

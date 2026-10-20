@@ -16,7 +16,7 @@ Express target-dependent sendability in generic APIs.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["maybe"]
 }
 ```

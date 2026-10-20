@@ -16,7 +16,7 @@ Bind dual-stack TCP and UDP listeners without tonic.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["tcp"]
 }
 ```

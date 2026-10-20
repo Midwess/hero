@@ -16,7 +16,7 @@ Coordinate distributed-ID worker leases through etcd.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["distributed-id-etcd"]
 }
 ```

@@ -21,7 +21,7 @@ Add Hero from crates.io and select only the features the project uses:
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["cancellation", "task"]
 }
 ```

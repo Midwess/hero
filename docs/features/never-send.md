@@ -16,7 +16,7 @@ Mark a value as intentionally local without faking auto-traits.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["never-send"]
 }
 ```

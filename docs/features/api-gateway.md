@@ -16,7 +16,7 @@ Define and register Kong services, routes, and plugins.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["api-gateway"]
 }
 ```

@@ -16,7 +16,7 @@ Lend a value temporarily and return it on drop.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["yield-container"]
 }
 ```

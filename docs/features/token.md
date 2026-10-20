@@ -16,7 +16,7 @@ Create and decode HS256 JSON Web Tokens.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["token"]
 }
 ```

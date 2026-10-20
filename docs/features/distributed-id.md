@@ -16,7 +16,7 @@ Generate Snowflake-style IDs without a coordination service.
 [dependencies]
 hero = {
     package = "midwess-hero",
-    version = "0.1",
+    version = "1",
     features = ["distributed-id"]
 }
 ```
