@@ -2,18 +2,32 @@
 set -euo pipefail
 
 native_features=(
-    retry
+    api-gateway
+    cancellation
+    config
     distributed-id
     distributed-id-etcd
-    shell
-    tcp
-    grpc-client
-    grpc-server
-    gateway
+    env
+    finally
+    grpc-gateway
+    logger
+    maybe
+    never-send
+    number
+    pool
+    retry
     s3
+    shell
     smtp
+    stream
+    string
+    task
+    tcp
+    grpc-server
+    throttle-future
+    time
     token
-    native-full
+    yield-container
 )
 
 for feature in "${native_features[@]}"; do
@@ -22,10 +36,29 @@ done
 
 cargo check --all-features
 
-wasm_features=(retry distributed-id wasm web-full)
+wasm_features=(
+    cancellation
+    config
+    distributed-id
+    env
+    finally
+    logger
+    maybe
+    never-send
+    number
+    pool
+    retry
+    stream
+    string
+    throttle-future
+    time
+    wasm
+    yield-container
+)
+
 for feature in "${wasm_features[@]}"; do
     cargo check --target wasm32-unknown-unknown --no-default-features --features "$feature"
 done
 
-cargo check --target wasm32-unknown-unknown --all-features
-
+wasm_all=$(IFS=,; echo "${wasm_features[*]}")
+cargo check --target wasm32-unknown-unknown --no-default-features --features "$wasm_all"

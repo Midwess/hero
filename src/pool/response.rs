@@ -3,7 +3,7 @@ use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use super::allocator::{PoolAllocator, PoolItem};
-use crate::utils::maybe::MaybeSendSync;
+use crate::maybe::MaybeSendSync;
 
 pub struct PoolResponse<T>
 where

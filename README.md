@@ -1,8 +1,9 @@
 # Hero
 
 Hero is the consolidated Midwess Rust library for cross-platform runtime
-utilities and service integrations. It combines the retained parts of
-`core-services` and `devlog-sdk` in one crate organized by capability.
+primitives and service integrations. Every capability is opt-in: the default
+feature set is empty, so applications compile only the modules and third-party
+dependencies they explicitly select.
 
 ## Scope
 
@@ -33,19 +34,50 @@ Enable only the capabilities an application uses:
 hero = {
     git = "ssh://git@github.com/Midwess/hero.git",
     rev = "<commit>",
-    features = ["gateway", "grpc-server", "tcp"]
+    features = ["api-gateway", "grpc-server"]
 }
 ```
 
 See [MIGRATION.md](MIGRATION.md) for import, feature, and API changes.
 
-## Feature Presets
+## Features
 
-- `native-full`: all supported native integrations.
-- `web-full`: browser HTTP/OPFS, retry, and distributed IDs.
+Hero has no feature presets and no default capabilities. Enable modules
+individually:
 
-Individual features are documented in `Cargo.toml`. Native and browser
-dependencies are target-isolated, so `--all-features` compiles on both targets.
+| Feature | Module |
+| --- | --- |
+| `api-gateway` | `hero::api_gateway` |
+| `cancellation` | `hero::cancellation` |
+| `config` | `hero::config` |
+| `distributed-id` | `hero::distributed_id` |
+| `distributed-id-etcd` | Adds etcd coordination to `distributed_id` |
+| `env` | `hero::env` |
+| `finally` | `hero::finally` |
+| `grpc-gateway` | `hero::grpc_gateway` |
+| `grpc-server` | Adds gRPC listener support to `hero::tcp` |
+| `logger` | `hero::logger` |
+| `maybe` | `hero::maybe` |
+| `never-send` | `hero::never_send` |
+| `number` | `hero::number` |
+| `pool` | `hero::pool`; enables `maybe` |
+| `retry` | `hero::retry` |
+| `s3` | `hero::s3` |
+| `shell` | `hero::shell` |
+| `smtp` | `hero::smtp`; enables `cancellation` |
+| `stream` | `hero::stream` |
+| `string` | `hero::string` |
+| `task` | `hero::task` |
+| `tcp` | `hero::tcp` |
+| `throttle-future` | `hero::throttle_future` |
+| `time` | `hero::time` |
+| `token` | `hero::token` |
+| `wasm` | `hero::wasm` |
+| `yield-container` | `hero::yield_container` |
+
+`cargo build` with no features compiles no optional dependency. Native-only
+features are not valid on WASM; `scripts/check-features.sh` validates every
+feature on its supported targets.
 
 ## Examples
 
@@ -86,10 +118,8 @@ let id = try_gen_id().await?;
 ```bash
 cargo fmt --all -- --check
 cargo test
-cargo test --features native-full
-cargo clippy --all-targets --features native-full -- -D warnings
-cargo check --target wasm32-unknown-unknown --features web-full
-cargo clippy --target wasm32-unknown-unknown --features web-full -- -D warnings
+cargo test --all-features
+cargo clippy --all-targets --all-features -- -D warnings
 scripts/check-exclusions.sh
 scripts/check-features.sh
 ```

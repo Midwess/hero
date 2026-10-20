@@ -39,34 +39,44 @@ hero/
 |- src/
 |  |- lib.rs
 |  |- api_gateway/
+|  |- cancellation.rs
 |  |- config.rs
 |  |- distributed_id/
 |  |- env.rs
+|  |- finally.rs
 |  |- grpc_gateway/
 |  |- logger/
+|  |- maybe.rs
+|  |- never_send.rs
+|  |- number.rs
+|  |- pool/
 |  |- retry/
 |  |- s3/
 |  |- shell/
 |  |- smtp/
+|  |- stream.rs
+|  |- string.rs
 |  |- task/
 |  |- tcp/
+|  |- throttle_future.rs
+|  |- time.rs
 |  |- token/
-|  |- utils/
-|  `- wasm/
+|  |- wasm/
+|  `- yield_container.rs
 `- tests/
 ```
 
-The structure follows `core-services`: its retained modules stay at their
-current top-level paths, and the non-conflicting SDK modules are added beside
-them. Do not introduce `core`, `sdk`, `core_services`, or `devlog_sdk` nesting
-modules.
+The structure follows `core-services`, but the former `utils` namespace is
+flattened so every capability is a root module. SDK modules are added beside
+them. Do not introduce `core`, `sdk`, `utils`, `core_services`, or
+`devlog_sdk` nesting modules.
 
 A retained API migration should therefore be mostly mechanical:
 
 ```rust
 core_services::utils::cancellation::CancellationToken
 // becomes
-hero::utils::cancellation::CancellationToken
+hero::cancellation::CancellationToken
 
 devlog_sdk::distributed_id::gen_id
 // becomes
@@ -289,11 +299,11 @@ Special cases:
    hero::retry::with_capped_backoff   # unbounded async helper
    ```
 
-3. Keep cancellation only at `hero::utils::cancellation`. Do not add a second
-   `hero::task` re-export.
+3. Flatten cancellation to `hero::cancellation`. Do not retain a `utils`
+   compatibility namespace or add a second `hero::task` re-export.
 
-4. Add `hero::utils::pool::response` without retaining the misspelled legacy
-   path.
+4. Flatten pooling to `hero::pool::response` without retaining either the
+   `utils` namespace or the misspelled legacy path.
 
 5. Do not retain `sdk.rs`, `DevlogSdk`, or the `DependenciesInjection` trait.
    Move their only meaningful behavior to a typed
@@ -317,26 +327,40 @@ is intentionally source-incompatible with the old schema-typed S3/SMTP APIs.
 
 ## Proposed Feature Model
 
-Use kebab-case feature names and explicit `dep:` references. Keep underscore
-aliases only when needed for migration.
+Use kebab-case feature names and explicit `dep:` references. The default
+feature set is empty, every root module is gated, and no preset or legacy alias
+is provided.
 
 | Feature | Enables | Target |
 | --- | --- | --- |
-| `default` | `distributed-id` plus platform-neutral utilities and config APIs | Native and WASM |
+| `default` | No capabilities | Native and WASM |
+| `api-gateway` | Kong models/client | Native |
+| `cancellation` | Scoped cancellation | Native and WASM |
+| `config` | Kong environment configuration | Native and WASM |
 | `retry` | Retry macro on all targets and capped-backoff helper where supported | Native and WASM |
 | `distributed-id` | Local Snowflake generator and scoped identifiers | Native and WASM |
+| `env` | Deployment environment parsing | Native and WASM |
+| `finally` | Async cleanup collection | Native and WASM |
 | `shell` | Child-process stream support | Native |
 | `tcp` | TCP/UDP listeners | Native |
-| `grpc-client` | Gateway channel | Native |
-| `grpc-server` | tonic status conversion and gRPC incoming listener support | Native |
-| `gateway` | Kong models/client | Native |
+| `grpc-gateway` | Shared gateway channel | Native |
+| `grpc-server` | gRPC incoming listener support on `tcp` | Native |
 | `distributed-id-etcd` | etcd worker allocation and lease maintenance | Native |
+| `logger` | Native/WASM logger and throttled logger | Native and WASM |
+| `maybe` | Conditional send/sync marker traits | Native and WASM |
+| `never-send` | Thread-local wrapper | Native and WASM |
+| `number` | Numeric growth helper | Native and WASM |
+| `pool` | Resource pool; enables `maybe` | Native and WASM |
 | `s3` | AWS S3 client | Native |
-| `smtp` | SMTP transport | Native |
+| `smtp` | SMTP transport; enables `cancellation` | Native |
+| `stream` | Duplex async stream | Native and WASM |
+| `string` | String extensions | Native and WASM |
+| `task` | Task lifecycle helpers | Native |
+| `throttle-future` | Throttled async dispatch | Native and WASM |
+| `time` | Cross-platform epoch time | Native and WASM |
 | `token` | JWT helpers | Native |
 | `wasm` | Browser HTTP, OPFS, and JS extensions | WASM |
-| `native-full` | `retry`, `distributed-id-etcd`, `shell`, `tcp`, `grpc-client`, `grpc-server`, `gateway`, `s3`, `smtp`, and `token` | Native |
-| `web-full` | `retry`, `distributed-id`, and `wasm` | WASM |
+| `yield-container` | Yield/return container | Native and WASM |
 
 The WASM target configuration must enable the JavaScript entropy backend used
 by `rand/getrandom`, because scoped identifier generation remains part of the
@@ -346,11 +370,10 @@ Do not add legacy feature aliases. The old `host_machine`, `distributed_id`,
 `backend`, `db-red`, `db-idb`, `local-storage`, `zip`, `zstd`, and `services`
 features must not exist in Hero.
 
-Target-only modules must have both feature and target cfgs. Enabling every
-native feature must not compile browser modules, and `web-full` must not pull
-in etcd, socket2, native Tokio networking, AWS, SMTP, or Kong. The current
-`tcp::listener` file must gate tonic-specific `GrpcConnection` APIs with
-`grpc-server`, so the standalone `tcp` feature does not require tonic.
+Target-only modules must have both feature and target cfgs. The feature matrix
+checks every feature independently on each valid target. The `tcp::listener`
+file gates tonic-specific `GrpcConnection` APIs with `grpc-server`, so the
+standalone `tcp` feature does not require tonic.
 
 ## Implementation Phases
 
@@ -406,7 +429,7 @@ test without containing the three excluded modules.
 3. Correct the `shell` Tokio I/O features and browser logger/time dependencies.
 4. Move native-only dependencies into native target sections and browser-only
    dependencies into WASM target sections.
-5. Add the exact `native-full` and `web-full` presets defined above.
+5. Validate every feature independently and keep `default = []`.
 6. Remove unused dependencies and converge AWS, tonic, Reqwest, and TLS
    versions/features.
 
@@ -475,14 +498,14 @@ The merge is complete only when these checks are automated:
 
 | Check | Command intent |
 | --- | --- |
-| Native minimal | `cargo check` and `cargo test` |
-| Native complete | check/test with `native-full` |
-| Browser minimal | check default features for `wasm32-unknown-unknown` |
-| Browser complete | check/test-compatible build with `web-full` |
-| Individual features | each public feature checked independently where valid |
+| Empty crate | `cargo check --no-default-features` builds no optional dependency |
+| Native complete | check/test with `--all-features` |
+| Browser empty | check no features for `wasm32-unknown-unknown` |
+| Browser complete | check with `--all-features` for WASM |
+| Individual features | every public feature checked independently on valid targets |
 | Exclusion guard | fail CI if excluded directories, compatibility modules/symbols, or old feature names reappear |
 | Formatting/lints | stable `cargo fmt --check`; Clippy for native and WASM presets |
-| Docs | rustdoc for default, native-full, and web-full APIs |
+| Docs | rustdoc for native and WASM all-feature APIs |
 | Packaging | package contains no external path dependency |
 | Consumer smoke tests | one gateway server, one native app, and one WASM consumer |
 
@@ -501,6 +524,7 @@ Add missing retained behavior tests during the merge:
 - The root has one Cargo package named `hero` and no nested active crates.
 - `core-services` is the structural base of the source tree.
 - Hero contains no `db`, `local_storage`, or `services` module.
+- Hero contains no `utils` module; former utilities are flat root modules.
 - Hero contains no `sdk` module, `DevlogSdk`, or `DependenciesInjection`
   compatibility facade.
 - Hero exposes no `db-red`, `db-idb`, `local-storage`, `zip`, `zstd`, or
@@ -509,7 +533,10 @@ Add missing retained behavior tests during the merge:
 - Retained code uses module-local errors and does not add a compatibility
   `services` namespace or root catch-all error.
 - Hero has no relative path dependency outside this repository.
-- Native and WASM feature presets compile independently.
+- `default = []`, every public module is feature-gated, and every optional
+  dependency is owned by a feature.
+- A no-feature normal dependency tree contains only `hero` itself.
+- Native and WASM feature matrices compile independently.
 - The 30 existing unit tests and current doc test are preserved and passing.
 - New tests cover retained feature/target failures found during this analysis.
 - All direct dependencies are used and assigned to the correct target/feature.
@@ -528,7 +555,8 @@ Add missing retained behavior tests during the merge:
 7. Replace retained service error/result dependencies with module-local error
    APIs.
 8. Keep schema outside Hero and expose product-neutral S3/SMTP APIs.
-9. Support native and browser consumers with separate feature presets.
+9. Use an empty default feature set and require consumers to enable each needed
+   module explicitly.
 10. Provide no old module or feature compatibility layer; migration happens in
     consumers.
 

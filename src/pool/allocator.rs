@@ -14,7 +14,7 @@ use std::time::Duration;
 use thiserror::Error;
 
 use super::response::PoolResponse;
-use crate::utils::maybe::MaybeSendSync;
+use crate::maybe::MaybeSendSync;
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum PoolBuildError {

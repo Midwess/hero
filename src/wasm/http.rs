@@ -1,11 +1,10 @@
-use crate::utils::never_send::NeverSend;
 use futures::channel::mpsc::{channel, Receiver};
 use futures::{AsyncRead, StreamExt};
 use futures_util::SinkExt;
 use js_sys::{Object, Reflect, Uint8Array};
 use serde::Serialize;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::rc::Rc;
 use wasm_bindgen::prelude::{Closure, JsValue};
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
@@ -31,7 +30,7 @@ pub enum Body {
 }
 
 pub struct XmlHttpRequest {
-    xml_http: Arc<NeverSend<WasmXmlHttpRequest>>,
+    xml_http: Rc<WasmXmlHttpRequest>,
     event_rx: Receiver<XhrEvent>,
 }
 
@@ -128,7 +127,7 @@ impl HttpClient {
 
     pub fn xhr(self) -> Result<XmlHttpRequest, JsValue> {
         let url = self.url.ok_or_else(|| JsValue::from_str("URL must be set before send()"))?;
-        let xml_http = Arc::new(NeverSend(WasmXmlHttpRequest::new()?));
+        let xml_http = Rc::new(WasmXmlHttpRequest::new()?);
         xml_http.open_with_async(&self.method, &url, true)?;
 
         for (k, v) in &self.headers {

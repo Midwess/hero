@@ -1,4 +1,4 @@
-use crate::utils::cancellation::{CancellationToken, FutureExtension, TaskErrors};
+use crate::cancellation::{CancellationToken, FutureExtension, TaskErrors};
 use lettre::address::AddressError;
 use lettre::message::header::ContentType;
 use lettre::message::{Mailbox, MultiPart, SinglePart};

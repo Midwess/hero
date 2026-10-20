@@ -130,7 +130,7 @@ impl CancellationToken {
     /// Exiting restores the enclosing scope without cancelling this token.
     ///
     /// ```
-    /// use hero::utils::cancellation::CancellationToken;
+    /// use hero::cancellation::CancellationToken;
     ///
     /// # futures::executor::block_on(async {
     /// let token = CancellationToken::current_or_new();

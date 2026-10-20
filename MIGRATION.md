@@ -1,8 +1,8 @@
 # Migrating to Hero
 
 Hero replaces the retained capabilities of `core-services` and `devlog-sdk`.
-It is intentionally a breaking migration with no legacy module or feature
-aliases.
+It is intentionally a breaking, fully opt-in migration with no default
+features and no legacy module or feature aliases.
 
 ## Dependency
 
@@ -15,7 +15,7 @@ core-services = { path = "../core-services", features = ["grpc-server"] }
 devlog-sdk = { path = "../devlog-sdk", features = ["gateway", "tcp"] }
 
 # After
-hero = { path = "../hero", features = ["grpc-server", "gateway", "tcp"] }
+hero = { path = "../hero", features = ["grpc-server", "api-gateway"] }
 ```
 
 ## Import Prefixes
@@ -23,7 +23,17 @@ hero = { path = "../hero", features = ["grpc-server", "gateway", "tcp"] }
 Retained modules stay at the top level:
 
 ```text
-core_services::utils::*       -> hero::utils::*
+core_services::utils::cancellation     -> hero::cancellation
+core_services::utils::finally          -> hero::finally
+core_services::utils::maybe            -> hero::maybe
+core_services::utils::never_send       -> hero::never_send
+core_services::utils::number           -> hero::number
+core_services::utils::pool             -> hero::pool
+core_services::utils::stream           -> hero::stream
+core_services::utils::string           -> hero::string
+core_services::utils::throttle_future  -> hero::throttle_future
+core_services::utils::time             -> hero::time
+core_services::utils::yield_container  -> hero::yield_container
 core_services::logger         -> hero::logger
 core_services::env            -> hero::env
 core_services::s3             -> hero::s3
@@ -67,13 +77,21 @@ needed. Consumers that constructed an empty `DevlogSdk` can remove it.
 | --- | --- |
 | `host_machine` | `shell` |
 | `distributed_id` | `distributed-id-etcd` |
-| `backend` | Select individual features or use `native-full` |
+| `gateway` | `api-gateway` |
+| `grpc-client` | `grpc-gateway` |
+| `backend` | Select every required capability individually |
 | `db-red` | Removed |
 | `db-idb` | Removed |
 | `local-storage` | Removed |
 | `zip` | Removed |
 | `zstd` | Removed |
 | `services` | Removed |
+
+The previous default exports are now feature-gated. For example, using
+`hero::cancellation` requires `features = ["cancellation"]`, and using the
+pool requires `features = ["pool"]`. Cross-module requirements are encoded in
+Cargo: `smtp` enables `cancellation`, `pool` enables `maybe`, `grpc-server`
+enables `tcp`, and `distributed-id-etcd` enables `distributed-id`.
 
 ## API Changes
 
@@ -112,6 +130,8 @@ product protobuf rendering are no longer library responsibilities.
 - `PoolResourceProvider::new` is renamed to `create`.
 - `PoolBuilder::build` and `PoolRequestBuilder::build` return `Result`.
 - `NeverSend<T>` no longer unsafely implements `Send` or `Sync`.
+- `NeverSend<T>` no longer provides implicit Serde forwarding; serialize the
+  wrapped value explicitly when needed.
 
 ### Shell and gRPC
 

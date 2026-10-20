@@ -1,6 +1,6 @@
 use super::allocator::PoolAllocator;
 use super::response::PoolResponse;
-use crate::utils::maybe::MaybeSendSync;
+use crate::maybe::MaybeSendSync;
 use futures_timer::Delay;
 use futures_util::{select, FutureExt};
 use std::sync::Arc;

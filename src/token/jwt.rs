@@ -15,8 +15,6 @@ pub struct Claims<T> {
 pub enum JwtErrors {
     #[error("JWT coding error: {0}")]
     CodingError(#[from] jsonwebtoken::errors::Error),
-    #[error("Serialization error: {0}")]
-    SerializationError(#[from] serde_json::Error),
     #[error("Invalid secret")]
     InvalidSecret,
 }
