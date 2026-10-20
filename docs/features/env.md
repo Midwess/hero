@@ -15,8 +15,8 @@ Normalize local, development, staging, and production checks.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["env"]
 }
 ```
@@ -58,4 +58,3 @@ use hero::env::Environment;
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)

@@ -14,7 +14,6 @@ organization once adopted.
 | `hero://<revision>/bundle-metadata` | `application/json` | Exact bundle version, revision, creation time, and distributable state. |
 | `hero://<revision>/rustdoc/native/<path>` | `text/html` | Native rustdoc page. |
 | `hero://<revision>/rustdoc/wasm/<path>` | `text/html` | WASM rustdoc page. |
-| `hero://<revision>/migration` | `text/markdown` | Migration guide. |
 | `hero://<revision>/llms` | `text/plain` | `llms.txt`. |
 | `hero://<revision>/llms-full` | `text/plain` | Consolidated documentation corpus. |
 

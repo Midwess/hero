@@ -15,8 +15,8 @@ Propagate structured, scoped cancellation through async work.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["cancellation"]
 }
 ```
@@ -60,4 +60,3 @@ This feature does not define environment variables.
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)

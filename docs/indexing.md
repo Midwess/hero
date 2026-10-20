@@ -11,7 +11,7 @@ Use these sources in priority order:
 2. `hero.features.json` for machine-readable selection metadata.
 3. `docs/features/<feature>.md` for focused feature guidance.
 4. rustdoc for item-level signatures and type documentation.
-5. `README.md`, `MIGRATION.md`, and `docs/architecture.md` for broader context.
+5. `README.md` and `docs/architecture.md` for broader context.
 
 ## Chunking
 
@@ -19,7 +19,6 @@ Use these sources in priority order:
 - Split rustdoc by public item or module, preserving the fully qualified path.
 - Keep feature name, API root, target, implied features, crate version, and Git
   revision as metadata on every chunk.
-- Keep migration content in a separate collection from current API guidance.
 - Do not merge multiple feature pages into one undifferentiated chunk.
 
 ## Versioning
@@ -33,12 +32,11 @@ Use these sources in priority order:
 
 ## Access
 
-- Private repositories require an organization-approved Git provider
-  connection, documentation crawler, or MCP server.
-- Do not copy private source or documentation into an external provider without
-  an approved data-handling agreement.
-- Apply repository access controls to the generated documentation bundle and
-  any derived vector/search index.
+- The public Git repository, release artifacts, and versioned documentation
+  bundles may be indexed under the repository's MIT license.
+- Never place credentials, internal endpoints, customer data, or other secrets
+  in the documentation corpus.
+- Preserve version/revision metadata in derived vector or search indexes.
 
 ## Retrieval Behavior
 

@@ -13,11 +13,6 @@ jobs:
   bundle:
     runs-on: ubuntu-latest
     steps:
-      - name: Refuse public artifact publication
-        if: ${{ github.event.repository.visibility == 'public' }}
-        run: |
-          echo "Documentation bundles are restricted to private or internal repositories."
-          exit 1
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0

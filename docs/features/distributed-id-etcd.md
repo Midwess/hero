@@ -15,8 +15,8 @@ Coordinate distributed-ID worker leases through etcd.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["distributed-id-etcd"]
 }
 ```
@@ -62,4 +62,3 @@ use hero::distributed_id::EtcdWorkerOptions;
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)

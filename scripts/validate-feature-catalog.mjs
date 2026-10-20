@@ -7,6 +7,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const manifest = await readFile(resolve(root, "Cargo.toml"), "utf8");
 const catalog = JSON.parse(await readFile(resolve(root, "hero.features.json"), "utf8"));
 
+if (catalog.crate.name !== "midwess-hero" || catalog.crate.lib_name !== "hero") {
+  throw new Error("feature catalog must identify package midwess-hero and library hero");
+}
+
 const version = manifest.match(/^version\s*=\s*"([^"]+)"/m)?.[1];
 if (!version || catalog.crate.version !== version) {
   throw new Error(`catalog version ${catalog.crate.version} does not match Cargo version ${version}`);

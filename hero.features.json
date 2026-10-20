@@ -2,7 +2,8 @@
   "$schema": "docs/hero-features.schema.json",
   "schema_version": 1,
   "crate": {
-    "name": "hero",
+    "name": "midwess-hero",
+    "lib_name": "hero",
     "version": "0.1.0",
     "default_features": [],
     "cargo_manifest": "Cargo.toml"

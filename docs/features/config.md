@@ -15,8 +15,8 @@ Read the standard Midwess Kong and deployment configuration.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["config"]
 }
 ```
@@ -67,4 +67,3 @@ use hero::config::CONFIGS;
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)

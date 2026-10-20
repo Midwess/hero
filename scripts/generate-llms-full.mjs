@@ -15,8 +15,6 @@ const sources = [
   "docs/architecture.md",
   "docs/features/README.md",
   ...catalog.features.map((feature) => feature.docs),
-  "MIGRATION.md",
-  "HISTORY.md",
   "docs/indexing.md",
   "docs/mcp-resource-contract.md",
   "docs/publishing.md"

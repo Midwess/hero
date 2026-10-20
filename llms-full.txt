@@ -17,16 +17,21 @@ build enables no normal dependency.
 
 ## Installation
 
-Until a license and publication policy are selected, consume Hero by pinned
-Git revision:
+Add Hero from crates.io and select only the features the project uses:
 
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["cancellation", "task"]
 }
+```
+
+Or use Cargo:
+
+```bash
+cargo add midwess-hero --rename hero --features cancellation,task
 ```
 
 Do not use `all-features` in an application dependency. Start with no features,
@@ -110,25 +115,9 @@ for details, exact API paths, environment variables, and related capabilities.
 These entries are introductions, not bundled presets. List individual features
 in the consuming `Cargo.toml` so architectural dependencies remain visible.
 
-## What Hero Does Not Include
-
-Hero deliberately excludes:
-
-- database repositories and persistence abstractions;
-- local filesystem/storage orchestration and ZIP packaging;
-- a generic application service trait or catch-all error type;
-- product schemas, protobuf-generated domain types, and Crafter templates;
-- application dependency-injection containers;
-- business workflows and product-specific policy.
-
-See [MIGRATION.md](MIGRATION.md) when moving from `core-services` or
-`devlog-sdk`. See [HISTORY.md](HISTORY.md) for imported repository history.
-
 ## Documentation
 
 - [Feature documentation](docs/features/README.md)
-- [Migration guide](MIGRATION.md)
-- [Source history](HISTORY.md)
 - [Documentation publishing](docs/publishing.md)
 
 ## Development
@@ -151,15 +140,20 @@ buildable by feature on supported native and WASM targets.
 # Source: Cargo.toml
 
 [package]
-name = "hero"
+name = "midwess-hero"
 version = "0.1.0"
 edition = "2021"
-publish = false
 description = "Opt-in cross-platform runtime and service integration utilities"
 repository = "https://github.com/Midwess/hero"
+homepage = "https://github.com/Midwess/hero"
+documentation = "https://docs.rs/midwess-hero"
 readme = "README.md"
+license = "MIT"
+keywords = ["midwess", "async", "infrastructure", "wasm", "gateway"]
+categories = ["asynchronous", "web-programming"]
 
 [lib]
+name = "hero"
 crate-type = ["rlib", "cdylib"]
 
 [features]
@@ -244,7 +238,8 @@ tokio = { version = "1.46.1", default-features = false, features = ["rt-multi-th
   "$schema": "docs/hero-features.schema.json",
   "schema_version": 1,
   "crate": {
-    "name": "hero",
+    "name": "midwess-hero",
+    "lib_name": "hero",
     "version": "0.1.0",
     "default_features": [],
     "cargo_manifest": "Cargo.toml"
@@ -713,8 +708,8 @@ Define and register Kong services, routes, and plugins.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["api-gateway"]
 }
 ```
@@ -759,7 +754,6 @@ This feature does not define environment variables.
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -782,8 +776,8 @@ Propagate structured, scoped cancellation through async work.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["cancellation"]
 }
 ```
@@ -827,7 +821,6 @@ This feature does not define environment variables.
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -850,8 +843,8 @@ Read the standard Midwess Kong and deployment configuration.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["config"]
 }
 ```
@@ -902,7 +895,6 @@ use hero::config::CONFIGS;
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -925,8 +917,8 @@ Generate Snowflake-style IDs without a coordination service.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["distributed-id"]
 }
 ```
@@ -971,7 +963,6 @@ This feature does not define environment variables.
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -994,8 +985,8 @@ Coordinate distributed-ID worker leases through etcd.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["distributed-id-etcd"]
 }
 ```
@@ -1041,7 +1032,6 @@ use hero::distributed_id::EtcdWorkerOptions;
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -1064,8 +1054,8 @@ Normalize local, development, staging, and production checks.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["env"]
 }
 ```
@@ -1107,7 +1097,6 @@ use hero::env::Environment;
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -1130,8 +1119,8 @@ Run collected asynchronous cleanup work when an owner drops.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["finally"]
 }
 ```
@@ -1172,7 +1161,6 @@ This feature does not define environment variables.
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -1195,8 +1183,8 @@ Reuse a tonic channel through the configured gateway.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["grpc-gateway"]
 }
 ```
@@ -1237,7 +1225,6 @@ use hero::grpc_gateway::channel::GrpcGatewayChannel;
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -1260,8 +1247,8 @@ Add tonic incoming-listener support to Hero's TCP pattern.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["grpc-server"]
 }
 ```
@@ -1303,7 +1290,6 @@ use hero::tcp::listener::find_grpc_listener;
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -1326,8 +1312,8 @@ Apply Midwess logging defaults and throttled logging.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["logger"]
 }
 ```
@@ -1373,7 +1359,6 @@ use hero::logger::setup;
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -1396,8 +1381,8 @@ Express target-dependent sendability in generic APIs.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["maybe"]
 }
 ```
@@ -1439,7 +1424,6 @@ This feature does not define environment variables.
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -1462,8 +1446,8 @@ Mark a value as intentionally local without faking auto-traits.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["never-send"]
 }
 ```
@@ -1504,7 +1488,6 @@ This feature does not define environment variables.
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -1527,8 +1510,8 @@ Compute time-based exponential integer growth.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["number"]
 }
 ```
@@ -1569,7 +1552,6 @@ This feature does not define environment variables.
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -1592,8 +1574,8 @@ Manage bounded reusable resources and waiter queues.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["pool"]
 }
 ```
@@ -1637,7 +1619,6 @@ This feature does not define environment variables.
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -1660,8 +1641,8 @@ Retry transient async operations with fixed or capped backoff.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["retry"]
 }
 ```
@@ -1703,7 +1684,6 @@ This feature does not define environment variables.
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -1726,8 +1706,8 @@ Access S3-compatible object storage with product-neutral paths.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["s3"]
 }
 ```
@@ -1774,7 +1754,6 @@ use hero::s3::S3Config;
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -1797,8 +1776,8 @@ Consume piped child stdout and stderr as one async stream.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["shell"]
 }
 ```
@@ -1839,7 +1818,6 @@ This feature does not define environment variables.
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -1862,8 +1840,8 @@ Send rendered HTML email with delivery cancellation.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["smtp"]
 }
 ```
@@ -1904,7 +1882,6 @@ This feature does not define environment variables.
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -1927,8 +1904,8 @@ Create in-memory duplex byte streams.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["stream"]
 }
 ```
@@ -1971,7 +1948,6 @@ This feature does not define environment variables.
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -1994,8 +1970,8 @@ Use shared string validation helpers.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["string"]
 }
 ```
@@ -2036,7 +2012,6 @@ This feature does not define environment variables.
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -2059,8 +2034,8 @@ Abort an owned Tokio task when its guard drops.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["task"]
 }
 ```
@@ -2101,7 +2076,6 @@ This feature does not define environment variables.
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -2124,8 +2098,8 @@ Bind dual-stack TCP and UDP listeners without tonic.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["tcp"]
 }
 ```
@@ -2168,7 +2142,6 @@ use hero::tcp::listener::find_tcp_listener;
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -2191,8 +2164,8 @@ Coalesce frequent values before asynchronous processing.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["throttle-future"]
 }
 ```
@@ -2234,7 +2207,6 @@ This feature does not define environment variables.
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -2257,8 +2229,8 @@ Read epoch time in microseconds across targets.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["time"]
 }
 ```
@@ -2299,7 +2271,6 @@ This feature does not define environment variables.
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -2322,8 +2293,8 @@ Create and decode HS256 JSON Web Tokens.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["token"]
 }
 ```
@@ -2366,7 +2337,6 @@ This feature does not define environment variables.
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -2389,8 +2359,8 @@ Use browser HTTP, byte/file, and OPFS helpers.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["wasm"]
 }
 ```
@@ -2435,7 +2405,6 @@ This feature does not define environment variables.
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
 
 ---
 
@@ -2458,8 +2427,8 @@ Lend a value temporarily and return it on drop.
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["yield-container"]
 }
 ```
@@ -2502,174 +2471,6 @@ This feature does not define environment variables.
 - [Feature index](README.md)
 - [Hero overview](../../README.md)
 - [Machine-readable catalog](../../hero.features.json)
-- [Migration guide](../../MIGRATION.md)
-
----
-
-# Source: MIGRATION.md
-
-# Migrating to Hero
-
-Hero replaces the retained capabilities of `core-services` and `devlog-sdk`.
-It is intentionally a breaking, fully opt-in migration with no default
-features and no legacy module or feature aliases.
-
-## Dependency
-
-Replace both old dependencies with one Hero dependency and the union of the
-retained features that the application uses:
-
-```toml
-# Before
-core-services = { path = "../core-services", features = ["grpc-server"] }
-devlog-sdk = { path = "../devlog-sdk", features = ["gateway", "tcp"] }
-
-# After
-hero = { path = "../hero", features = ["grpc-server", "api-gateway"] }
-```
-
-## Import Prefixes
-
-Retained modules stay at the top level:
-
-```text
-core_services::utils::cancellation     -> hero::cancellation
-core_services::utils::finally          -> hero::finally
-core_services::utils::maybe            -> hero::maybe
-core_services::utils::never_send       -> hero::never_send
-core_services::utils::number           -> hero::number
-core_services::utils::pool             -> hero::pool
-core_services::utils::stream           -> hero::stream
-core_services::utils::string           -> hero::string
-core_services::utils::throttle_future  -> hero::throttle_future
-core_services::utils::time             -> hero::time
-core_services::utils::yield_container  -> hero::yield_container
-core_services::logger         -> hero::logger
-core_services::env            -> hero::env
-core_services::s3             -> hero::s3
-core_services::smtp           -> hero::smtp
-core_services::token          -> hero::token
-core_services::shell          -> hero::shell
-core_services::wasm           -> hero::wasm
-
-devlog_sdk::api_gateway       -> hero::api_gateway
-devlog_sdk::config            -> hero::config
-devlog_sdk::distributed_id    -> hero::distributed_id
-devlog_sdk::grpc_gateway      -> hero::grpc_gateway
-devlog_sdk::retry             -> hero::retry
-devlog_sdk::task              -> hero::task
-devlog_sdk::tcp               -> hero::tcp
-```
-
-## Removed Capabilities
-
-Hero has no replacement for:
-
-- `core_services::db`
-- `core_services::local_storage`
-- the generic `core_services::services::Service` abstraction
-
-Move those capabilities into application-owned code or a dedicated library.
-Retained Kong, TCP, S3, and SMTP APIs now expose errors in their own modules
-instead of using `services::Errors`.
-
-Hero also removes:
-
-- `devlog_sdk::sdk::DevlogSdk`
-- `devlog_sdk::sdk::DependenciesInjection`
-
-Use `hero::s3::S3Config::from_env()?.build_client()` where an S3 client is
-needed. Consumers that constructed an empty `DevlogSdk` can remove it.
-
-## Feature Changes
-
-| Old feature | Hero replacement |
-| --- | --- |
-| `host_machine` | `shell` |
-| `distributed_id` | `distributed-id-etcd` |
-| `gateway` | `api-gateway` |
-| `grpc-client` | `grpc-gateway` |
-| `backend` | Select every required capability individually |
-| `db-red` | Removed |
-| `db-idb` | Removed |
-| `local-storage` | Removed |
-| `zip` | Removed |
-| `zstd` | Removed |
-| `services` | Removed |
-
-The previous default exports are now feature-gated. For example, using
-`hero::cancellation` requires `features = ["cancellation"]`, and using the
-pool requires `features = ["pool"]`. Cross-module requirements are encoded in
-Cargo: `smtp` enables `cancellation`, `pool` enables `maybe`, `grpc-server`
-enables `tcp`, and `distributed-id-etcd` enables `distributed-id`.
-
-## API Changes
-
-### Gateway builders
-
-`GatewayRouteBuilder::build` and `GatewayServiceBuilder::build` now return
-`Result` instead of panicking when required fields are missing.
-
-### Distributed IDs
-
-- Prefer `try_gen_id` and native `try_gen_id_sync`.
-- `id_to_datetime` now returns `Result`.
-- Scoped and etcd initialization report duplicate initialization.
-- Call `shutdown_id_generator().await` before native etcd-backed shutdown.
-
-The old `gen_id` functions remain deprecated panic-based wrappers for a short
-source migration window.
-
-### S3
-
-- Schema protobuf types are replaced by `hero::s3::ObjectPath`.
-- Environment parsing is handled by `S3Config::from_env`.
-- Access to the underlying AWS client is read-only through `raw_client`.
-
-Product-specific `StaticResource` conversions belong in the consuming
-application or a separate adapter crate.
-
-### SMTP
-
-`SmtpClient::send_html` accepts a rendered subject and HTML body. Crafter and
-product protobuf rendering are no longer library responsibilities.
-
-### Pooling
-
-- `pool::reponse` is removed; use `pool::response`.
-- `PoolResourceProvider::new` is renamed to `create`.
-- `PoolBuilder::build` and `PoolRequestBuilder::build` return `Result`.
-- `NeverSend<T>` no longer unsafely implements `Send` or `Sync`.
-- `NeverSend<T>` no longer provides implicit Serde forwarding; serialize the
-  wrapped value explicitly when needed.
-
-### Shell and gRPC
-
-- Construct `StdStream` with `TryFrom<tokio::process::Child>`.
-- `GrpcGatewayChannel::new` returns `Result`.
-- `connect_with_timeout` returns the connected channel.
-
-### Browser extensions
-
-`VecExtension` methods are renamed to `to_uint8_array`, `to_js_value`, and
-unsafe `view_uint8_array`. JSON bodies and missing URLs now return errors.
-
----
-
-# Source: HISTORY.md
-
-# Source History
-
-Hero preserves the complete Git histories of its two source libraries as
-ancestors of the Hero main branch.
-
-| Source | Repository | Imported tip |
-| --- | --- | --- |
-| Core structural base | `git@github.com:midwess/core-services.git` | `c1c62b6dea44bf4394e129e1d695be573d915a32` |
-| SDK capabilities | `git@github.com:midwess/devlog-sdk.git` | `b125eccd3a2dff8571b45d31ed79ddb769599577` |
-
-The final source tree is a scoped consolidation, not a complete union. The
-former `db`, `local_storage`, `services`, and SDK facade modules are excluded.
 
 ---
 
@@ -2688,7 +2489,7 @@ Use these sources in priority order:
 2. `hero.features.json` for machine-readable selection metadata.
 3. `docs/features/<feature>.md` for focused feature guidance.
 4. rustdoc for item-level signatures and type documentation.
-5. `README.md`, `MIGRATION.md`, and `docs/architecture.md` for broader context.
+5. `README.md` and `docs/architecture.md` for broader context.
 
 ## Chunking
 
@@ -2696,7 +2497,6 @@ Use these sources in priority order:
 - Split rustdoc by public item or module, preserving the fully qualified path.
 - Keep feature name, API root, target, implied features, crate version, and Git
   revision as metadata on every chunk.
-- Keep migration content in a separate collection from current API guidance.
 - Do not merge multiple feature pages into one undifferentiated chunk.
 
 ## Versioning
@@ -2710,12 +2510,11 @@ Use these sources in priority order:
 
 ## Access
 
-- Private repositories require an organization-approved Git provider
-  connection, documentation crawler, or MCP server.
-- Do not copy private source or documentation into an external provider without
-  an approved data-handling agreement.
-- Apply repository access controls to the generated documentation bundle and
-  any derived vector/search index.
+- The public Git repository, release artifacts, and versioned documentation
+  bundles may be indexed under the repository's MIT license.
+- Never place credentials, internal endpoints, customer data, or other secrets
+  in the documentation corpus.
+- Preserve version/revision metadata in derived vector or search indexes.
 
 ## Retrieval Behavior
 
@@ -2756,7 +2555,6 @@ organization once adopted.
 | `hero://<revision>/bundle-metadata` | `application/json` | Exact bundle version, revision, creation time, and distributable state. |
 | `hero://<revision>/rustdoc/native/<path>` | `text/html` | Native rustdoc page. |
 | `hero://<revision>/rustdoc/wasm/<path>` | `text/html` | WASM rustdoc page. |
-| `hero://<revision>/migration` | `text/markdown` | Migration guide. |
 | `hero://<revision>/llms` | `text/plain` | `llms.txt`. |
 | `hero://<revision>/llms-full` | `text/plain` | Consolidated documentation corpus. |
 
@@ -2803,7 +2601,7 @@ bundle under `target/docs-bundle/`.
 
 ## Bundle Contents
 
-- overview, architecture, migration, and history documents;
+- overview and architecture documents;
 - `Cargo.toml` and repository operating instructions;
 - `llms.txt` and `llms-full.txt`;
 - `hero.features.json` and its schema;
@@ -2816,9 +2614,9 @@ bundle under `target/docs-bundle/`.
 ## Distribution
 
 The CI workflow uploads the bundle as a repository-controlled build artifact.
-Its visibility follows repository and Actions permissions; it is not private if
-those permissions are public or broadly shared. The workflow refuses to upload
-documentation from a public repository.
+For the public Midwess Hero repository, the source documentation is public and
+redistributable under the MIT license. Artifact visibility follows repository
+and Actions permissions.
 
 Distributable bundles require a clean Git worktree. For local preview only,
 `ALLOW_DIRTY_DOCS=1 scripts/build-docs-bundle.sh` creates a bundle marked
@@ -2828,14 +2626,8 @@ An approved internal documentation site, Git provider connector, search
 service, or MCP server can ingest a distributable artifact without rebuilding
 documentation.
 
-Before publishing outside the organization, confirm:
+Before publishing a new bundle, confirm that it contains no secrets, internal
+endpoints, customer data, or unpublished product information, and that the
+revision retention policy is appropriate for the selected host.
 
-- repository visibility and source-code disclosure policy;
-- selected license and documentation redistribution rights;
-- provider data-retention and training controls;
-- authentication and authorization for private documentation;
-- revision retention and removal policy.
-
-`AGENTS.md` is included as internal repository operating guidance. Treat it as
-organization-internal material unless an explicit publication review approves
-it for a broader audience.
+`AGENTS.md` is included as repository operating guidance.

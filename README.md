@@ -15,16 +15,21 @@ build enables no normal dependency.
 
 ## Installation
 
-Until a license and publication policy are selected, consume Hero by pinned
-Git revision:
+Add Hero from crates.io and select only the features the project uses:
 
 ```toml
 [dependencies]
 hero = {
-    git = "ssh://git@github.com/Midwess/hero.git",
-    rev = "<commit>",
+    package = "midwess-hero",
+    version = "0.1",
     features = ["cancellation", "task"]
 }
+```
+
+Or use Cargo:
+
+```bash
+cargo add midwess-hero --rename hero --features cancellation,task
 ```
 
 Do not use `all-features` in an application dependency. Start with no features,
@@ -108,25 +113,9 @@ for details, exact API paths, environment variables, and related capabilities.
 These entries are introductions, not bundled presets. List individual features
 in the consuming `Cargo.toml` so architectural dependencies remain visible.
 
-## What Hero Does Not Include
-
-Hero deliberately excludes:
-
-- database repositories and persistence abstractions;
-- local filesystem/storage orchestration and ZIP packaging;
-- a generic application service trait or catch-all error type;
-- product schemas, protobuf-generated domain types, and Crafter templates;
-- application dependency-injection containers;
-- business workflows and product-specific policy.
-
-See [MIGRATION.md](MIGRATION.md) when moving from `core-services` or
-`devlog-sdk`. See [HISTORY.md](HISTORY.md) for imported repository history.
-
 ## Documentation
 
 - [Feature documentation](docs/features/README.md)
-- [Migration guide](MIGRATION.md)
-- [Source history](HISTORY.md)
 - [Documentation publishing](docs/publishing.md)
 
 ## Development

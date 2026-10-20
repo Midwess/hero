@@ -1349,47 +1349,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e17592d60ebacc7d5e169f4663c5f84f9161cc90328abcfe8456f41e4dfcb284"
 
 [[package]]
-name = "hero"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "aws-sdk-s3",
- "bytes",
- "chrono",
- "console_error_panic_hook",
- "env_logger",
- "etcd-client",
- "event-listener",
- "futures",
- "futures-timer",
- "futures-util",
- "getrandom 0.3.4",
- "js-sys",
- "jsonwebtoken",
- "lettre",
- "log",
- "n0-future",
- "parking_lot",
- "pretty_env_logger",
- "rand 0.9.5",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "socket2 0.6.5",
- "thiserror",
- "tokio",
- "tokio-stream",
- "tonic 0.13.1",
- "validator",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-streams",
- "web-sys",
-]
-
-[[package]]
 name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1979,6 +1938,47 @@ name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+
+[[package]]
+name = "midwess-hero"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "aws-sdk-s3",
+ "bytes",
+ "chrono",
+ "console_error_panic_hook",
+ "env_logger",
+ "etcd-client",
+ "event-listener",
+ "futures",
+ "futures-timer",
+ "futures-util",
+ "getrandom 0.3.4",
+ "js-sys",
+ "jsonwebtoken",
+ "lettre",
+ "log",
+ "n0-future",
+ "parking_lot",
+ "pretty_env_logger",
+ "rand 0.9.5",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "socket2 0.6.5",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tonic 0.13.1",
+ "validator",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-streams",
+ "web-sys",
+]
 
 [[package]]
 name = "mime"

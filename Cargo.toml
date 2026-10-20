@@ -1,13 +1,18 @@
 [package]
-name = "hero"
+name = "midwess-hero"
 version = "0.1.0"
 edition = "2021"
-publish = false
 description = "Opt-in cross-platform runtime and service integration utilities"
 repository = "https://github.com/Midwess/hero"
+homepage = "https://github.com/Midwess/hero"
+documentation = "https://docs.rs/midwess-hero"
 readme = "README.md"
+license = "MIT"
+keywords = ["midwess", "async", "infrastructure", "wasm", "gateway"]
+categories = ["asynchronous", "web-programming"]
 
 [lib]
+name = "hero"
 crate-type = ["rlib", "cdylib"]
 
 [features]

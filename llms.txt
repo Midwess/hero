@@ -16,8 +16,6 @@ the consuming project and target.
 
 ## Supporting Documents
 
-- [Migration](MIGRATION.md): changes from core-services and devlog-sdk.
-- [History](HISTORY.md): imported source repositories and revisions.
 - [Indexing Guidance](docs/indexing.md): chunking, versioning, access, and retrieval rules.
 - [MCP Resource Contract](docs/mcp-resource-contract.md): suggested internal resource layout.
 - [Publishing](docs/publishing.md): versioned private documentation bundles.

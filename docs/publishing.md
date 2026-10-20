@@ -15,7 +15,7 @@ bundle under `target/docs-bundle/`.
 
 ## Bundle Contents
 
-- overview, architecture, migration, and history documents;
+- overview and architecture documents;
 - `Cargo.toml` and repository operating instructions;
 - `llms.txt` and `llms-full.txt`;
 - `hero.features.json` and its schema;
@@ -28,9 +28,9 @@ bundle under `target/docs-bundle/`.
 ## Distribution
 
 The CI workflow uploads the bundle as a repository-controlled build artifact.
-Its visibility follows repository and Actions permissions; it is not private if
-those permissions are public or broadly shared. The workflow refuses to upload
-documentation from a public repository.
+For the public Midwess Hero repository, the source documentation is public and
+redistributable under the MIT license. Artifact visibility follows repository
+and Actions permissions.
 
 Distributable bundles require a clean Git worktree. For local preview only,
 `ALLOW_DIRTY_DOCS=1 scripts/build-docs-bundle.sh` creates a bundle marked
@@ -40,14 +40,8 @@ An approved internal documentation site, Git provider connector, search
 service, or MCP server can ingest a distributable artifact without rebuilding
 documentation.
 
-Before publishing outside the organization, confirm:
+Before publishing a new bundle, confirm that it contains no secrets, internal
+endpoints, customer data, or unpublished product information, and that the
+revision retention policy is appropriate for the selected host.
 
-- repository visibility and source-code disclosure policy;
-- selected license and documentation redistribution rights;
-- provider data-retention and training controls;
-- authentication and authorization for private documentation;
-- revision retention and removal policy.
-
-`AGENTS.md` is included as internal repository operating guidance. Treat it as
-organization-internal material unless an explicit publication review approves
-it for a broader audience.
+`AGENTS.md` is included as repository operating guidance.

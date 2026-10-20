@@ -20,7 +20,7 @@ where
                 let jitter = rand::rng().random_range(0.75..=1.25);
                 let sleep_for = delay.mul_f64(jitter).min(max);
                 warn!(
-                    target: "devlog-sdk-retry",
+                    target: "hero-retry",
                     "{label} attempt failed: {err}; retrying in {}ms",
                     sleep_for.as_millis()
                 );
