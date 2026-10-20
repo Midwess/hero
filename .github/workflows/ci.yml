@@ -20,6 +20,7 @@ jobs:
       - run: cargo clippy --all-targets --all-features -- -D warnings
       - run: scripts/check-features.sh
       - run: scripts/check-exclusions.sh
+      - run: scripts/check-docs.sh
 
   wasm:
     runs-on: ubuntu-latest

@@ -1,0 +1,32 @@
+# Hero
+
+Hero is the opt-in shared Rust library for Midwess architectural boundaries.
+Its default Cargo feature set is empty. Select only the features required by
+the consuming project and target.
+
+## Start Here
+
+- [Overview](README.md): scope, architectural role, common combinations, and feature introductions.
+- [Feature Catalog](hero.features.json): machine-readable feature names, targets, implications, APIs, environment variables, and documentation paths.
+- [Feature Pages](docs/features/README.md): one focused page per Cargo feature.
+- [Architecture](docs/architecture.md): design boundaries and common flows.
+- [Cargo Manifest](Cargo.toml): executable source of truth for features and dependencies.
+- Native rustdoc: generated bundles expose `rustdoc/native/hero/index.html`.
+- WASM rustdoc: generated bundles expose `rustdoc/wasm/hero/index.html`.
+
+## Supporting Documents
+
+- [Migration](MIGRATION.md): changes from core-services and devlog-sdk.
+- [History](HISTORY.md): imported source repositories and revisions.
+- [Indexing Guidance](docs/indexing.md): chunking, versioning, access, and retrieval rules.
+- [MCP Resource Contract](docs/mcp-resource-contract.md): suggested internal resource layout.
+- [Publishing](docs/publishing.md): versioned private documentation bundles.
+- [Full Corpus](llms-full.txt): consolidated Markdown documentation.
+
+## Selection Rules
+
+- Read `hero.features.json` before recommending Cargo features.
+- Prefer the minimum feature set matching imported Hero modules.
+- Include target restrictions and implied features in recommendations.
+- Do not recommend `all-features` for production consumers.
+- Treat `Cargo.toml` as authoritative when documentation disagrees.

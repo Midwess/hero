@@ -1,0 +1,309 @@
+{
+  "$schema": "docs/hero-features.schema.json",
+  "schema_version": 1,
+  "crate": {
+    "name": "hero",
+    "version": "0.1.0",
+    "default_features": [],
+    "cargo_manifest": "Cargo.toml"
+  },
+  "features": [
+    {
+      "name": "api-gateway",
+      "api_root": "hero::api_gateway",
+      "targets": ["native"],
+      "implies": [],
+      "summary": "Define and register Kong services, routes, and plugins.",
+      "enable_when": ["The process constructs Kong route definitions.", "The process registers or removes services through the Kong Admin API."],
+      "primary_apis": ["hero::api_gateway::service::GatewayServiceBuilder", "hero::api_gateway::service::GatewayRouteBuilder", "hero::api_gateway::client::ApiGatewayClient", "hero::api_gateway::kong::client::KongGatewayAdminClient"],
+      "environment": [],
+      "docs": "docs/features/api-gateway.md"
+    },
+    {
+      "name": "cancellation",
+      "api_root": "hero::cancellation",
+      "targets": ["native", "wasm32-unknown-unknown"],
+      "implies": [],
+      "summary": "Propagate structured, scoped cancellation through async work.",
+      "enable_when": ["Async work needs parent-child cancellation.", "A future needs timeout or cancel-on-drop behavior."],
+      "primary_apis": ["hero::cancellation::CancellationToken", "hero::cancellation::FutureExtension", "hero::cancellation::DropGuard"],
+      "environment": [],
+      "docs": "docs/features/cancellation.md"
+    },
+    {
+      "name": "config",
+      "api_root": "hero::config",
+      "targets": ["native", "wasm32-unknown-unknown"],
+      "implies": [],
+      "summary": "Read the standard Midwess Kong and deployment configuration.",
+      "enable_when": ["Code imports the shared Kong configuration.", "Code needs the configured public gateway URL."],
+      "primary_apis": ["hero::config::CONFIGS", "hero::config::Config", "hero::config::KongGatewayConfig"],
+      "environment": ["ENVIRONMENT", "KONG_GATEWAY_ADMIN_URL", "KONG_GATEWAY_URL", "KONG_GATEWAY_HOST", "KONG_GATEWAY_PORT", "PUBLIC_GATEWAY_HOST", "PUBLIC_GATEWAY_PORT", "PUBLIC_GATEWAY_WITH_SSL"],
+      "docs": "docs/features/config.md"
+    },
+    {
+      "name": "distributed-id",
+      "api_root": "hero::distributed_id",
+      "targets": ["native", "wasm32-unknown-unknown"],
+      "implies": [],
+      "summary": "Generate Snowflake-style IDs without a coordination service.",
+      "enable_when": ["One process generates IDs with a scoped worker ID.", "Code decodes Hero ID timestamps or generates scoped synthetic phone numbers."],
+      "primary_apis": ["hero::distributed_id::init_scoped_id_generator", "hero::distributed_id::try_gen_id", "hero::distributed_id::id_to_datetime", "hero::distributed_id::generate_phone_number"],
+      "environment": [],
+      "docs": "docs/features/distributed-id.md"
+    },
+    {
+      "name": "distributed-id-etcd",
+      "api_root": "hero::distributed_id",
+      "targets": ["native"],
+      "implies": ["distributed-id"],
+      "summary": "Coordinate distributed-ID worker leases through etcd.",
+      "enable_when": ["Multiple processes must generate IDs without worker-ID collisions."],
+      "primary_apis": ["hero::distributed_id::EtcdWorkerOptions", "hero::distributed_id::init_id_generator", "hero::distributed_id::shutdown_id_generator", "hero::distributed_id::etcd::WorkerLeaseGuard"],
+      "environment": ["SNOWFLAKE_ETCD_ENDPOINTS", "SNOWFLAKE_ETCD_NAMESPACE", "SNOWFLAKE_ETCD_LEASE_TTL_SECS"],
+      "docs": "docs/features/distributed-id-etcd.md"
+    },
+    {
+      "name": "env",
+      "api_root": "hero::env",
+      "targets": ["native", "wasm32-unknown-unknown"],
+      "implies": [],
+      "summary": "Normalize local, development, staging, and production checks.",
+      "enable_when": ["Code branches on the deployment environment."],
+      "primary_apis": ["hero::env::Environment"],
+      "environment": ["ENVIRONMENT", "DEPLOYMENT_ENV"],
+      "docs": "docs/features/env.md"
+    },
+    {
+      "name": "finally",
+      "api_root": "hero::finally",
+      "targets": ["native", "wasm32-unknown-unknown"],
+      "implies": [],
+      "summary": "Run collected asynchronous cleanup work when an owner drops.",
+      "enable_when": ["An owner needs best-effort async cleanup on drop."],
+      "primary_apis": ["hero::finally::Finally"],
+      "environment": [],
+      "docs": "docs/features/finally.md"
+    },
+    {
+      "name": "grpc-gateway",
+      "api_root": "hero::grpc_gateway",
+      "targets": ["native"],
+      "implies": ["config"],
+      "summary": "Reuse a tonic channel through the configured gateway.",
+      "enable_when": ["A native client calls gRPC services through Kong."],
+      "primary_apis": ["hero::grpc_gateway::channel::GrpcGatewayChannel"],
+      "environment": ["KONG_GATEWAY_URL"],
+      "docs": "docs/features/grpc-gateway.md"
+    },
+    {
+      "name": "grpc-server",
+      "api_root": "hero::tcp::listener",
+      "targets": ["native"],
+      "implies": ["tcp"],
+      "summary": "Add tonic incoming-listener support to Hero's TCP pattern.",
+      "enable_when": ["A tonic server uses Hero to bind or select its listening port."],
+      "primary_apis": ["hero::tcp::listener::find_grpc_listener", "hero::tcp::listener::GrpcConnection"],
+      "environment": ["SERVICE_HOST"],
+      "docs": "docs/features/grpc-server.md"
+    },
+    {
+      "name": "logger",
+      "api_root": "hero::logger",
+      "targets": ["native", "wasm32-unknown-unknown"],
+      "implies": [],
+      "summary": "Apply Midwess logging defaults and throttled logging.",
+      "enable_when": ["A process uses the shared logging setup.", "Repeated log messages should be aggregated."],
+      "primary_apis": ["hero::logger::setup", "hero::logger::ThrottleLogger"],
+      "environment": ["RUST_LOG", "FILE_LOG", "FILE_LOG_PATH", "SANDBOX_ID"],
+      "docs": "docs/features/logger.md"
+    },
+    {
+      "name": "maybe",
+      "api_root": "hero::maybe",
+      "targets": ["native", "wasm32-unknown-unknown"],
+      "implies": [],
+      "summary": "Express target-dependent sendability in generic APIs.",
+      "enable_when": ["A generic API needs native Send/Sync bounds but relaxed WASM bounds."],
+      "primary_apis": ["hero::maybe::MaybeSend", "hero::maybe::MaybeSendSync"],
+      "environment": [],
+      "docs": "docs/features/maybe.md"
+    },
+    {
+      "name": "never-send",
+      "api_root": "hero::never_send",
+      "targets": ["native", "wasm32-unknown-unknown"],
+      "implies": [],
+      "summary": "Mark a value as intentionally local without faking auto-traits.",
+      "enable_when": ["A wrapper should communicate thread-local ownership."],
+      "primary_apis": ["hero::never_send::NeverSend"],
+      "environment": [],
+      "docs": "docs/features/never-send.md"
+    },
+    {
+      "name": "number",
+      "api_root": "hero::number",
+      "targets": ["native", "wasm32-unknown-unknown"],
+      "implies": [],
+      "summary": "Compute time-based exponential integer growth.",
+      "enable_when": ["A bounded integer should grow exponentially with elapsed time."],
+      "primary_apis": ["hero::number::ExponentialGrowth"],
+      "environment": [],
+      "docs": "docs/features/number.md"
+    },
+    {
+      "name": "pool",
+      "api_root": "hero::pool",
+      "targets": ["native", "wasm32-unknown-unknown"],
+      "implies": ["maybe"],
+      "summary": "Manage bounded reusable resources and waiter queues.",
+      "enable_when": ["Infrastructure resources are expensive to create and safe to reuse."],
+      "primary_apis": ["hero::pool::allocator::PoolResourceProvider", "hero::pool::allocator::PoolBuilder", "hero::pool::request::PoolRequestBuilder", "hero::pool::response::PoolResponse"],
+      "environment": [],
+      "docs": "docs/features/pool.md"
+    },
+    {
+      "name": "retry",
+      "api_root": "hero::retry",
+      "targets": ["native", "wasm32-unknown-unknown"],
+      "implies": [],
+      "summary": "Retry transient async operations with fixed or capped backoff.",
+      "enable_when": ["An operation has explicitly classified transient failures."],
+      "primary_apis": ["hero::retry!", "hero::retry::with_capped_backoff"],
+      "environment": [],
+      "docs": "docs/features/retry.md"
+    },
+    {
+      "name": "s3",
+      "api_root": "hero::s3",
+      "targets": ["native"],
+      "implies": [],
+      "summary": "Access S3-compatible object storage with product-neutral paths.",
+      "enable_when": ["A native process reads, writes, signs, or manages multipart S3 objects."],
+      "primary_apis": ["hero::s3::S3Config", "hero::s3::S3Client", "hero::s3::ObjectPath"],
+      "environment": ["AWS_S3_REGION", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_ENDPOINT_URL", "AWS_S3_FORCE_PATH_STYLE"],
+      "docs": "docs/features/s3.md"
+    },
+    {
+      "name": "shell",
+      "api_root": "hero::shell",
+      "targets": ["native"],
+      "implies": [],
+      "summary": "Consume piped child stdout and stderr as one async stream.",
+      "enable_when": ["A native process streams output from a spawned child."],
+      "primary_apis": ["hero::shell::StdStream"],
+      "environment": [],
+      "docs": "docs/features/shell.md"
+    },
+    {
+      "name": "smtp",
+      "api_root": "hero::smtp",
+      "targets": ["native"],
+      "implies": ["cancellation"],
+      "summary": "Send rendered HTML email with delivery cancellation.",
+      "enable_when": ["A native process sends already-rendered email through SMTP."],
+      "primary_apis": ["hero::smtp::client::SmtpClient"],
+      "environment": [],
+      "docs": "docs/features/smtp.md"
+    },
+    {
+      "name": "stream",
+      "api_root": "hero::stream",
+      "targets": ["native", "wasm32-unknown-unknown"],
+      "implies": [],
+      "summary": "Create in-memory duplex byte streams.",
+      "enable_when": ["Two async endpoints need a bidirectional in-memory byte transport."],
+      "primary_apis": ["hero::stream::duplex", "hero::stream::duplex_with_config", "hero::stream::DuplexStream"],
+      "environment": [],
+      "docs": "docs/features/stream.md"
+    },
+    {
+      "name": "string",
+      "api_root": "hero::string",
+      "targets": ["native", "wasm32-unknown-unknown"],
+      "implies": [],
+      "summary": "Use shared string validation helpers.",
+      "enable_when": ["Code needs the shared email validation extension."],
+      "primary_apis": ["hero::string::StringExt"],
+      "environment": [],
+      "docs": "docs/features/string.md"
+    },
+    {
+      "name": "task",
+      "api_root": "hero::task",
+      "targets": ["native"],
+      "implies": [],
+      "summary": "Abort an owned Tokio task when its guard drops.",
+      "enable_when": ["A background Tokio task must not outlive its owner."],
+      "primary_apis": ["hero::task::AbortOnDrop"],
+      "environment": [],
+      "docs": "docs/features/task.md"
+    },
+    {
+      "name": "tcp",
+      "api_root": "hero::tcp",
+      "targets": ["native"],
+      "implies": [],
+      "summary": "Bind dual-stack TCP and UDP listeners without tonic.",
+      "enable_when": ["A native process uses Hero to bind or select a TCP/UDP port."],
+      "primary_apis": ["hero::tcp::listener::find_tcp_listener", "hero::tcp::listener::bind_tcp_listener", "hero::tcp::listener::find_udp_socket"],
+      "environment": ["SERVICE_HOST"],
+      "docs": "docs/features/tcp.md"
+    },
+    {
+      "name": "throttle-future",
+      "api_root": "hero::throttle_future",
+      "targets": ["native", "wasm32-unknown-unknown"],
+      "implies": [],
+      "summary": "Coalesce frequent values before asynchronous processing.",
+      "enable_when": ["Only the latest pending value should run after a delay."],
+      "primary_apis": ["hero::throttle_future::ThrottleFuture", "hero::throttle_future::ThrottleFn"],
+      "environment": [],
+      "docs": "docs/features/throttle-future.md"
+    },
+    {
+      "name": "time",
+      "api_root": "hero::time",
+      "targets": ["native", "wasm32-unknown-unknown"],
+      "implies": [],
+      "summary": "Read epoch time in microseconds across targets.",
+      "enable_when": ["Code needs one microsecond epoch-time API on native and browser targets."],
+      "primary_apis": ["hero::time::epoch_micro"],
+      "environment": [],
+      "docs": "docs/features/time.md"
+    },
+    {
+      "name": "token",
+      "api_root": "hero::token",
+      "targets": ["native"],
+      "implies": [],
+      "summary": "Create and decode HS256 JSON Web Tokens.",
+      "enable_when": ["A native authentication boundary issues or validates HS256 JWTs."],
+      "primary_apis": ["hero::token::jwt::create_jwt_token", "hero::token::jwt::decode_jwt_token", "hero::token::jwt::decode_jwt_token_without_validation"],
+      "environment": [],
+      "docs": "docs/features/token.md"
+    },
+    {
+      "name": "wasm",
+      "api_root": "hero::wasm",
+      "targets": ["wasm32-unknown-unknown"],
+      "implies": [],
+      "summary": "Use browser HTTP, byte/file, and OPFS helpers.",
+      "enable_when": ["A browser client needs Hero's Fetch/XHR, byte conversion, file metadata, or OPFS helpers."],
+      "primary_apis": ["hero::wasm::HttpClient", "hero::wasm::FetchRequest", "hero::wasm::XmlHttpRequest", "hero::wasm::extensions::VecExtension", "hero::wasm::opfs::SyncAccessHandleWriter"],
+      "environment": [],
+      "docs": "docs/features/wasm.md"
+    },
+    {
+      "name": "yield-container",
+      "api_root": "hero::yield_container",
+      "targets": ["native", "wasm32-unknown-unknown"],
+      "implies": [],
+      "summary": "Lend a value temporarily and return it on drop.",
+      "enable_when": ["One owner temporarily lends a value that must be returned automatically."],
+      "primary_apis": ["hero::yield_container::YieldContainer", "hero::yield_container::Yieldable", "hero::yield_container::YieldError"],
+      "environment": [],
+      "docs": "docs/features/yield-container.md"
+    }
+  ]
+}

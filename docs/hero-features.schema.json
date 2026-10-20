@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Midwess/hero/blob/main/docs/hero-features.schema.json",
+  "title": "Hero feature catalog",
+  "type": "object",
+  "required": ["schema_version", "crate", "features"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "crate": {
+      "type": "object",
+      "required": ["name", "version", "default_features", "cargo_manifest"],
+      "properties": {
+        "name": { "type": "string", "const": "hero" },
+        "version": { "type": "string" },
+        "default_features": { "type": "array", "maxItems": 0 },
+        "cargo_manifest": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "api_root",
+          "targets",
+          "implies",
+          "summary",
+          "enable_when",
+          "primary_apis",
+          "environment",
+          "docs"
+        ],
+        "properties": {
+          "name": { "type": "string" },
+          "api_root": { "type": "string" },
+          "targets": {
+            "type": "array",
+            "items": { "enum": ["native", "wasm32-unknown-unknown"] },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "implies": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+          "summary": { "type": "string" },
+          "enable_when": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+          "primary_apis": { "type": "array", "items": { "type": "string" } },
+          "environment": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+          "docs": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

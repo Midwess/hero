@@ -39,7 +39,7 @@ fi
 
 while IFS= read -r feature; do
     [[ "$feature" == "default" ]] && continue
-    if ! rg -q "^#### \`${feature}\`" README.md; then
+    if ! rg -Fq "| [\`${feature}\`](docs/features/${feature}.md)" README.md; then
         echo "README feature catalog is missing: $feature" >&2
         exit 1
     fi
