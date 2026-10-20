@@ -37,3 +37,11 @@ if [[ "$minimal_dependency_lines" != "1" ]]; then
     exit 1
 fi
 
+while IFS= read -r feature; do
+    [[ "$feature" == "default" ]] && continue
+    if ! rg -q "^#### \`${feature}\`" README.md; then
+        echo "README feature catalog is missing: $feature" >&2
+        exit 1
+    fi
+done < <(sed -n '/^\[features\]/,/^\[/p' Cargo.toml | sed -n 's/^\([a-z0-9-]*\)[[:space:]]*=.*/\1/p')
+
