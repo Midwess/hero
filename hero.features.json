@@ -4,7 +4,7 @@
   "crate": {
     "name": "midwess-hero",
     "lib_name": "hero",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "default_features": [],
     "cargo_manifest": "Cargo.toml"
   },
@@ -181,7 +181,7 @@
       "implies": [],
       "summary": "Access S3-compatible object storage with product-neutral paths.",
       "enable_when": ["A native process reads, writes, signs, or manages multipart S3 objects."],
-      "primary_apis": ["hero::s3::S3Config", "hero::s3::S3Client", "hero::s3::ObjectPath"],
+      "primary_apis": ["hero::s3::S3Config", "hero::s3::S3Client", "hero::s3::ObjectPath", "hero::s3::PostUploadOptions", "hero::s3::PresignedPost"],
       "environment": ["AWS_S3_REGION", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_ENDPOINT_URL", "AWS_S3_FORCE_PATH_STYLE"],
       "docs": "docs/features/s3.md"
     },

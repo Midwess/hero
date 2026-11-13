@@ -36,6 +36,13 @@ on both targets.
 
 ## Common Flows
 
+### Direct object uploads
+
+The `s3` feature can issue exact-key presigned POST policies with storage-enforced
+size bounds and expiration. Applications own resource rules, ownership checks,
+byte validation, publication, and cleanup. See [direct POST uploads](s3-post.md)
+for the browser contract and local storage verification.
+
 ### Service ingress
 
 1. Bind a listener with `tcp` or `grpc-server` when Hero owns listener setup.
