@@ -1,6 +1,6 @@
 [package]
 name = "midwess-hero"
-version = "1.0.1"
+version = "1.1.0"
 edition = "2021"
 description = "Opt-in cross-platform runtime and service integration utilities"
 repository = "https://github.com/Midwess/hero"
@@ -37,7 +37,7 @@ never-send = []
 number = ["dep:n0-future"]
 pool = ["maybe", "dep:async-trait", "dep:futures", "dep:futures-timer", "dep:futures-util", "dep:log", "dep:n0-future", "dep:thiserror"]
 retry = ["dep:futures-timer", "dep:log", "dep:rand", "dep:tokio", "dep:getrandom", "tokio/time"]
-s3 = ["dep:aws-sdk-s3", "dep:serde", "dep:thiserror"]
+s3 = ["dep:aws-sdk-s3", "dep:base64", "dep:chrono", "dep:hmac", "dep:serde", "dep:serde_json", "dep:sha2", "dep:thiserror", "dep:url"]
 shell = ["dep:tokio", "dep:tokio-stream", "tokio/io-util", "tokio/process"]
 smtp = ["cancellation", "dep:lettre", "dep:thiserror"]
 stream = ["dep:futures"]
@@ -70,6 +70,10 @@ validator = { version = "0.20.0", optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 aws-sdk-s3 = { version = "=1.142.0", optional = true }
+base64 = { version = "0.22", optional = true }
+hmac = { version = "0.12", optional = true }
+sha2 = { version = "0.10", optional = true }
+url = { version = "2", optional = true }
 env_logger = { version = "0.10", optional = true }
 etcd-client = { version = "0.17.0", optional = true }
 jsonwebtoken = { version = "10.0.0", features = ["rust_crypto"], optional = true }
@@ -93,4 +97,5 @@ wasm-streams = { version = "0.4.2", optional = true }
 web-sys = { version = "0.3.80", optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
-tokio = { version = "1.46.1", default-features = false, features = ["rt-multi-thread", "test-util"] }
+reqwest = { version = "0.12.22", default-features = false, features = ["multipart", "rustls-tls"] }
+tokio = { version = "1.46.1", default-features = false, features = ["macros", "rt-multi-thread", "test-util"] }

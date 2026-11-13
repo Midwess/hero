@@ -142,7 +142,7 @@ buildable by feature on supported native and WASM targets.
 
 [package]
 name = "midwess-hero"
-version = "1.0.1"
+version = "1.1.0"
 edition = "2021"
 description = "Opt-in cross-platform runtime and service integration utilities"
 repository = "https://github.com/Midwess/hero"
@@ -179,7 +179,7 @@ never-send = []
 number = ["dep:n0-future"]
 pool = ["maybe", "dep:async-trait", "dep:futures", "dep:futures-timer", "dep:futures-util", "dep:log", "dep:n0-future", "dep:thiserror"]
 retry = ["dep:futures-timer", "dep:log", "dep:rand", "dep:tokio", "dep:getrandom", "tokio/time"]
-s3 = ["dep:aws-sdk-s3", "dep:serde", "dep:thiserror"]
+s3 = ["dep:aws-sdk-s3", "dep:base64", "dep:chrono", "dep:hmac", "dep:serde", "dep:serde_json", "dep:sha2", "dep:thiserror", "dep:url"]
 shell = ["dep:tokio", "dep:tokio-stream", "tokio/io-util", "tokio/process"]
 smtp = ["cancellation", "dep:lettre", "dep:thiserror"]
 stream = ["dep:futures"]
@@ -212,6 +212,10 @@ validator = { version = "0.20.0", optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 aws-sdk-s3 = { version = "=1.142.0", optional = true }
+base64 = { version = "0.22", optional = true }
+hmac = { version = "0.12", optional = true }
+sha2 = { version = "0.10", optional = true }
+url = { version = "2", optional = true }
 env_logger = { version = "0.10", optional = true }
 etcd-client = { version = "0.17.0", optional = true }
 jsonwebtoken = { version = "10.0.0", features = ["rust_crypto"], optional = true }
@@ -235,7 +239,8 @@ wasm-streams = { version = "0.4.2", optional = true }
 web-sys = { version = "0.3.80", optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
-tokio = { version = "1.46.1", default-features = false, features = ["rt-multi-thread", "test-util"] }
+reqwest = { version = "0.12.22", default-features = false, features = ["multipart", "rustls-tls"] }
+tokio = { version = "1.46.1", default-features = false, features = ["macros", "rt-multi-thread", "test-util"] }
 
 ---
 
@@ -247,7 +252,7 @@ tokio = { version = "1.46.1", default-features = false, features = ["rt-multi-th
   "crate": {
     "name": "midwess-hero",
     "lib_name": "hero",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "default_features": [],
     "cargo_manifest": "Cargo.toml"
   },
@@ -424,7 +429,7 @@ tokio = { version = "1.46.1", default-features = false, features = ["rt-multi-th
       "implies": [],
       "summary": "Access S3-compatible object storage with product-neutral paths.",
       "enable_when": ["A native process reads, writes, signs, or manages multipart S3 objects."],
-      "primary_apis": ["hero::s3::S3Config", "hero::s3::S3Client", "hero::s3::ObjectPath"],
+      "primary_apis": ["hero::s3::S3Config", "hero::s3::S3Client", "hero::s3::ObjectPath", "hero::s3::PostUploadOptions", "hero::s3::PresignedPost"],
       "environment": ["AWS_S3_REGION", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_ENDPOINT_URL", "AWS_S3_FORCE_PATH_STYLE"],
       "docs": "docs/features/s3.md"
     },
@@ -641,6 +646,13 @@ module on browser targets. Cross-platform features are validated independently
 on both targets.
 
 ## Common Flows
+
+### Direct object uploads
+
+The `s3` feature can issue exact-key presigned POST policies with storage-enforced
+size bounds and expiration. Applications own resource rules, ownership checks,
+byte validation, publication, and cleanup. See [direct POST uploads](s3-post.md)
+for the browser contract and local storage verification.
 
 ### Service ingress
 
@@ -1747,6 +1759,8 @@ hero = {
 - `hero::s3::S3Config`
 - `hero::s3::S3Client`
 - `hero::s3::ObjectPath`
+- `hero::s3::PostUploadOptions`
+- `hero::s3::PresignedPost`
 
 ## Import Example
 

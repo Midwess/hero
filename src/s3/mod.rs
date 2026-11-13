@@ -20,7 +20,7 @@
 //! # }
 //! ```
 
-use aws_sdk_s3::config::{BehaviorVersion, Credentials, Region};
+use aws_sdk_s3::config::{BehaviorVersion, Credentials, ProvideCredentials, Region, SharedCredentialsProvider};
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::head_object::HeadObjectError;
 use aws_sdk_s3::presigning::{PresigningConfig, PresigningConfigError};
@@ -31,6 +31,9 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
+
+mod post;
+pub use post::{PostUploadOptions, PresignedPost};
 
 /// Result type for Hero S3 operations.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -143,14 +146,17 @@ impl S3Config {
         let mut builder = aws_sdk_s3::Config::builder()
             .behavior_version(BehaviorVersion::latest())
             .region(Region::new(self.region.clone()))
-            .credentials_provider(credentials)
+            .credentials_provider(credentials.clone())
             .force_path_style(self.force_path_style);
 
         if let Some(endpoint_url) = &self.endpoint_url {
             builder = builder.endpoint_url(endpoint_url);
         }
 
-        S3Client::new(Client::from_conf(builder.build()))
+        S3Client {
+            client: Arc::new(Client::from_conf(builder.build())),
+            post_credentials: Some(SharedCredentialsProvider::new(credentials)),
+        }
     }
 }
 
@@ -182,6 +188,7 @@ pub struct MultipartUpload {
 /// Clonable high-level wrapper around [`aws_sdk_s3::Client`].
 pub struct S3Client {
     client: Arc<Client>,
+    post_credentials: Option<SharedCredentialsProvider>,
 }
 
 impl S3Client {
@@ -189,6 +196,21 @@ impl S3Client {
     pub fn new(client: Client) -> Self {
         Self {
             client: Arc::new(client),
+            post_credentials: None,
+        }
+    }
+
+    /// Configures one credential provider for both SDK operations and POST policies.
+    ///
+    /// Use this constructor for refreshable or temporary credentials. The SDK
+    /// does not expose an existing client's provider; [`Self::new`] therefore
+    /// supports existing operations but cannot sign POST policies.
+    pub fn with_credentials_provider(client: Client, provider: impl ProvideCredentials + 'static) -> Self {
+        let provider = SharedCredentialsProvider::new(provider);
+        let config = client.config().to_builder().credentials_provider(provider.clone()).build();
+        Self {
+            client: Arc::new(Client::from_conf(config)),
+            post_credentials: Some(provider),
         }
     }
 
