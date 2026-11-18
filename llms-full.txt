@@ -142,7 +142,7 @@ buildable by feature on supported native and WASM targets.
 
 [package]
 name = "midwess-hero"
-version = "1.1.0"
+version = "1.1.1"
 edition = "2021"
 description = "Opt-in cross-platform runtime and service integration utilities"
 repository = "https://github.com/Midwess/hero"
@@ -242,6 +242,11 @@ web-sys = { version = "0.3.80", optional = true }
 reqwest = { version = "0.12.22", default-features = false, features = ["multipart", "rustls-tls"] }
 tokio = { version = "1.46.1", default-features = false, features = ["macros", "rt-multi-thread", "test-util"] }
 
+[[bench]]
+name = "cancellation"
+harness = false
+required-features = ["cancellation"]
+
 ---
 
 # Source: hero.features.json
@@ -252,7 +257,7 @@ tokio = { version = "1.46.1", default-features = false, features = ["macros", "r
   "crate": {
     "name": "midwess-hero",
     "lib_name": "hero",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "default_features": [],
     "cargo_manifest": "Cargo.toml"
   },

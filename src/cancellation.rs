@@ -52,7 +52,19 @@ tokio::task_local! {
 struct CancelState {
     cancelled: AtomicBool,
     event: Event,
-    children: Mutex<Vec<Weak<CancelState>>>,
+    children: Mutex<Children>,
+}
+
+impl Drop for CancelState {
+    fn drop(&mut self) {
+        self.event.notify(usize::MAX);
+    }
+}
+
+#[derive(Debug, Default)]
+struct Children {
+    entries: Vec<Weak<CancelState>>,
+    until_cleanup: usize,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -196,7 +208,7 @@ impl CancellationToken {
             state: Arc::new(CancelState {
                 cancelled: AtomicBool::new(false),
                 event: Event::new(),
-                children: Mutex::new(Vec::new()),
+                children: Mutex::new(Children::default()),
             }),
             timeout_handle: None,
         }
@@ -210,8 +222,9 @@ impl CancellationToken {
         let mut token = CancellationToken::new();
         let child = token.clone();
         let handle = spawn(async move {
-            Delay::new(duration).await;
-            child.cancel();
+            if !child.is_cancelled() && Delay::new(duration).with_cancel(&child).await.is_ok() {
+                child.cancel();
+            }
         });
 
         token.timeout_handle = Some(handle);
@@ -226,59 +239,54 @@ impl CancellationToken {
     /// Schedules cancellation after a delay without tying the timer to a handle.
     ///
     /// Calling this more than once is harmless; the earliest timer to fire wins.
+    /// Timers release their resources promptly when the token is cancelled.
     pub fn cancel_after(&self, duration: Duration) {
+        if self.is_cancelled() {
+            return;
+        }
         let token = self.clone();
         spawn(async move {
-            Delay::new(duration).await;
-            token.cancel();
+            if !token.is_cancelled() && Delay::new(duration).with_cancel(&token).await.is_ok() {
+                token.cancel();
+            }
         });
     }
 
     /// Cancel this token and recursively cancel all descendant tokens.
     pub fn cancel(&self) {
-        if !self.state.cancelled.swap(true, Ordering::AcqRel) {
-            self.state.event.notify(usize::MAX);
-            let mut stack: Vec<Arc<CancelState>> = Vec::new();
-            stack.extend(Self::collect_children(&self.state));
-            while let Some(node) = stack.pop() {
-                if !node.cancelled.swap(true, Ordering::AcqRel) {
-                    node.event.notify(usize::MAX);
-                    stack.extend(Self::collect_children(&node));
-                }
-            }
+        if self.is_cancelled() || self.state.cancelled.swap(true, Ordering::AcqRel) {
+            return;
         }
-    }
-
-    fn collect_children(state: &Arc<CancelState>) -> Vec<Arc<CancelState>> {
-        let mut children_lock = state.children.lock();
-        let mut valid_children = Vec::new();
-        children_lock.retain(|weak_ref| {
-            if let Some(child) = weak_ref.upgrade() {
-                valid_children.push(child);
-                true
-            } else {
-                false
+        self.state.event.notify(usize::MAX);
+        let mut stack: Vec<_> = std::mem::take(&mut self.state.children.lock().entries)
+            .into_iter()
+            .filter_map(|weak| weak.upgrade())
+            .collect();
+        while let Some(node) = stack.pop() {
+            if node.cancelled.load(Ordering::Acquire) || node.cancelled.swap(true, Ordering::AcqRel) {
+                continue;
             }
-        });
-        valid_children
+            node.event.notify(usize::MAX);
+            stack.extend(
+                std::mem::take(&mut node.children.lock().entries).into_iter().filter_map(|weak| weak.upgrade()),
+            );
+        }
     }
 
     /// Creates a new child token that is linked to this token.
     pub fn child_token(&self) -> Self {
         let child = CancellationToken::new();
-
-        // Add child to parent's list within a limited scope
-        {
-            let mut children = self.state.children.lock();
-            children.retain(|child| child.strong_count() > 0);
-            children.push(Arc::downgrade(&child.state));
-        }
-
-        // If parent is already cancelled, cancel the child
+        let mut children = self.state.children.lock();
         if self.is_cancelled() {
-            child.cancel();
+            child.state.cancelled.store(true, Ordering::Release);
+        } else {
+            if children.until_cleanup == 0 {
+                children.entries.retain(|child| child.strong_count() > 0);
+                children.until_cleanup = children.entries.len().max(64);
+            }
+            children.until_cleanup -= 1;
+            children.entries.push(Arc::downgrade(&child.state));
         }
-
         child
     }
 
@@ -407,6 +415,147 @@ mod tests {
     use futures::task::{waker_ref, ArcWake};
     use std::sync::atomic::AtomicUsize;
 
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn cancelled_timers_release_their_tokens_promptly() {
+        for token in [
+            CancellationToken::timeout(Duration::from_secs(60)),
+            CancellationToken::new(),
+        ] {
+            token.cancel_after(Duration::from_secs(60));
+            tokio::task::yield_now().await;
+            token.cancel();
+            for _ in 0..1000 {
+                if Arc::strong_count(&token.state) == 1 {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+            assert_eq!(Arc::strong_count(&token.state), 1);
+        }
+        let token = CancellationToken::new();
+        token.cancel();
+        token.cancel_after(Duration::from_secs(60));
+        assert_eq!(Arc::strong_count(&token.state), 1);
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn parent_cancellation_releases_a_large_timer_backlog() {
+        let root = CancellationToken::new();
+        let children: Vec<_> = (0..10000)
+            .map(|_| {
+                let child = root.child_token();
+                child.cancel_after(Duration::from_secs(60));
+                child
+            })
+            .collect();
+        tokio::task::yield_now().await;
+        root.cancel();
+        for _ in 0..1000 {
+            if children.iter().all(|child| Arc::strong_count(&child.state) == 1) {
+                return;
+            }
+            tokio::task::yield_now().await;
+        }
+        panic!("cancelled timer tasks retained child states");
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn timer_ownership_and_detached_deadlines_are_preserved() {
+        let token = CancellationToken::timeout(Duration::from_millis(10));
+        let observer = token.clone();
+        drop(token);
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        assert!(!observer.is_cancelled());
+        let token = CancellationToken::timeout(Duration::from_millis(10));
+        drop(token.clone());
+        token.cancelled().await;
+        assert!(token.is_cancelled());
+        let token = CancellationToken::new();
+        let observer = token.clone();
+        token.cancel_after(Duration::from_millis(10));
+        token.cancel_after(Duration::from_secs(60));
+        drop(token);
+        observer.cancelled().await;
+        assert!(observer.is_cancelled());
+    }
+
+    #[test]
+    fn cancelled_parent_and_dead_child_cleanup_remain_bounded() {
+        let root = CancellationToken::new();
+        for _ in 0..10000 {
+            drop(root.child_token());
+        }
+        assert!(root.state.children.lock().entries.len() <= 64);
+        root.cancel();
+        assert!(root.child_token().is_cancelled());
+        assert!(root.state.children.lock().entries.is_empty());
+    }
+
+    #[test]
+    fn dropping_parent_detaches_children_and_resolves_waiters() {
+        let parent = CancellationToken::new();
+        let child = parent.child_token();
+        let mut waiter = Box::pin(parent.cancelled());
+        let counter = Arc::new(WakeCounter(AtomicUsize::new(0)));
+        let waker = waker_ref(&counter);
+        let mut cx = std::task::Context::from_waker(&waker);
+        assert!(waiter.as_mut().poll(&mut cx).is_pending());
+        drop(parent);
+        assert_eq!(counter.0.load(Ordering::Relaxed), 1);
+        assert!(waiter.as_mut().poll(&mut cx).is_ready());
+        assert!(!child.is_cancelled());
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[test]
+    fn child_registration_racing_cancellation_cannot_escape() {
+        for _ in 0..100 {
+            let root = CancellationToken::new();
+            std::thread::scope(|scope| {
+                let cancellation = scope.spawn(|| root.cancel());
+                let children: Vec<_> = (0..100).map(|_| root.child_token()).collect();
+                cancellation.join().unwrap();
+                root.cancel();
+                assert!(children.iter().all(CancellationToken::is_cancelled));
+            });
+        }
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[test]
+    fn waiter_registration_racing_cancellation_cannot_lose_a_wakeup() {
+        for _ in 0..100 {
+            let token = CancellationToken::new();
+            let counter = Arc::new(WakeCounter(AtomicUsize::new(0)));
+            let waker = waker_ref(&counter);
+            let mut cx = std::task::Context::from_waker(&waker);
+            let mut waiter = Box::pin(token.cancelled());
+            std::thread::scope(|scope| {
+                let cancellation = scope.spawn(|| token.cancel());
+                let pending = waiter.as_mut().poll(&mut cx).is_pending();
+                cancellation.join().unwrap();
+                if pending {
+                    assert!(counter.0.load(Ordering::Relaxed) >= 1);
+                }
+                assert!(waiter.as_mut().poll(&mut cx).is_ready());
+            });
+        }
+    }
+
+    #[test]
+    fn deep_cancellation_does_not_recurse() {
+        let root = CancellationToken::new();
+        let mut nodes = vec![root.clone()];
+        for _ in 0..10000 {
+            nodes.push(nodes.last().unwrap().child_token());
+        }
+        root.cancel();
+        assert!(nodes.iter().all(CancellationToken::is_cancelled));
+    }
+
     #[test]
     fn missing_scope_and_fallback_tokens_are_explicit() {
         assert!(matches!(
@@ -498,7 +647,7 @@ mod tests {
         let root = CancellationToken::new();
         futures::executor::block_on(root.clone().scope(async {
             let child = CancellationToken::child_scope(futures::future::pending::<()>()).unwrap();
-            let child_state = root.state.children.lock()[0].upgrade().unwrap();
+            let child_state = root.state.children.lock().entries[0].upgrade().unwrap();
             drop(child);
             assert!(child_state.cancelled.load(Ordering::Acquire));
             assert!(Arc::ptr_eq(&CancellationToken::current().unwrap().state, &root.state));
