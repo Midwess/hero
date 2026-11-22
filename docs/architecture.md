@@ -43,6 +43,24 @@ size bounds and expiration. Applications own resource rules, ownership checks,
 byte validation, publication, and cleanup. See [direct POST uploads](s3-post.md)
 for the browser contract and local storage verification.
 
+### Browser HTTP
+
+The `wasm` feature builds Fetch requests against the current global object,
+including dedicated workers. Browser values stay on that worker. `send_streaming`
+returns an owned `StreamingResponse`: status and headers precede consumption,
+each `next_chunk` pulls one browser chunk, and dropping the response aborts the
+request. `abort_handle` lets a worker-local cancellation observer stop an idle
+response. Consumers attach their own cancellation/deadline policy to sending
+and reading. The compatible `send` API returns the browser response with body
+ownership transferred to its caller; `bytes` and `response` retain abort ownership
+through complete body consumption.
+
+Streaming uploads use the configured `stream_buffer_size`; the default is 1 MiB.
+Request streaming requires browser support and a compatible server transport.
+Consumers own upload admission, exact-length validation and buffered fallbacks.
+`reject_redirects` can enforce a signed endpoint boundary without changing the
+default browser redirect behavior for other Hero callers.
+
 ### Service ingress
 
 1. Bind a listener with `tcp` or `grpc-server` when Hero owns listener setup.

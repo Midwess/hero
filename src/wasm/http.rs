@@ -27,6 +27,8 @@ pub struct HttpClient {
     url: Option<String>,
     headers: HashMap<String, String>,
     body: Option<Body>,
+    stream_buffer_size: usize,
+    reject_redirects: bool,
 }
 
 /// Request body formats supported by Hero's browser transports.
@@ -69,6 +71,8 @@ impl HttpClient {
             url: None,
             headers: HashMap::new(),
             body: None,
+            stream_buffer_size: 1024 * 1024,
+            reject_redirects: false,
         }
     }
 
@@ -81,6 +85,15 @@ impl HttpClient {
     /// Sets the absolute or browser-resolvable request URL.
     pub fn url(mut self, url: &str) -> Self {
         self.url = Some(url.to_string());
+        self
+    }
+
+    /// Makes Fetch fail on redirects, preserving the signed endpoint boundary.
+    ///
+    /// The default follows the browser's redirect behavior. This option applies
+    /// to Fetch; XMLHttpRequest does not expose a redirect policy.
+    pub fn reject_redirects(mut self) -> Self {
+        self.reject_redirects = true;
         self
     }
 
@@ -144,6 +157,15 @@ impl HttpClient {
         }
 
         self.body = Some(Body::AsyncReader(Box::new(value)));
+        Ok(self)
+    }
+
+    /// Bounds the Rust reader buffer used by a streaming Fetch upload.
+    ///
+    /// Zero is rejected; this does not bound buffering inside the browser.
+    pub fn stream_buffer_size(mut self, bytes: usize) -> Result<Self, anyhow::Error> {
+        anyhow::ensure!(bytes > 0, "stream buffer size must be positive");
+        self.stream_buffer_size = bytes;
         Ok(self)
     }
 
@@ -240,10 +262,13 @@ impl HttpClient {
     pub fn fetch(self) -> Result<FetchRequest, JsValue> {
         let url = self.url.ok_or_else(|| JsValue::from_str("URL must be set before fetch()"))?;
 
-        let abort_controller = AbortController::new().ok();
+        let abort_controller = Some(AbortController::new()?);
 
         let opts = RequestInit::new();
         opts.set_method(&self.method);
+        if self.reject_redirects {
+            opts.set_redirect(web_sys::RequestRedirect::Error);
+        }
 
         if let Some(ref controller) = abort_controller {
             opts.set_signal(Some(&controller.signal()))
@@ -272,7 +297,7 @@ impl HttpClient {
                     opts.set_body(&u8a);
                 }
                 Body::AsyncReader(reader) => {
-                    let readable_stream = ReadableStream::from_async_read(reader, 1024 * 1024);
+                    let readable_stream = ReadableStream::from_async_read(reader, self.stream_buffer_size);
                     let init_obj: &Object = opts.as_ref();
                     Reflect::set(init_obj, &JsValue::from_str("duplex"), &JsValue::from_str("half"))?;
                     opts.set_body(readable_stream.as_raw());
@@ -347,60 +372,115 @@ impl Drop for XmlHttpRequest {
     }
 }
 
-impl FetchRequest {
-    /// Sends the request and returns the browser response without status checks.
-    pub async fn send(self) -> Result<Response, JsValue> {
-        let window = web_sys::window().ok_or_else(|| JsValue::from_str("No global window"))?;
-        let resp_js = JsFuture::from(window.fetch_with_request(&self.request)).await?;
-        resp_js.dyn_into().map_err(|_| JsValue::from_str("Failed to convert to Response"))
-    }
+type ResponseChunks = std::pin::Pin<Box<dyn futures::Stream<Item = Result<JsValue, JsValue>>>>;
 
-    /// Sends the request and buffers the complete response body as bytes.
+/// Fetch response that owns its abort controller until body consumption finishes.
+///
+/// Status and headers are available before the first body read. Each read pulls
+/// one browser chunk; no response pump or complete-body allocation is created.
+/// Dropping the response aborts outstanding network and body work.
+pub struct StreamingResponse {
+    request: FetchRequest,
+    response: Response,
+    body: Option<ResponseChunks>,
+}
+
+impl StreamingResponse {
+    /// Returns a worker-local callback that aborts outstanding Fetch and body work.
     ///
-    /// The status code is returned to the caller rather than interpreted.
-    pub async fn bytes(self) -> Result<(u16, HashMap<String, String>, Vec<u8>), JsValue> {
-        let window = web_sys::window().ok_or_else(|| JsValue::from_str("No global window"))?;
-        let resp_js = JsFuture::from(window.fetch_with_request(&self.request)).await?;
-        let resp: Response = resp_js.dyn_into().map_err(|_| JsValue::from_str("Failed to convert to Response"))?;
-
-        let status = resp.status();
-        let headers_map = parse_headers(resp.headers())?;
-
-        let array_buffer_promise = resp.array_buffer()?;
-        let array_buffer_js = JsFuture::from(array_buffer_promise).await?;
-        let array_buffer: js_sys::ArrayBuffer =
-            array_buffer_js.dyn_into().map_err(|_| JsValue::from_str("Failed to convert to ArrayBuffer"))?;
-        let bytes = Uint8Array::new(&array_buffer).to_vec();
-
-        Ok((status, headers_map, bytes))
-    }
-
-    /// Sends the request and decodes a successful response as JavaScript JSON.
-    ///
-    /// Non-2xx statuses are errors. If the body is empty or invalid JSON, the
-    /// returned body is `JsValue::NULL` while response headers remain available.
-    pub async fn response(self) -> Result<(HashMap<String, String>, JsValue), JsValue> {
-        let window = web_sys::window().ok_or_else(|| JsValue::from_str("No global window"))?;
-        let resp_js = JsFuture::from(window.fetch_with_request(&self.request)).await?;
-        let resp: Response = resp_js.dyn_into().map_err(|_| JsValue::from_str("Failed to convert to Response"))?;
-
-        // Check status code
-        let status = resp.status();
-        if !(200..300).contains(&status) {
-            return Err(JsValue::from_str(&format!("HTTP error: status {}", status)));
+    /// The callback can be attached to a cancellation observer without moving the
+    /// response or polling its body. Calling it after EOF has no network effect.
+    pub fn abort_handle(&self) -> impl FnOnce() + use<> {
+        let controller = self.request._abort_controller.clone();
+        move || {
+            if let Some(controller) = controller {
+                controller.abort();
+            }
         }
+    }
 
-        let headers_map = parse_headers(resp.headers())?;
+    /// Returns the HTTP status, including unsuccessful HTTP responses.
+    pub fn status(&self) -> u16 {
+        self.response.status()
+    }
 
-        let Ok(json_promise) = resp.json().map(JsFuture::from) else {
-            return Ok((headers_map, JsValue::NULL));
+    /// Reads browser-visible headers without consuming the body.
+    pub fn headers(&self) -> Result<HashMap<String, String>, JsValue> {
+        parse_headers(self.response.headers())
+    }
+
+    /// Pulls one chunk, copying its browser buffer into owned Rust memory.
+    ///
+    /// A transport failure is returned unchanged. At EOF the abort controller
+    /// is released without aborting the completed request.
+    pub async fn next_chunk(&mut self) -> Result<Option<bytes::Bytes>, JsValue> {
+        let Some(body) = self.body.as_mut() else {
+            return Ok(None);
         };
+        match body.next().await {
+            Some(Ok(chunk)) => Ok(Some(Uint8Array::new(&chunk).to_vec().into())),
+            Some(Err(error)) => Err(error),
+            None => {
+                self.body = None;
+                self.request._abort_controller.take();
+                Ok(None)
+            }
+        }
+    }
+}
 
-        let Ok(json_js) = json_promise.await else {
-            return Ok((headers_map, JsValue::NULL));
+impl FetchRequest {
+    async fn fetch_response(&self) -> Result<Response, JsValue> {
+        let global = js_sys::global();
+        let fetch: js_sys::Function = Reflect::get(&global, &JsValue::from_str("fetch"))?.dyn_into()?;
+        let promise: js_sys::Promise = fetch.call1(&global, &self.request)?.dyn_into()?;
+        JsFuture::from(promise).await?.dyn_into()
+    }
+
+    /// Sends from the current window or worker and retains body cancellation.
+    pub async fn send_streaming(self) -> Result<StreamingResponse, JsValue> {
+        let response = self.fetch_response().await?;
+        let body = response.body().map(|raw| Box::pin(ReadableStream::from_raw(raw).into_stream()) as ResponseChunks);
+        Ok(StreamingResponse {
+            request: self,
+            response,
+            body,
+        })
+    }
+
+    /// Sends from the current window or worker without status checks.
+    ///
+    /// Ownership of body cancellation passes to the caller's browser response.
+    /// Use `send_streaming` to abort body work when the Rust owner is dropped.
+    pub async fn send(mut self) -> Result<Response, JsValue> {
+        let response = self.fetch_response().await?;
+        self._abort_controller.take();
+        Ok(response)
+    }
+
+    /// Sends and buffers the complete body while retaining abort ownership.
+    pub async fn bytes(self) -> Result<(u16, HashMap<String, String>, Vec<u8>), JsValue> {
+        let response = self.fetch_response().await?;
+        let status = response.status();
+        let headers = parse_headers(response.headers())?;
+        let buffer = JsFuture::from(response.array_buffer()?).await?;
+        Ok((status, headers, Uint8Array::new(&buffer).to_vec()))
+    }
+
+    /// Decodes successful JSON; an empty or invalid JSON body becomes `NULL`.
+    ///
+    /// Non-2xx responses are errors. Cancellation ownership lasts through parsing.
+    pub async fn response(self) -> Result<(HashMap<String, String>, JsValue), JsValue> {
+        let response = self.fetch_response().await?;
+        if !(200..300).contains(&response.status()) {
+            return Err(JsValue::from_str(&format!("HTTP error: status {}", response.status())));
+        }
+        let headers = parse_headers(response.headers())?;
+        let body = match response.json() {
+            Ok(promise) => JsFuture::from(promise).await.unwrap_or(JsValue::NULL),
+            Err(_) => JsValue::NULL,
         };
-
-        Ok((headers_map, json_js))
+        Ok((headers, body))
     }
 }
 

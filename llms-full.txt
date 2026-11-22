@@ -142,7 +142,7 @@ buildable by feature on supported native and WASM targets.
 
 [package]
 name = "midwess-hero"
-version = "1.1.0"
+version = "1.2.0"
 edition = "2021"
 description = "Opt-in cross-platform runtime and service integration utilities"
 repository = "https://github.com/Midwess/hero"
@@ -190,7 +190,7 @@ grpc-server = ["tcp", "dep:tonic"]
 throttle-future = ["dep:futures-util", "dep:n0-future"]
 time = ["dep:js-sys", "dep:web-sys", "web-sys/Performance", "web-sys/Window"]
 token = ["dep:chrono", "dep:jsonwebtoken", "dep:serde", "dep:thiserror"]
-wasm = ["dep:anyhow", "dep:bytes", "dep:futures", "dep:futures-util", "dep:js-sys", "dep:serde", "dep:serde_json", "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:wasm-streams", "dep:web-sys", "web-sys/AbortController", "web-sys/AbortSignal", "web-sys/Blob", "web-sys/Event", "web-sys/EventTarget", "web-sys/File", "web-sys/FileSystemReadWriteOptions", "web-sys/FileSystemSyncAccessHandle", "web-sys/Headers", "web-sys/ProgressEvent", "web-sys/Request", "web-sys/RequestInit", "web-sys/Response", "web-sys/Window", "web-sys/XmlHttpRequest", "web-sys/XmlHttpRequestUpload"]
+wasm = ["dep:anyhow", "dep:bytes", "dep:futures", "dep:futures-util", "dep:js-sys", "dep:serde", "dep:serde_json", "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:wasm-streams", "dep:web-sys", "web-sys/AbortController", "web-sys/AbortSignal", "web-sys/Blob", "web-sys/Event", "web-sys/EventTarget", "web-sys/File", "web-sys/FileSystemReadWriteOptions", "web-sys/FileSystemSyncAccessHandle", "web-sys/Headers", "web-sys/ProgressEvent", "web-sys/Request", "web-sys/RequestInit", "web-sys/RequestRedirect", "web-sys/Response", "web-sys/ReadableStream", "web-sys/Window", "web-sys/XmlHttpRequest", "web-sys/XmlHttpRequestUpload"]
 yield-container = ["dep:futures-timer", "dep:futures-util", "dep:n0-future", "dep:thiserror"]
 
 [dependencies]
@@ -242,6 +242,9 @@ web-sys = { version = "0.3.80", optional = true }
 reqwest = { version = "0.12.22", default-features = false, features = ["multipart", "rustls-tls"] }
 tokio = { version = "1.46.1", default-features = false, features = ["macros", "rt-multi-thread", "test-util"] }
 
+[target.'cfg(target_family = "wasm")'.dev-dependencies]
+wasm-bindgen-test = "0.3"
+
 ---
 
 # Source: hero.features.json
@@ -252,7 +255,7 @@ tokio = { version = "1.46.1", default-features = false, features = ["macros", "r
   "crate": {
     "name": "midwess-hero",
     "lib_name": "hero",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "default_features": [],
     "cargo_manifest": "Cargo.toml"
   },
@@ -539,7 +542,7 @@ tokio = { version = "1.46.1", default-features = false, features = ["macros", "r
       "implies": [],
       "summary": "Use browser HTTP, byte/file, and OPFS helpers.",
       "enable_when": ["A browser client needs Hero's Fetch/XHR, byte conversion, file metadata, or OPFS helpers."],
-      "primary_apis": ["hero::wasm::HttpClient", "hero::wasm::FetchRequest", "hero::wasm::XmlHttpRequest", "hero::wasm::extensions::VecExtension", "hero::wasm::opfs::SyncAccessHandleWriter"],
+      "primary_apis": ["hero::wasm::HttpClient", "hero::wasm::FetchRequest", "hero::wasm::StreamingResponse", "hero::wasm::XmlHttpRequest", "hero::wasm::extensions::VecExtension", "hero::wasm::opfs::SyncAccessHandleWriter"],
       "environment": [],
       "docs": "docs/features/wasm.md"
     },
@@ -653,6 +656,24 @@ The `s3` feature can issue exact-key presigned POST policies with storage-enforc
 size bounds and expiration. Applications own resource rules, ownership checks,
 byte validation, publication, and cleanup. See [direct POST uploads](s3-post.md)
 for the browser contract and local storage verification.
+
+### Browser HTTP
+
+The `wasm` feature builds Fetch requests against the current global object,
+including dedicated workers. Browser values stay on that worker. `send_streaming`
+returns an owned `StreamingResponse`: status and headers precede consumption,
+each `next_chunk` pulls one browser chunk, and dropping the response aborts the
+request. `abort_handle` lets a worker-local cancellation observer stop an idle
+response. Consumers attach their own cancellation/deadline policy to sending
+and reading. The compatible `send` API returns the browser response with body
+ownership transferred to its caller; `bytes` and `response` retain abort ownership
+through complete body consumption.
+
+Streaming uploads use the configured `stream_buffer_size`; the default is 1 MiB.
+Request streaming requires browser support and a compatible server transport.
+Consumers own upload admission, exact-length validation and buffered fallbacks.
+`reject_redirects` can enforce a signed endpoint boundary without changing the
+default browser redirect behavior for other Hero callers.
 
 ### Service ingress
 
@@ -2413,6 +2434,7 @@ hero = {
 
 - `hero::wasm::HttpClient`
 - `hero::wasm::FetchRequest`
+- `hero::wasm::StreamingResponse`
 - `hero::wasm::XmlHttpRequest`
 - `hero::wasm::extensions::VecExtension`
 - `hero::wasm::opfs::SyncAccessHandleWriter`
