@@ -35,6 +35,7 @@ hero = {
 
 - `hero::wasm::HttpClient`
 - `hero::wasm::FetchRequest`
+- `hero::wasm::StreamingResponse`
 - `hero::wasm::XmlHttpRequest`
 - `hero::wasm::extensions::VecExtension`
 - `hero::wasm::opfs::SyncAccessHandleWriter`

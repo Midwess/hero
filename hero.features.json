@@ -4,7 +4,7 @@
   "crate": {
     "name": "midwess-hero",
     "lib_name": "hero",
-    "version": "1.1.1",
+    "version": "1.2.0",
     "default_features": [],
     "cargo_manifest": "Cargo.toml"
   },
@@ -291,7 +291,7 @@
       "implies": [],
       "summary": "Use browser HTTP, byte/file, and OPFS helpers.",
       "enable_when": ["A browser client needs Hero's Fetch/XHR, byte conversion, file metadata, or OPFS helpers."],
-      "primary_apis": ["hero::wasm::HttpClient", "hero::wasm::FetchRequest", "hero::wasm::XmlHttpRequest", "hero::wasm::extensions::VecExtension", "hero::wasm::opfs::SyncAccessHandleWriter"],
+      "primary_apis": ["hero::wasm::HttpClient", "hero::wasm::FetchRequest", "hero::wasm::StreamingResponse", "hero::wasm::XmlHttpRequest", "hero::wasm::extensions::VecExtension", "hero::wasm::opfs::SyncAccessHandleWriter"],
       "environment": [],
       "docs": "docs/features/wasm.md"
     },
