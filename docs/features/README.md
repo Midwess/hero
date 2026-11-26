@@ -14,7 +14,7 @@ the consuming project.
 | [`finally`](finally.md) | `hero::finally` | Native and `wasm32-unknown-unknown` | Run collected asynchronous cleanup work when an owner drops. |
 | [`grpc-gateway`](grpc-gateway.md) | `hero::grpc_gateway` | Native | Reuse a tonic channel through the configured gateway. |
 | [`grpc-server`](grpc-server.md) | `hero::tcp::listener` | Native | Add tonic incoming-listener support to Hero's TCP pattern. |
-| [`logger`](logger.md) | `hero::logger` | Native and `wasm32-unknown-unknown` | Apply Midwess logging defaults and throttled logging. |
+| [`logger`](logger.md) | `hero::logger` | Native and `wasm32-unknown-unknown` | Emit structured logfmt records with Midwess logging defaults. |
 | [`maybe`](maybe.md) | `hero::maybe` | Native and `wasm32-unknown-unknown` | Express target-dependent sendability in generic APIs. |
 | [`never-send`](never-send.md) | `hero::never_send` | Native and `wasm32-unknown-unknown` | Mark a value as intentionally local without faking auto-traits. |
 | [`number`](number.md) | `hero::number` | Native and `wasm32-unknown-unknown` | Compute time-based exponential integer growth. |

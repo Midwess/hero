@@ -4,7 +4,7 @@
   "crate": {
     "name": "midwess-hero",
     "lib_name": "hero",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "default_features": [],
     "cargo_manifest": "Cargo.toml"
   },
@@ -113,9 +113,9 @@
       "api_root": "hero::logger",
       "targets": ["native", "wasm32-unknown-unknown"],
       "implies": [],
-      "summary": "Apply Midwess logging defaults and throttled logging.",
+      "summary": "Emit structured logfmt records with Midwess logging defaults.",
       "enable_when": ["A process uses the shared logging setup.", "Repeated log messages should be aggregated."],
-      "primary_apis": ["hero::logger::setup", "hero::logger::ThrottleLogger"],
+      "primary_apis": ["hero::logger::setup", "hero::logger::setup_with_context", "hero::logger::ThrottleLogger"],
       "environment": ["RUST_LOG", "FILE_LOG", "FILE_LOG_PATH", "SANDBOX_ID"],
       "docs": "docs/features/logger.md"
     },

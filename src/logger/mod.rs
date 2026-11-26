@@ -1,9 +1,12 @@
-//! Logging defaults for native processes and browser applications.
+//! Structured logfmt output for native processes and browser applications.
 //!
 //! Native setup honors `RUST_LOG`. Setting `FILE_LOG` enables an uncolored tee
 //! to `FILE_LOG_PATH`, or to `logs/sandbox-<SANDBOX_ID>.log` when no path is
 //! supplied. Browser setup writes informational records to the console and can
 //! be toggled through the global `__midwess_log` value.
+
+mod logfmt;
+pub use logfmt::Logfmt;
 
 use futures_util::lock::Mutex;
 use log::info;
@@ -15,7 +18,7 @@ use std::time::Duration;
 
 /// Installs Hero's process logger if another logger has not already won.
 ///
-/// Repeated calls are harmless. Native builds suppress known noisy targets and
+/// Repeated calls are harmless. Native defaults suppress known noisy targets and
 /// browser builds also install the panic hook.
 pub fn setup() {
     #[cfg(target_arch = "wasm32")]
@@ -46,7 +49,11 @@ pub fn setup() {
             fn log(&self, record: &Record) {
                 if self.enabled(record.metadata()) {
                     let now = js_sys::Date::new_0().to_iso_string();
-                    web_sys::console::log_1(&format!("[{}] {} - {}", now, record.level(), record.args()).into());
+                    let mut line = Vec::new();
+                    if logfmt::write_record(&mut line, String::from(now), record, |_| Ok(())).is_ok() {
+                        let line = String::from_utf8_lossy(&line);
+                        web_sys::console::log_1(&line.trim_end_matches('\n').into());
+                    }
                 }
             }
 
@@ -61,38 +68,50 @@ pub fn setup() {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    {
-        use pretty_env_logger::formatted_timed_builder;
-        let mut log_builder = formatted_timed_builder();
+    setup_native("info", |_| Ok(()), true);
+}
 
-        let file_log = std::env::var("FILE_LOG").ok().filter(|v| !v.is_empty());
-        if let Ok(filter_env) = std::env::var("RUST_LOG") {
-            log_builder.parse_filters(&filter_env);
-        } else if let Some(level) = file_log.as_deref() {
-            log_builder.parse_filters(level);
-        } else {
-            log_builder.filter(None, log::LevelFilter::Info);
+/// Installs the native logfmt logger with an application-specific fallback filter and context.
+///
+/// `RUST_LOG` overrides the fallback. The context callback runs only for records
+/// that pass the filter and can attach fixed fields or task-local identifiers.
+/// Existing process loggers keep ownership. File tee output uses the same format.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn setup_with_context(
+    default_filter: &str,
+    context: impl Fn(&mut Logfmt<'_>) -> std::io::Result<()> + Send + Sync + 'static,
+) {
+    setup_native(default_filter, context, false);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn setup_native(
+    default_filter: &str,
+    context: impl Fn(&mut Logfmt<'_>) -> std::io::Result<()> + Send + Sync + 'static,
+    midwess_filters: bool,
+) {
+    let mut builder = env_logger::Builder::new();
+    let file_log = std::env::var("FILE_LOG").ok().filter(|v| !v.is_empty());
+    let filter_env = std::env::var("RUST_LOG").ok();
+    builder.parse_filters(filter_env.as_deref().or(file_log.as_deref()).unwrap_or(default_filter));
+    if midwess_filters {
+        for target in ["rig::completions", "rig::agent_chat", "sqlx::query"] {
+            builder.filter_module(target, log::LevelFilter::Off);
         }
-        // Suppress noisy third-party log targets
-        log_builder.filter_module("rig::completions", log::LevelFilter::Off);
-        log_builder.filter_module("rig::agent_chat", log::LevelFilter::Off);
-        log_builder.filter_module("sqlx::query", log::LevelFilter::Off);
-        // Keep exact provider payload tracing available without a separate feature flag.
-        log_builder.filter_module("llm::request", log::LevelFilter::Debug);
-        log_builder.filter_module("llm::raw_request", log::LevelFilter::Debug);
-        log_builder.filter_module("llm::raw_response", log::LevelFilter::Debug);
-
-        // FILE_LOG=<level> tees the (uncolored) stream to a file at FILE_LOG_PATH
-        // (default: <binary>.log in the cwd) so live runs have a grep-able log.
-        if file_log.is_some() {
-            if let Some(target) = file_log_target() {
-                log_builder.target(target);
-                log_builder.write_style(env_logger::WriteStyle::Never);
-            }
+        for target in ["llm::request", "llm::raw_request", "llm::raw_response"] {
+            builder.filter_module(target, log::LevelFilter::Debug);
         }
-
-        let _ = log_builder.try_init();
     }
+    builder.format(move |buffer, record| {
+        let timestamp = buffer.timestamp_millis();
+        logfmt::write_record(buffer, timestamp, record, &context)
+    });
+
+    if file_log.is_some() {
+        builder.target(file_log_target().unwrap_or(env_logger::Target::Stderr));
+    }
+
+    let _ = builder.try_init();
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -172,7 +191,7 @@ impl ThrottleLogger {
                 for (content, count) in msgs.drain() {
                     info!(
                         target: ns.as_str(),
-                        "{content} happens {count} times in the last {delay:?}"
+                        event = "log.aggregate", count = count, window_ms = delay.as_millis(); "{content}"
                     );
                 }
             }

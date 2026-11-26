@@ -1,6 +1,6 @@
 [package]
 name = "midwess-hero"
-version = "1.4.0"
+version = "1.5.0"
 edition = "2021"
 description = "Opt-in cross-platform runtime and service integration utilities"
 repository = "https://github.com/Midwess/hero"
@@ -31,7 +31,7 @@ distributed-id-etcd = ["distributed-id", "dep:etcd-client", "dep:log", "dep:n0-f
 env = []
 finally = ["dep:futures-util", "dep:n0-future"]
 grpc-gateway = ["config", "dep:tokio", "dep:tonic"]
-logger = ["dep:console_error_panic_hook", "dep:env_logger", "dep:futures-util", "dep:js-sys", "dep:log", "dep:n0-future", "dep:pretty_env_logger", "dep:wasm-bindgen", "dep:web-sys", "web-sys/console"]
+logger = ["dep:console_error_panic_hook", "dep:env_logger", "dep:futures-util", "dep:js-sys", "dep:log", "dep:n0-future", "log/kv", "dep:wasm-bindgen", "dep:web-sys", "web-sys/console"]
 maybe = []
 never-send = []
 number = ["dep:n0-future"]
@@ -78,7 +78,6 @@ env_logger = { version = "0.10", optional = true }
 etcd-client = { version = "0.17.0", optional = true }
 jsonwebtoken = { version = "10.0.0", features = ["rust_crypto"], optional = true }
 lettre = { version = "0.11.7", default-features = false, features = ["builder", "hostname", "smtp-transport", "tokio1-rustls-tls"], optional = true }
-pretty_env_logger = { version = "0.5.0", optional = true }
 regex = { version = "1.11.1", optional = true }
 reqwest = { version = "0.12.22", default-features = false, features = ["json", "rustls-tls"], optional = true }
 socket2 = { version = "0.6.3", optional = true }

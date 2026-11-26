@@ -142,7 +142,7 @@ buildable by feature on supported native and WASM targets.
 
 [package]
 name = "midwess-hero"
-version = "1.4.0"
+version = "1.5.0"
 edition = "2021"
 description = "Opt-in cross-platform runtime and service integration utilities"
 repository = "https://github.com/Midwess/hero"
@@ -173,7 +173,7 @@ distributed-id-etcd = ["distributed-id", "dep:etcd-client", "dep:log", "dep:n0-f
 env = []
 finally = ["dep:futures-util", "dep:n0-future"]
 grpc-gateway = ["config", "dep:tokio", "dep:tonic"]
-logger = ["dep:console_error_panic_hook", "dep:env_logger", "dep:futures-util", "dep:js-sys", "dep:log", "dep:n0-future", "dep:pretty_env_logger", "dep:wasm-bindgen", "dep:web-sys", "web-sys/console"]
+logger = ["dep:console_error_panic_hook", "dep:env_logger", "dep:futures-util", "dep:js-sys", "dep:log", "dep:n0-future", "log/kv", "dep:wasm-bindgen", "dep:web-sys", "web-sys/console"]
 maybe = []
 never-send = []
 number = ["dep:n0-future"]
@@ -220,7 +220,6 @@ env_logger = { version = "0.10", optional = true }
 etcd-client = { version = "0.17.0", optional = true }
 jsonwebtoken = { version = "10.0.0", features = ["rust_crypto"], optional = true }
 lettre = { version = "0.11.7", default-features = false, features = ["builder", "hostname", "smtp-transport", "tokio1-rustls-tls"], optional = true }
-pretty_env_logger = { version = "0.5.0", optional = true }
 regex = { version = "1.11.1", optional = true }
 reqwest = { version = "0.12.22", default-features = false, features = ["json", "rustls-tls"], optional = true }
 socket2 = { version = "0.6.3", optional = true }
@@ -260,7 +259,7 @@ wasm-bindgen-test = "0.3"
   "crate": {
     "name": "midwess-hero",
     "lib_name": "hero",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "default_features": [],
     "cargo_manifest": "Cargo.toml"
   },
@@ -369,9 +368,9 @@ wasm-bindgen-test = "0.3"
       "api_root": "hero::logger",
       "targets": ["native", "wasm32-unknown-unknown"],
       "implies": [],
-      "summary": "Apply Midwess logging defaults and throttled logging.",
+      "summary": "Emit structured logfmt records with Midwess logging defaults.",
       "enable_when": ["A process uses the shared logging setup.", "Repeated log messages should be aggregated."],
-      "primary_apis": ["hero::logger::setup", "hero::logger::ThrottleLogger"],
+      "primary_apis": ["hero::logger::setup", "hero::logger::setup_with_context", "hero::logger::ThrottleLogger"],
       "environment": ["RUST_LOG", "FILE_LOG", "FILE_LOG_PATH", "SANDBOX_ID"],
       "docs": "docs/features/logger.md"
     },
@@ -717,6 +716,17 @@ In a tight loop, obtain the scoped token once and call its borrowed
 `is_cancelled` method. Use `is_current_cancelled` when a scope lookup is needed
 for each check and a missing scope should be treated as active work.
 
+
+### Logging
+
+The `logger` feature emits one logfmt record per line. The formatter uses
+`ts`, `level`, `target`, and `msg` for the common record fields.
+Applications can attach typed fields with `log` key-value records. Numeric
+and boolean values remain unquoted, strings are escaped, and absent values
+are omitted. Native applications can use `setup_with_context` for their own
+fallback filter and task-local fields. Native stderr and file tee output use
+the same format as browser console output.
+
 ---
 
 # Source: docs/features/README.md
@@ -737,7 +747,7 @@ the consuming project.
 | [`finally`](finally.md) | `hero::finally` | Native and `wasm32-unknown-unknown` | Run collected asynchronous cleanup work when an owner drops. |
 | [`grpc-gateway`](grpc-gateway.md) | `hero::grpc_gateway` | Native | Reuse a tonic channel through the configured gateway. |
 | [`grpc-server`](grpc-server.md) | `hero::tcp::listener` | Native | Add tonic incoming-listener support to Hero's TCP pattern. |
-| [`logger`](logger.md) | `hero::logger` | Native and `wasm32-unknown-unknown` | Apply Midwess logging defaults and throttled logging. |
+| [`logger`](logger.md) | `hero::logger` | Native and `wasm32-unknown-unknown` | Emit structured logfmt records with Midwess logging defaults. |
 | [`maybe`](maybe.md) | `hero::maybe` | Native and `wasm32-unknown-unknown` | Express target-dependent sendability in generic APIs. |
 | [`never-send`](never-send.md) | `hero::never_send` | Native and `wasm32-unknown-unknown` | Mark a value as intentionally local without faking auto-traits. |
 | [`number`](number.md) | `hero::number` | Native and `wasm32-unknown-unknown` | Compute time-based exponential integer growth. |
@@ -1380,7 +1390,7 @@ catalog_schema: 1
 
 # logger
 
-Apply Midwess logging defaults and throttled logging.
+Emit structured logfmt records with Midwess logging defaults.
 
 ## Enable
 
@@ -1407,6 +1417,7 @@ hero = {
 ## Primary APIs
 
 - `hero::logger::setup`
+- `hero::logger::setup_with_context`
 - `hero::logger::ThrottleLogger`
 
 ## Import Example

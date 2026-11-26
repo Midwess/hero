@@ -8,7 +8,7 @@ catalog_schema: 1
 
 # logger
 
-Apply Midwess logging defaults and throttled logging.
+Emit structured logfmt records with Midwess logging defaults.
 
 ## Enable
 
@@ -35,6 +35,7 @@ hero = {
 ## Primary APIs
 
 - `hero::logger::setup`
+- `hero::logger::setup_with_context`
 - `hero::logger::ThrottleLogger`
 
 ## Import Example

@@ -98,3 +98,13 @@ In a tight loop, obtain the scoped token once and call its borrowed
 `is_cancelled` method. Use `is_current_cancelled` when a scope lookup is needed
 for each check and a missing scope should be treated as active work.
 
+
+### Logging
+
+The `logger` feature emits one logfmt record per line. The formatter uses
+`ts`, `level`, `target`, and `msg` for the common record fields.
+Applications can attach typed fields with `log` key-value records. Numeric
+and boolean values remain unquoted, strings are escaped, and absent values
+are omitted. Native applications can use `setup_with_context` for their own
+fallback filter and task-local fields. Native stderr and file tee output use
+the same format as browser console output.
