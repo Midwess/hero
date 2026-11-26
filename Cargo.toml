@@ -1,6 +1,6 @@
 [package]
 name = "midwess-hero"
-version = "1.5.0"
+version = "1.5.1"
 edition = "2021"
 description = "Opt-in cross-platform runtime and service integration utilities"
 repository = "https://github.com/Midwess/hero"

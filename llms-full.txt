@@ -142,7 +142,7 @@ buildable by feature on supported native and WASM targets.
 
 [package]
 name = "midwess-hero"
-version = "1.5.0"
+version = "1.5.1"
 edition = "2021"
 description = "Opt-in cross-platform runtime and service integration utilities"
 repository = "https://github.com/Midwess/hero"
@@ -259,7 +259,7 @@ wasm-bindgen-test = "0.3"
   "crate": {
     "name": "midwess-hero",
     "lib_name": "hero",
-    "version": "1.5.0",
+    "version": "1.5.1",
     "default_features": [],
     "cargo_manifest": "Cargo.toml"
   },
@@ -371,7 +371,7 @@ wasm-bindgen-test = "0.3"
       "summary": "Emit structured logfmt records with Midwess logging defaults.",
       "enable_when": ["A process uses the shared logging setup.", "Repeated log messages should be aggregated."],
       "primary_apis": ["hero::logger::setup", "hero::logger::setup_with_context", "hero::logger::ThrottleLogger"],
-      "environment": ["RUST_LOG", "FILE_LOG", "FILE_LOG_PATH", "SANDBOX_ID"],
+      "environment": ["RUST_LOG", "RUST_LOG_STYLE", "FILE_LOG", "FILE_LOG_PATH", "SANDBOX_ID"],
       "docs": "docs/features/logger.md"
     },
     {
@@ -724,8 +724,9 @@ The `logger` feature emits one logfmt record per line. The formatter uses
 Applications can attach typed fields with `log` key-value records. Numeric
 and boolean values remain unquoted, strings are escaped, and absent values
 are omitted. Native applications can use `setup_with_context` for their own
-fallback filter and task-local fields. Native stderr and file tee output use
-the same format as browser console output.
+fallback filter and task-local fields. Native stderr colors the severity on
+supported terminals. Use `RUST_LOG_STYLE=never` for plain logfmt or `always`
+to force colors. File tee output stays plain.
 
 ---
 
@@ -1429,6 +1430,7 @@ use hero::logger::setup;
 ## Environment
 
 - `RUST_LOG`
+- `RUST_LOG_STYLE`
 - `FILE_LOG`
 - `FILE_LOG_PATH`
 - `SANDBOX_ID`

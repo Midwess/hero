@@ -47,6 +47,7 @@ use hero::logger::setup;
 ## Environment
 
 - `RUST_LOG`
+- `RUST_LOG_STYLE`
 - `FILE_LOG`
 - `FILE_LOG_PATH`
 - `SANDBOX_ID`

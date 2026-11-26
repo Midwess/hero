@@ -27,19 +27,23 @@ impl Logfmt<'_> {
     }
 }
 
-pub(super) fn write_record(
-    output: &mut dyn Write,
-    timestamp: impl fmt::Display,
-    record: &Record<'_>,
-    context: impl FnOnce(&mut Logfmt<'_>) -> io::Result<()>,
-) -> io::Result<()> {
-    let level = match record.level() {
+pub(super) fn level_name(level: Level) -> &'static str {
+    match level {
         Level::Error => "error",
         Level::Warn => "warn",
         Level::Info => "info",
         Level::Debug => "debug",
         Level::Trace => "trace",
-    };
+    }
+}
+
+pub(super) fn write_record(
+    output: &mut dyn Write,
+    timestamp: impl fmt::Display,
+    level: impl fmt::Display,
+    record: &Record<'_>,
+    context: impl FnOnce(&mut Logfmt<'_>) -> io::Result<()>,
+) -> io::Result<()> {
     write!(
         output,
         "ts={} level={level} target={}",

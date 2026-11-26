@@ -106,5 +106,6 @@ The `logger` feature emits one logfmt record per line. The formatter uses
 Applications can attach typed fields with `log` key-value records. Numeric
 and boolean values remain unquoted, strings are escaped, and absent values
 are omitted. Native applications can use `setup_with_context` for their own
-fallback filter and task-local fields. Native stderr and file tee output use
-the same format as browser console output.
+fallback filter and task-local fields. Native stderr colors the severity on
+supported terminals. Use `RUST_LOG_STYLE=never` for plain logfmt or `always`
+to force colors. File tee output stays plain.

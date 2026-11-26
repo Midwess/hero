@@ -1,6 +1,7 @@
 //! Structured logfmt output for native processes and browser applications.
 //!
-//! Native setup honors `RUST_LOG`. Setting `FILE_LOG` enables an uncolored tee
+//! Native setup honors `RUST_LOG` and `RUST_LOG_STYLE`. Severity is colored
+//! on supported terminals by default. Setting `FILE_LOG` enables an uncolored tee
 //! to `FILE_LOG_PATH`, or to `logs/sandbox-<SANDBOX_ID>.log` when no path is
 //! supplied. Browser setup writes informational records to the console and can
 //! be toggled through the global `__midwess_log` value.
@@ -50,7 +51,15 @@ pub fn setup() {
                 if self.enabled(record.metadata()) {
                     let now = js_sys::Date::new_0().to_iso_string();
                     let mut line = Vec::new();
-                    if logfmt::write_record(&mut line, String::from(now), record, |_| Ok(())).is_ok() {
+                    if logfmt::write_record(
+                        &mut line,
+                        String::from(now),
+                        logfmt::level_name(record.level()),
+                        record,
+                        |_| Ok(()),
+                    )
+                    .is_ok()
+                    {
                         let line = String::from_utf8_lossy(&line);
                         web_sys::console::log_1(&line.trim_end_matches('\n').into());
                     }
@@ -75,7 +84,9 @@ pub fn setup() {
 ///
 /// `RUST_LOG` overrides the fallback. The context callback runs only for records
 /// that pass the filter and can attach fixed fields or task-local identifiers.
-/// Existing process loggers keep ownership. File tee output uses the same format.
+/// Existing process loggers keep ownership. Redirected output is plain by default.
+/// Set `RUST_LOG_STYLE=never` to disable severity colors or `always` to force them.
+/// File tee output stays plain.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn setup_with_context(
     default_filter: &str,
@@ -102,14 +113,20 @@ fn setup_native(
             builder.filter_module(target, log::LevelFilter::Debug);
         }
     }
+    if let Ok(style) = std::env::var("RUST_LOG_STYLE") {
+        builder.parse_write_style(&style);
+    }
+    if file_log.is_some() {
+        if let Some(target) = file_log_target() {
+            builder.target(target).write_style(env_logger::WriteStyle::Never);
+        }
+    }
     builder.format(move |buffer, record| {
         let timestamp = buffer.timestamp_millis();
-        logfmt::write_record(buffer, timestamp, record, &context)
+        let style = buffer.default_level_style(record.level());
+        let level = style.value(logfmt::level_name(record.level()));
+        logfmt::write_record(buffer, timestamp, level, record, &context)
     });
-
-    if file_log.is_some() {
-        builder.target(file_log_target().unwrap_or(env_logger::Target::Stderr));
-    }
 
     let _ = builder.try_init();
 }
