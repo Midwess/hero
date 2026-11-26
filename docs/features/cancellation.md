@@ -35,6 +35,8 @@ hero = {
 ## Primary APIs
 
 - `hero::cancellation::CancellationToken`
+- `hero::cancellation::CancellationToken::is_current_cancelled`
+- `hero::cancellation::CancellationToken::child_timeout`
 - `hero::cancellation::FutureExtension`
 - `hero::cancellation::DropGuard`
 

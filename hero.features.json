@@ -4,7 +4,7 @@
   "crate": {
     "name": "midwess-hero",
     "lib_name": "hero",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "default_features": [],
     "cargo_manifest": "Cargo.toml"
   },
@@ -27,7 +27,7 @@
       "implies": [],
       "summary": "Propagate structured, scoped cancellation through async work.",
       "enable_when": ["Async work needs parent-child cancellation.", "A future needs timeout or cancel-on-drop behavior."],
-      "primary_apis": ["hero::cancellation::CancellationToken", "hero::cancellation::FutureExtension", "hero::cancellation::DropGuard"],
+      "primary_apis": ["hero::cancellation::CancellationToken", "hero::cancellation::CancellationToken::is_current_cancelled", "hero::cancellation::CancellationToken::child_timeout", "hero::cancellation::FutureExtension", "hero::cancellation::DropGuard"],
       "environment": [],
       "docs": "docs/features/cancellation.md"
     },

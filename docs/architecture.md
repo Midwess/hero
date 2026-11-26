@@ -92,3 +92,9 @@ watermark.
 Compose `cancellation`, `task`, `retry`, `finally`, and `yield-container`
 according to the ownership and shutdown behavior required by the component.
 
+Use `child_timeout` for operation deadlines that end with their owner. Use
+`cancel_after` when the timer must run independently of the scheduling handle.
+In a tight loop, obtain the scoped token once and call its borrowed
+`is_cancelled` method. Use `is_current_cancelled` when a scope lookup is needed
+for each check and a missing scope should be treated as active work.
+
