@@ -35,6 +35,7 @@ hero = {
 ## Primary APIs
 
 - `hero::distributed_id::init_scoped_id_generator`
+- `hero::distributed_id::allow_ahead_of_time`
 - `hero::distributed_id::try_gen_id`
 - `hero::distributed_id::id_to_datetime`
 - `hero::distributed_id::generate_phone_number`

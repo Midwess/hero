@@ -79,6 +79,14 @@ default browser redirect behavior for other Hero callers.
 2. Use `distributed-id-etcd` when worker IDs require fleet coordination.
 3. Explicitly shut down etcd-backed generation to revoke the lease.
 
+Configure scoped generators with `allow_ahead_of_time(milliseconds)` before
+initialization. The default is zero. Positive values allow bursts to use future
+sequence slots, so decoded timestamps can lead wall time by the configured
+amount. If a scoped worker ID is reused, the next owner must start after the
+last timestamp the previous owner could have issued. The etcd allocator
+requires zero lead because it can reassign worker IDs without a timestamp
+watermark.
+
 ### Owned asynchronous work
 
 Compose `cancellation`, `task`, `retry`, `finally`, and `yield-container`

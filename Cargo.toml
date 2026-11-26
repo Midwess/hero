@@ -1,6 +1,6 @@
 [package]
 name = "midwess-hero"
-version = "1.2.0"
+version = "1.3.0"
 edition = "2021"
 description = "Opt-in cross-platform runtime and service integration utilities"
 repository = "https://github.com/Midwess/hero"
@@ -26,8 +26,8 @@ default = []
 api-gateway = ["dep:async-trait", "dep:log", "dep:regex", "dep:reqwest", "dep:serde", "dep:serde_json", "dep:thiserror"]
 cancellation = ["dep:event-listener", "dep:futures", "dep:futures-timer", "dep:futures-util", "dep:n0-future", "dep:parking_lot", "dep:serde", "dep:thiserror", "dep:tokio"]
 config = []
-distributed-id = ["dep:chrono", "dep:futures-timer", "dep:n0-future", "dep:rand", "dep:thiserror", "dep:tokio", "dep:getrandom"]
-distributed-id-etcd = ["distributed-id", "dep:etcd-client", "dep:log", "dep:n0-future", "dep:serde_json", "tokio/time"]
+distributed-id = ["dep:chrono", "dep:futures-timer", "dep:rand", "dep:thiserror", "dep:getrandom"]
+distributed-id-etcd = ["distributed-id", "dep:etcd-client", "dep:log", "dep:n0-future", "dep:serde_json", "dep:tokio", "tokio/time"]
 env = []
 finally = ["dep:futures-util", "dep:n0-future"]
 grpc-gateway = ["config", "dep:tokio", "dep:tonic"]

@@ -7,8 +7,8 @@ use thiserror::Error;
 
 /// Unix timestamp in milliseconds used as the ID format's custom epoch.
 ///
-/// The value represents `2024-12-29T00:00:00Z`.
-pub const EPOCH_SINCE: u64 = 1735405200000; // 2024-12-29T00:00:00Z
+/// The value represents `2024-12-28T17:00:00Z`.
+pub const EPOCH_SINCE: u64 = 1735405200000;
 
 /// Number of sequence values available to one worker per millisecond.
 pub const MAX_ID_IN_MS: u64 = 1024;
@@ -25,8 +25,8 @@ pub enum DistributedIdError {
     /// The process-global generator or lease guard was initialized twice.
     #[error("distributed ID generator is already initialized")]
     AlreadyInitialized,
-    /// Coordinator settings cannot produce a valid etcd lease.
-    #[error("Invalid coordinator configuration: {0}")]
+    /// The supplied settings cannot be used by this generator.
+    #[error("Invalid distributed ID configuration: {0}")]
     InvalidConfig(String),
     /// An etcd operation failed.
     #[error("Coordinator error: {0}")]
@@ -34,8 +34,8 @@ pub enum DistributedIdError {
     /// Every representable worker ID is already reserved.
     #[error("Worker id space exhausted in namespace {0}")]
     WorkerIdsExhausted(String),
-    /// An ID encoded a timestamp that `chrono` cannot represent.
-    #[error("invalid timestamp encoded in distributed ID {0}")]
+    /// A timestamp cannot be encoded in a new ID or decoded from an existing ID.
+    #[error("invalid distributed ID timestamp for value {0}")]
     InvalidTimestamp(u64),
     /// The system clock is earlier than Hero's custom epoch.
     #[error("system clock is before the distributed ID epoch")]
